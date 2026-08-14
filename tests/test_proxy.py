@@ -172,3 +172,20 @@ def test_concurrent_calls_get_unique_sequence_numbers(tmp_path: Path):
     assert len(proxy.records) == 8
     assert sorted(seqs) == list(range(1, 9)), f"duplicate seq: {sorted(seqs)}"
     assert len(list(tmp_path.glob("*.json"))) == 8
+
+
+def test_proxy_keeps_the_last_response_body_in_memory(tmp_path: Path):
+    """Scoring needs what the model answered, and with --no-capture-bodies
+    nothing is written to disk. Like last_request_body this is memory-only and
+    deliberately NOT part of `records`, which get serialised into reports."""
+    with _Upstream() as upstream:
+        proxy = RecordingProxy(
+            upstream_base=upstream, out_dir=tmp_path, capture_bodies=False
+        )
+        port = proxy.start()
+        _post(port, "/v1/chat/completions", {"model": "m"})
+        proxy.stop()
+
+    assert proxy.last_response_body is not None
+    assert proxy.last_response_body["usage"]["prompt_tokens"] == 1234
+    assert "responseBody" not in proxy.records[0]

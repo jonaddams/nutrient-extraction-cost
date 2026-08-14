@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -177,10 +178,81 @@ def _document_text(body: dict[str, Any]) -> str:
     return best
 
 
-def _run_sdk_cell(provider: Provider, doc: Doc, proxy: RecordingProxy, port: int) -> str:
+def extracted_values(payload: Any, *, with_nutrient: bool) -> dict[str, Any] | None:
+    """The field values one cell produced, or None if none could be read.
+
+    None and {} are different findings and must never be conflated. An empty
+    dict scores every field as a mismatch, which reports the provider as
+    catastrophically wrong; None records that the harness could not read the
+    answer, which is a statement about the harness.
+
+    The two halves genuinely differ in shape. The SDK returns an envelope with
+    the values under "extraction" beside its own grounding metadata. A direct
+    call returns a JSON string inside a chat completion (choices) or an
+    Anthropic content block, and that string is model output: it may be fenced,
+    prefaced with prose, or not be an object at all.
+    """
+    if payload is None:
+        return None
+
+    if isinstance(payload, str):
+        parsed = _loads_or_none(payload)
+    else:
+        parsed = payload
+
+    if parsed is None:
+        return None
+
+    if with_nutrient:
+        if not isinstance(parsed, dict):
+            return None
+        values = parsed.get("extraction", parsed)
+        return values if isinstance(values, dict) and values else None
+
+    if not isinstance(parsed, dict):
+        return None
+
+    content: Any = None
+    choices = parsed.get("choices")
+    if isinstance(choices, list) and choices:
+        content = ((choices[0] or {}).get("message") or {}).get("content")
+    elif isinstance(parsed.get("content"), list):
+        # Anthropic's /v1/messages dialect: content blocks, not choices.
+        for block in parsed["content"]:
+            if isinstance(block, dict) and block.get("type") == "text":
+                content = block.get("text")
+                break
+
+    if not isinstance(content, str):
+        return None
+    values = _loads_or_none(content)
+    return values if isinstance(values, dict) and values else None
+
+
+def _loads_or_none(text: str) -> Any:
+    """Parse JSON, tolerating a markdown fence around it.
+
+    Models wrap JSON in ```json fences despite being told not to. Tolerating
+    that is not the same as tolerating prose: anything that still will not parse
+    returns None and is recorded as unreadable.
+    """
+    candidate = text.strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```[a-zA-Z]*\s*", "", candidate)
+        candidate = re.sub(r"\s*```$", "", candidate)
+    try:
+        return json.loads(candidate)
+    except (ValueError, TypeError):
+        return None
+
+
+def _run_sdk_cell(
+    provider: Provider, doc: Doc, proxy: RecordingProxy, port: int
+) -> tuple[str, dict[str, Any] | None]:
     """Drive one extraction through the SDK, pointed at the proxy.
 
-    Returns the document text the SDK sent, for the direct half to reuse.
+    Returns the document text the SDK sent (for the direct half to reuse) and
+    the values it extracted (for scoring).
     """
     from nutrient_sdk import Document, StructuredExtractionRequest, Vision
 
@@ -201,14 +273,17 @@ def _run_sdk_cell(provider: Provider, doc: Doc, proxy: RecordingProxy, port: int
         # The SDK takes the schema wrapped; direct_request takes it bare.
         request.schema = json.dumps({"schema": doc.schema})
         request.instructions = ""
-        Vision.set(document).extract_structured(request)
+        raw = Vision.set(document).extract_structured(request)
 
-    return _document_text(proxy.last_request_body or {})
+    return (
+        _document_text(proxy.last_request_body or {}),
+        extracted_values(raw, with_nutrient=True),
+    )
 
 
 def _run_direct_cell(
-    provider: Provider, doc: Doc, port: int, document_text: str
-) -> None:
+    provider: Provider, doc: Doc, port: int, document_text: str, proxy: RecordingProxy
+) -> dict[str, Any] | None:
     """POST the minimal no-Nutrient request through the same proxy."""
     body = direct_request(
         provider, provider.default_model, document_text, doc.schema
@@ -231,6 +306,7 @@ def _run_direct_cell(
         # The proxy already recorded the status. A failed direct call is a
         # measurement outcome, not a reason to abandon the remaining documents.
         pass
+    return extracted_values(proxy.last_response_body, with_nutrient=False)
 
 
 def run(
@@ -275,14 +351,17 @@ def run(
                     proxy.label(label)
                     before = len(proxy.records)
                     note = None
+                    extracted: dict[str, Any] | None = None
                     started = time.perf_counter()
                     try:
                         if cell.with_nutrient:
-                            document_text = _run_sdk_cell(
+                            document_text, extracted = _run_sdk_cell(
                                 provider, doc, proxy, port
                             )
                         elif document_text:
-                            _run_direct_cell(provider, doc, port, document_text)
+                            extracted = _run_direct_cell(
+                                provider, doc, port, document_text, proxy
+                            )
                         else:
                             # No SDK capture for this document, so there is no
                             # controlled document text to send. Extracting our
@@ -301,6 +380,7 @@ def run(
                             "wallMs": round(
                                 (time.perf_counter() - started) * 1000, 1
                             ),
+                            "extracted": extracted,
                             **summary,
                             **({"note": note} if note else {}),
                         }

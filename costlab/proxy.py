@@ -59,6 +59,12 @@ class RecordingProxy:
         # "Last" is only meaningful because the runner drives one call at a time
         # per proxy. Do not read it from concurrent callers.
         self.last_request_body: dict[str, Any] | None = None
+        # The most recent response body, IN MEMORY ONLY, for the same reasons
+        # last_request_body is: scoring needs what the model answered, and
+        # --no-capture-bodies means nothing reaches disk. Not part of `records`,
+        # because records get serialised into reports and an extracted value can
+        # carry document content.
+        self.last_response_body: dict[str, Any] | None = None
         self._label = "unlabelled"
         self._server: http.server.ThreadingHTTPServer | None = None
         # ThreadingHTTPServer handles requests in parallel, so claiming a
@@ -159,6 +165,7 @@ class RecordingProxy:
             record["seq"] = seq
             self.records.append(record)
             self.last_request_body = request_body
+            self.last_response_body = response_body
         if self.capture_bodies:
             (self.out_dir / f"{seq}.json").write_text(
                 json.dumps(

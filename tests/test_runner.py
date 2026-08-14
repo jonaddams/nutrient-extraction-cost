@@ -4,6 +4,7 @@ from costlab.providers import PROVIDERS
 from costlab.runner import (
     Cell,
     _document_text,
+    extracted_values,
     load_corpus,
     plan_cells,
     summarise_attempts,
@@ -198,3 +199,66 @@ def test_the_bundled_corpus_manifest_resolves_every_file():
     entries = _json.loads((corpus / "manifest.json").read_text())["documents"]
     pages = sorted(e["pages"] for e in entries.values())
     assert pages[0] == 1 and pages[-1] >= 40
+
+
+def test_extracted_values_reads_the_sdk_envelope():
+    """The SDK wraps values under "extraction" alongside its own metadata. Only
+    the values are the answer."""
+    raw = json.dumps(
+        {
+            "extraction": {"invoiceNumber": "AC-2025-1047", "totalAmount": 345015},
+            "metadata": {"invoiceNumber": {"match": "id_match", "confidence": 0.98}},
+        }
+    )
+    assert extracted_values(raw, with_nutrient=True) == {
+        "invoiceNumber": "AC-2025-1047",
+        "totalAmount": 345015,
+    }
+
+
+def test_extracted_values_reads_a_direct_chat_completion():
+    body = {
+        "choices": [
+            {"message": {"content": '{"invoiceNumber": "AC-2025-1047"}'}}
+        ]
+    }
+    assert extracted_values(body, with_nutrient=False) == {
+        "invoiceNumber": "AC-2025-1047"
+    }
+
+
+def test_extracted_values_reads_an_anthropic_messages_reply():
+    """Anthropic returns content blocks, not choices. Plan 1 established that
+    this provider speaks a different dialect end to end; it does not stop at the
+    request."""
+    body = {"content": [{"type": "text", "text": '{"invoiceNumber": "AC-2025-1047"}'}]}
+    assert extracted_values(body, with_nutrient=False) == {
+        "invoiceNumber": "AC-2025-1047"
+    }
+
+
+def test_unparseable_content_is_none_not_an_empty_dict():
+    """An empty dict scores every field as a mismatch and reports the provider
+    as catastrophically wrong, when the truth is that we could not read its
+    answer. Those are different findings and must not be conflated."""
+    body = {"choices": [{"message": {"content": "I could not find the fields."}}]}
+    assert extracted_values(body, with_nutrient=False) is None
+    assert extracted_values("not json at all", with_nutrient=True) is None
+    assert extracted_values(None, with_nutrient=False) is None
+
+
+def test_a_json_array_reply_is_none_rather_than_a_field_map():
+    """A local 8B model was measured returning the bare array ["b2"] instead of
+    the requested object. It parses as JSON and is still not an answer."""
+    body = {"choices": [{"message": {"content": '["b2"]'}}]}
+    assert extracted_values(body, with_nutrient=False) is None
+
+
+def test_a_fenced_json_block_still_parses():
+    """Models wrap JSON in markdown fences despite instructions not to."""
+    body = {
+        "choices": [
+            {"message": {"content": '```json\n{"invoiceNumber": "AC-1"}\n```'}}
+        ]
+    }
+    assert extracted_values(body, with_nutrient=False) == {"invoiceNumber": "AC-1"}
