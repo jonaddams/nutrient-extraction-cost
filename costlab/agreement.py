@@ -19,18 +19,34 @@ agreement from a comparison that was never made would be a fabricated claim in
 a prospect-facing artifact, and it would understate disagreement, cutting
 against the very case this tool exists to make.
 
-The comparison TYPE for a row is decided from every value in the row, not from
-whichever provider label happens to sort first alphabetically. Deciding it
-from one arbitrary member means the same two values -- 345015 and
+The comparison TYPE for a row is decided from every PRESENT value in the row,
+not from whichever provider label happens to sort first alphabetically.
+Deciding it from one arbitrary member means the same two values -- 345015 and
 "$345,015.00" -- verify as agreeing or disagreeing depending only on which
 provider's name sorts first, which would make a prospect's own naming of their
 providers change what the report shows for an identical extraction. The rule
-is: "number" only if EVERY value in the row parses unambiguously as a number
-(via compare.py's own _to_number, the same parser compare_field itself uses
-for numeric fields); otherwise "string". That degrades honestly at the edges
--- when only some values parse as numbers, falling back to a text comparison
-is not a guess, it is refusing to fabricate a shared numeric type neither side
-actually offered.
+is: "number" only if EVERY present value in the row parses unambiguously as a
+number (via compare.py's own _to_number, the same parser compare_field itself
+uses for numeric fields); otherwise "string". That degrades honestly at the
+edges -- when only some present values parse as numbers, falling back to a
+text comparison is not a guess, it is refusing to fabricate a shared numeric
+type neither side actually offered.
+
+PRESENT is doing real work in that sentence: absent values are excluded from
+the type decision entirely, not counted as evidence either way. An absence
+carries no type information -- that is what absence means -- but
+_looks_numeric(None) is False, so counting it here demoted an otherwise
+unanimous numeric row to "string" the instant any one provider returned
+nothing: {100, "$100.00"} agreed, but {100, "$100.00", None} fell back to a
+text comparison between 100 and "$100.00" and disagreed -- two providers who
+plainly agree reported as disagreeing because a THIRD provider found nothing.
+Three providers with two halves each is this tool's normal configuration, and
+a provider returning null for a field it could not find is ordinary, so this
+was reachable in real runs, not a contrived corner case. Restricting the type
+decision to present values fixes it; the absent cell still drives the row to
+"disagreed" via the absence rule below (one provider answered, one did not --
+a real difference), but it does so without corrupting the *other* providers'
+verdict against each other.
 
 Fixing the type alone is not enough once a row has three or more cells, which
 is the routine case here: PROVIDERS configures several providers, each with an
@@ -185,12 +201,22 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             # the disagreement rate with fields nobody contested.
             if len(values) < 2:
                 continue
-            # Decided from every value in the row, never from one arbitrary
-            # member -- see the module docstring for why that would make the
-            # verdict depend on provider naming order.
+            # Decided from every PRESENT value in the row, never from one
+            # arbitrary member -- see the module docstring for why that would
+            # make the verdict depend on provider naming order. Absent values
+            # are excluded from this decision entirely: an absence carries no
+            # type information (that is what absence means), and
+            # _looks_numeric(None) is False, so including absent cells here
+            # would demote an otherwise-numeric row to "string" the moment
+            # any one provider returned nothing -- exactly the bug this
+            # exclusion closes. A row with no present values at all falls
+            # back to "string", unchanged from prior behaviour (and moot: the
+            # pairwise loop below never delegates to compare_field when
+            # every value is absent).
+            present_values = [v for v in values.values() if not _is_absent(v)]
             type_ = (
                 "number"
-                if all(_looks_numeric(v) for v in values.values())
+                if present_values and all(_looks_numeric(v) for v in present_values)
                 else "string"
             )
 

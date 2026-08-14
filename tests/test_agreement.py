@@ -344,3 +344,79 @@ def test_distinct_of_one_never_implies_disagreement():
         row = next(r for r in rows if r["field"] == "total")
         if row["distinct"] == 1:
             assert row["state"] != "disagreed", values
+
+
+def test_an_absent_cell_does_not_change_how_present_cells_compare_to_each_other():
+    """The row's numeric type used to be inferred from EVERY value,
+    including absent ones, and _looks_numeric(None) is False, so one
+    provider returning nothing demoted the whole row to a text comparison:
+    {100, "$100.00"} agreed with distinct=1, but {100, "$100.00", None} fell
+    back to a text comparison between 100 and "$100.00" and disagreed with
+    distinct=3 -- two providers who plainly agree, reported as disagreeing
+    WITH EACH OTHER, because a third provider found nothing.
+
+    Once any cell is absent the row correctly reports "disagreed" either
+    way (one provider did not answer -- a real difference), so `state`
+    alone cannot show whether the present pair was itself corrupted by the
+    type flip. `distinct` can: it must stay 2 -- one present answer plus one
+    absence -- never 3, whenever an absent cell is added to a pair of
+    present values that the comparator recognises as the same answer.
+    A `distinct` of 3 here would mean the present pair stopped agreeing
+    with itself the moment a peer went silent, which is exactly the bug
+    this test pins."""
+    agreeing_present_pairs = [
+        (100, "$100.00"),
+        ("x", "x"),
+    ]
+    for pair in agreeing_present_pairs:
+        baseline_rows = agreement([
+            _rec("inv", "p0", True, {"total": pair[0]}),
+            _rec("inv", "p1", True, {"total": pair[1]}),
+        ])
+        baseline = next(r for r in baseline_rows if r["field"] == "total")
+        assert baseline["state"] == "agreed", pair
+        assert baseline["distinct"] == 1, pair  # sanity check on the pair itself
+
+        for absent in (None, ""):
+            rows = agreement([
+                _rec("inv", "p0", True, {"total": pair[0]}),
+                _rec("inv", "p1", True, {"total": pair[1]}),
+                _rec("inv", "p2", True, {"total": absent}),
+            ])
+            row = next(r for r in rows if r["field"] == "total")
+            # Correctly disagrees now -- one provider did not answer -- but
+            # for the honest reason, not a fabricated mismatch between the
+            # present pair:
+            assert row["state"] == "disagreed", (pair, absent)
+            assert row["distinct"] == 2, (pair, absent)
+
+
+def test_distinct_counts_one_absence_regardless_of_how_many_cells_are_absent():
+    """{100, "$100.00", None, None} has two distinct answers -- one numeric
+    amount and one absence -- not three or four. Every absent cell must
+    collapse into the same single counted absence no matter how many
+    providers returned nothing."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"total": 100}),
+        _rec("inv", "anthropic", True, {"total": "$100.00"}),
+        _rec("inv", "zed", True, {"total": None}),
+        _rec("inv", "yed", True, {"total": None}),
+    ])
+    row = next(r for r in rows if r["field"] == "total")
+    assert row["distinct"] == 2
+
+
+def test_one_absent_cell_among_agreeing_present_values_is_a_coherent_disagreement():
+    """Pinning the coordinator's worked example directly: {100, "$100.00",
+    None} must type-infer as "number" from the two present values, compare
+    100 against "$100.00" as a match, disagree overall (one provider did not
+    answer -- a real difference), and count two distinct answers (one
+    amount, one absence) rather than three."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"total": 100}),
+        _rec("inv", "anthropic", True, {"total": "$100.00"}),
+        _rec("inv", "zed", True, {"total": None}),
+    ])
+    row = next(r for r in rows if r["field"] == "total")
+    assert row["state"] == "disagreed"
+    assert row["distinct"] == 2
