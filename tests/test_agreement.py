@@ -233,3 +233,114 @@ def test_two_unresolvable_slash_dates_are_ambiguous_at_the_agreement_level():
     ])
     row = next(r for r in rows if r["field"] == "issueDate")
     assert row["state"] == "ambiguous"
+
+
+def test_absence_agreement_is_order_independent():
+    """compare_field is asymmetric in its two operands by design: it opens
+    with `if extracted is None or extracted == "": return "mismatch"`, which
+    inspects only the first argument. That rule is correct for scoring
+    against a ground-truth key, but agreement() casts one PEER into the
+    "verified" role that asymmetry depends on, and which peer plays that
+    role used to be nothing but insertion order. Concretely,
+    compare_field(".", {"value": ""}, "string") is "match" (both normalise
+    to "") but compare_field("", {"value": "."}, "string") is "mismatch" (the
+    extracted-side check fires first) -- so the exact same pair of records,
+    listed in the opposite order, used to flip between "agreed" and
+    "disagreed". For every pair below, the state must be identical with the
+    records in both insertion orders."""
+    pairs = [
+        ("", "."),
+        (None, "x"),
+        ("", ""),
+        (None, None),
+        (100, "$100.00"),
+        (345015, "$345,015.00"),
+    ]
+    for value_a, value_b in pairs:
+        records = [
+            _rec("inv", "bedrock", True, {"total": value_a}),
+            _rec("inv", "anthropic", True, {"total": value_b}),
+        ]
+        forward = next(
+            r for r in agreement(records) if r["field"] == "total"
+        )["state"]
+        backward = next(
+            r for r in agreement(list(reversed(records))) if r["field"] == "total"
+        )["state"]
+        assert forward == backward, (value_a, value_b, forward, backward)
+
+
+def test_both_absent_values_agree_and_count_as_one_distinct_answer():
+    """Two providers that both found nothing have not disagreed about
+    anything. None, "", and "." are the same non-answer wearing different
+    clothes -- _normalise_text(".") is "", so a punctuation placeholder and a
+    blank field are indistinguishable -- so any pair of them must agree, and
+    must count as a single distinct answer rather than as two or three."""
+    absent_pairs = [
+        (None, None), ("", ""), (".", "."),
+        (None, ""), ("", "."), (None, "."),
+    ]
+    for absent_a, absent_b in absent_pairs:
+        rows = agreement([
+            _rec("inv", "bedrock", True, {"total": absent_a}),
+            _rec("inv", "anthropic", True, {"total": absent_b}),
+        ])
+        row = next(r for r in rows if r["field"] == "total")
+        assert row["state"] == "agreed", (absent_a, absent_b)
+        assert row["distinct"] == 1, (absent_a, absent_b)
+
+
+def test_exactly_one_absent_value_disagrees():
+    """One provider found a value and the other did not -- that is a real
+    difference a prospect should see, and it must disagree regardless of
+    which side is the one that found nothing."""
+    present_and_absent = [("x", None), ("x", ""), ("x", ".")]
+    for present, absent in present_and_absent:
+        rows = agreement([
+            _rec("inv", "bedrock", True, {"total": present}),
+            _rec("inv", "anthropic", True, {"total": absent}),
+        ])
+        row = next(r for r in rows if r["field"] == "total")
+        assert row["state"] == "disagreed", (present, absent)
+
+        rows_reversed = agreement([
+            _rec("inv", "bedrock", True, {"total": absent}),
+            _rec("inv", "anthropic", True, {"total": present}),
+        ])
+        row_reversed = next(r for r in rows_reversed if r["field"] == "total")
+        assert row_reversed["state"] == "disagreed", (absent, present)
+
+
+def test_distinct_of_one_never_implies_disagreement():
+    """The invariant this whole round of fixes exists to guarantee: across a
+    table of representative rows, distinct == 1 must never coincide with
+    state == "disagreed". If every provider's answer normalises to the same
+    thing -- including "no answer" -- there is nothing left to disagree
+    about. Checked across a table, not one example, because three prior
+    rounds were each defeated by a test that only covered one shape of
+    input."""
+    value_sets = [
+        [None, None],
+        ["", ""],
+        [".", "."],
+        [None, "", "."],
+        [100, "$100.00"],
+        [345015, "$345,015.00", 345015.0],
+        ["same", "same", "same"],
+        # Two identical ambiguous slash dates: compare_field's both-sided
+        # slash-date guard returns "unverified" here even though the raw
+        # text is identical, so this lands on "ambiguous" rather than
+        # "agreed" -- a separate, narrower quirk of compare.py that this
+        # round does not touch, but still satisfies the invariant under
+        # test: "ambiguous" is not "disagreed".
+        ["4/1/2026", "4/1/2026"],
+    ]
+    for values in value_sets:
+        records = [
+            _rec("inv", f"provider{i}", True, {"total": v})
+            for i, v in enumerate(values)
+        ]
+        rows = agreement(records)
+        row = next(r for r in rows if r["field"] == "total")
+        if row["distinct"] == 1:
+            assert row["state"] != "disagreed", values

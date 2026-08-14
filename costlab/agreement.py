@@ -37,26 +37,63 @@ is the routine case here: PROVIDERS configures several providers, each with an
 SDK and a direct half, so one (docId, field) row commonly holds many cells.
 compare_field's numeric match is a TOLERANCE (abs(a - b) <= 0.01), and
 tolerance-based equality is not transitive -- 100.008 is close enough to both
-100.0 and 100.016, but 100.0 and 100.016 are 0.016 apart, over tolerance.
-Comparing every other cell only against whichever one happens to be the
-reference (a star topology) therefore reports a different verdict depending
-purely on which cell that was, i.e. on provider naming again. The fix is
-EVERY unordered pair, not a star: a row disagrees if any pair mismatches,
-agrees if none mismatch and at least one pair matches, and is ambiguous only
-if every pair came back unverified. Enumerating all pairs is order-independent
-by construction -- it does not depend on argument, unlike a single arbitrary
-reference -- and it is the honest reading: if two providers genuinely differ
-by more than the tolerance, that is a real disagreement worth showing even
-when some third value happens to sit between them.
+100.0 and 100.016, but 100.0 and 100.016 are 0.016 apart, over tolerance. A
+star topology -- comparing every other cell only against whichever one
+happens to be the reference -- therefore reports a different verdict
+depending purely on which cell that was, i.e. on provider naming again. The
+fix is EVERY unordered pair, not a star: a row disagrees if any pair
+mismatches, agrees if none mismatch and at least one pair matches, and is
+ambiguous only if every pair came back unverified. That is the honest
+reading: if two providers genuinely differ by more than the tolerance, that
+is a real disagreement worth showing even when some third value happens to
+sit between them.
+
+Enumerating every pair does NOT, by itself, make the per-pair verdict
+order-independent -- that was the false claim this docstring made through
+three rounds of fixes, and it is exactly how the next bug survived
+unnoticed. compare_field is asymmetric in its two operands by design: it
+opens with `if extracted is None or extracted == "": return "mismatch"`,
+which inspects only the first argument. That rule is CORRECT for scoring
+against a ground-truth key (a provider that declined to answer a field the
+key covers must not score better than one that guessed wrong), and it is
+pinned there by the shared golden-case fixture. It is wrong here, where
+calling compare_field(a, {"value": b}) casts one PEER into the "verified"
+role that asymmetry depends on, and that casting is just whichever one
+combinations() happened to emit first -- insertion order again. Concretely:
+compare_field(".", {"value": ""}, "string") is "match" (both normalise to
+""), but compare_field("", {"value": "."}, "string") is "mismatch" (the
+extracted-side check fires before normalisation ever runs), so the exact
+same pair of values disagrees or agrees depending on which provider's
+record happened to be built first.
+
+The fix is to classify absence explicitly, per value, before ever calling
+compare_field: a value is absent if it is None, or if
+_normalise_text(_js_string(value)) is empty (which is why "." and ""
+collapse to the same "no answer" -- a punctuation placeholder and a blank
+field are the same non-answer in different clothes). Given that:
+  - both absent -> the pair AGREES. Two providers that both found nothing
+    have not disagreed about anything.
+  - exactly one absent -> the pair DISAGREES. One found a value, one did
+    not; that is a real difference a prospect should see, and it is
+    symmetric by inspection -- it does not matter which side is which.
+  - both present -> delegate to compare_field as before. In this regime the
+    None/"" branch cannot fire (both values are, by construction, evidence
+    of an answer), and every remaining branch -- numeric tolerance, ymd
+    equality, boolean, and text normalisation -- treats its two operands
+    alike, so the result is symmetric by construction, not by luck.
+Only with absence handled this way is the per-pair verdict actually
+order-independent; enumerating all pairs was necessary but not sufficient.
 
 `distinct` counts unique ANSWERS, not mismatches against an arbitrary
 reference -- {100, 200, 200} has two distinct answers, not three, and a count
 that fabricates a third would overstate disagreement in exactly the direction
-this module exists to avoid overstating it. It is computed by normalising
-every value the row's chosen way (the parsed number when the row is numeric,
-otherwise the same text normalisation compare_field itself applies) and
-counting unique results -- well-defined, order-independent, and it can never
-exceed the number of cells in the row.
+this module exists to avoid overstating it. Two absent values are the same
+answer and must count as one, so every absent value normalises to a single
+shared marker before counting; present values normalise the row's chosen way
+(the parsed number when the row is numeric, otherwise the same text
+normalisation compare_field itself applies). Counting the unique results is
+well-defined, order-independent, and can never exceed the number of cells in
+the row.
 """
 
 from __future__ import annotations
@@ -74,9 +111,39 @@ from .compare import (
 )
 
 
+class _Absent:
+    """A single canonical marker every absent value normalises to for
+    `distinct` -- so None, "" and "." collapse to one shared answer instead
+    of three. A dedicated sentinel rather than reusing None or "" so it can
+    never collide with a real parsed number or a genuinely-empty-after-
+    normalisation string (there is no such string: emptiness after
+    normalisation is exactly the absence test)."""
+
+
+_ABSENT = _Absent()
+
+
 def _label(record: dict[str, Any]) -> str:
     half = "sdk" if record.get("withNutrient") else "direct"
     return f"{record['providerId']}:{half}"
+
+
+def _is_absent(value: Any) -> bool:
+    """True for a value that amounts to "no answer" -- None, "", or a
+    punctuation-only placeholder like "." that normalises to nothing.
+
+    compare_field's own extracted-is-None-or-empty rule is correct for
+    scoring against a ground-truth key but must never decide a PEER
+    comparison, where there is no key and either side could just as easily
+    have been cast as "extracted". Classifying absence here, before either
+    value is handed to compare_field, is what makes the pairwise verdict
+    symmetric regardless of which value combinations() happened to emit
+    first -- see the module docstring for the concrete "." vs "" example
+    this closes.
+    """
+    if value is None:
+        return True
+    return _normalise_text(_js_string(value)) == ""
 
 
 def _looks_numeric(value: Any) -> bool:
@@ -131,13 +198,24 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             # compare_field's numeric tolerance is not transitive, so a star
             # topology's verdict depends on which cell happened to be picked
             # as the reference -- i.e. on provider naming again. Enumerating
-            # every pair is order-independent by construction and catches a
-            # real disagreement (like 100.0 vs. 100.016 above) even when a
-            # third value sits between them.
-            pair_verdicts = [
-                compare_field(a, {"value": b}, type_)
-                for a, b in combinations(values.values(), 2)
-            ]
+            # every pair catches a real disagreement (like 100.0 vs. 100.016
+            # above) even when a third value sits between them.
+            #
+            # Absence is classified before either value ever reaches
+            # compare_field -- see _is_absent and the module docstring for
+            # why compare_field's own None/"" rule must not decide a peer
+            # comparison. Only once both values are confirmed present is the
+            # verdict delegated, where compare_field's remaining branches are
+            # symmetric in their two operands by construction.
+            pair_verdicts = []
+            for a, b in combinations(values.values(), 2):
+                a_absent, b_absent = _is_absent(a), _is_absent(b)
+                if a_absent and b_absent:
+                    pair_verdicts.append("match")
+                elif a_absent or b_absent:
+                    pair_verdicts.append("mismatch")
+                else:
+                    pair_verdicts.append(compare_field(a, {"value": b}, type_))
             disagreed = any(v == "mismatch" for v in pair_verdicts)
             agreed = any(v == "match" for v in pair_verdicts)
             # Three states, not a boolean. A row where every pairwise
@@ -156,12 +234,20 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
             # Unique ANSWERS, not mismatches against an arbitrary reference --
             # see the module docstring for why the latter overstates
-            # disagreement. Normalised the same way the row's type decided:
-            # the parsed number, or compare_field's own text normalisation.
-            if type_ == "number":
-                normalised = {_to_number(v) for v in values.values()}
-            else:
-                normalised = {_normalise_text(_js_string(v)) for v in values.values()}
+            # disagreement. Every absent value collapses to the same _ABSENT
+            # marker -- None and "" and "." are one answer, not three -- and
+            # every present value normalises the row's chosen way: the parsed
+            # number, or compare_field's own text normalisation. _ABSENT can
+            # never collide with a real normalised value (a parsed number is
+            # always a float; a normalised present string is never empty,
+            # since emptiness after normalisation is exactly the absence
+            # test above), so the count is unambiguous.
+            normalised = {
+                _ABSENT
+                if _is_absent(v)
+                else (_to_number(v) if type_ == "number" else _normalise_text(_js_string(v)))
+                for v in values.values()
+            }
             distinct = len(normalised)
 
             rows.append(
