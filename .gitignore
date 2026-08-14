@@ -1,0 +1,4 @@
+# Captured request bodies contain the content of whatever documents were run.
+out/
+__pycache__/
+*.egg-info/

@@ -1,0 +1,15 @@
+[project]
+name = "nutrient-extraction-cost"
+version = "0.1.0"
+description = "Measure what document extraction costs, with and without the Nutrient SDK, on your own documents"
+requires-python = ">=3.10"
+# One dependency, deliberately. Everything else is the standard library, so the
+# list a prospect audits before running this fits on one line.
+dependencies = ["nutrient-sdk"]
+
+[project.scripts]
+costlab = "costlab.runner:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
