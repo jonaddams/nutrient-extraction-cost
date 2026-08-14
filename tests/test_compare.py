@@ -107,3 +107,17 @@ def test_both_components_low_slash_date_stays_unverified():
     assert (
         compare_field("2026-01-04", {"value": "4/1/2026"}, "string") == "unverified"
     )
+
+
+def test_two_unresolvable_slash_dates_against_each_other_stay_unverified():
+    """The existing guard above only covers ONE side being an unresolvable
+    slash date against a side that DID resolve. When BOTH sides are
+    ambiguous slash dates that never resolve -- "1/2/2026" and "4/1/2026",
+    every component <= 12 on both -- they used to fall through to the plain
+    text comparison and report "mismatch": a confident claim that two
+    providers disagree, when the comparator has confirmed nothing about
+    either value. That is the same guess this design already refuses for a
+    single ambiguous side, just on both sides at once, so the verdict must
+    be "unverified" here too, not a text mismatch."""
+    assert compare_field("1/2/2026", {"value": "4/1/2026"}, "string") == "unverified"
+    assert compare_field("4/1/2026", {"value": "1/2/2026"}, "string") == "unverified"

@@ -211,6 +211,19 @@ def compare_field(extracted: Any, verified: dict | None, type_: str) -> Verdict:
         return "unverified"
     if b_ymd is not None and a_ymd is None and _AMBIGUOUS_SLASH_DATE.match(a_text.strip()):
         return "unverified"
+    # Same principle, both sides at once: "1/2/2026" against "4/1/2026" are
+    # BOTH ambiguous slash dates that never resolve (every component is <= 12
+    # on both sides). Without this guard they fall through to the plain text
+    # comparison below and report "mismatch" — a confident accusation that two
+    # providers disagree, when the comparator has in fact confirmed nothing
+    # about either of them. "unverified" is the only honest verdict here too.
+    if (
+        a_ymd is None
+        and b_ymd is None
+        and _AMBIGUOUS_SLASH_DATE.match(a_text.strip())
+        and _AMBIGUOUS_SLASH_DATE.match(b_text.strip())
+    ):
+        return "unverified"
 
     return "match" if _normalise_text(a_text) == _normalise_text(b_text) else "mismatch"
 

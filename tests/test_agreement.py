@@ -170,3 +170,66 @@ def test_a_row_where_only_some_values_parse_as_numbers_falls_back_to_string():
     ])
     row = next(r for r in rows if r["field"] == "total")
     assert row["state"] == "disagreed"
+
+
+def test_three_cell_state_does_not_depend_on_provider_naming_order():
+    """compare_field's numeric match is a TOLERANCE, so equality here is not
+    transitive: 100.008 is within tolerance of both 100.0 and 100.016, but
+    100.0 and 100.016 are 0.016 apart -- over tolerance. A star topology that
+    compares every cell only against whichever provider's name happens to
+    sort first therefore used to report a different verdict purely from
+    naming: with the alphabetically-first provider holding 100.008 as the
+    reference, both other values read as "close enough" (agreed); with the
+    alphabetically-first provider holding 100.0 instead, the reference vs.
+    100.016 exceeds tolerance (disagreed) -- same three values, opposite
+    verdicts. All-pairs comparison always checks 100.0 against 100.016
+    directly, regardless of which provider holds which value or how many
+    ways the three are named and ordered, so the row must disagree in every
+    arrangement below."""
+    triple = [100.008, 100.0, 100.016]
+    orderings = [
+        [("alpha", triple[0]), ("beta", triple[1]), ("gamma", triple[2])],
+        [("aaa", triple[1]), ("bbb", triple[0]), ("ccc", triple[2])],
+        [("zzz", triple[2]), ("mmm", triple[0]), ("aaa", triple[1])],
+        [("bedrock", triple[2]), ("anthropic", triple[1]), ("zed", triple[0])],
+    ]
+    states = set()
+    for arrangement in orderings:
+        rows = agreement([
+            _rec("inv", pid, True, {"total": value}) for pid, value in arrangement
+        ])
+        row = next(r for r in rows if r["field"] == "total")
+        states.add(row["state"])
+    assert states == {"disagreed"}
+
+
+def test_distinct_counts_unique_answers_not_mismatches_against_a_reference():
+    """{100, 200, 200} has two distinct answers, not three. The old
+    `1 + count(mismatches against an arbitrary reference)` formula would
+    report 3 here (both other cells mismatch the reference), fabricating a
+    third answer nobody gave -- overstating disagreement in exactly the
+    direction this tool must not overstate it. `distinct` must equal the
+    number of unique normalised values in the row."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"total": 100}),
+        _rec("inv", "anthropic", True, {"total": 200}),
+        _rec("inv", "zed", True, {"total": 200}),
+    ])
+    row = next(r for r in rows if r["field"] == "total")
+    assert row["distinct"] == 2
+
+
+def test_two_unresolvable_slash_dates_are_ambiguous_at_the_agreement_level():
+    """"1/2/2026" and "4/1/2026" are both ambiguous slash dates that never
+    resolve to a calendar day (every component is <= 12 on both sides).
+    compare_field now returns "unverified" for this pair (fixed in
+    costlab/compare.py alongside this change), and agreement() must
+    therefore report the row as "ambiguous", not "disagreed" -- two
+    providers must not be shown to a prospect as disagreeing on a
+    comparison the comparator confirmed nothing about."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"issueDate": "1/2/2026"}),
+        _rec("inv", "anthropic", True, {"issueDate": "4/1/2026"}),
+    ])
+    row = next(r for r in rows if r["field"] == "issueDate")
+    assert row["state"] == "ambiguous"

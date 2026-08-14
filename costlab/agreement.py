@@ -19,7 +19,7 @@ agreement from a comparison that was never made would be a fabricated claim in
 a prospect-facing artifact, and it would understate disagreement, cutting
 against the very case this tool exists to make.
 
-The comparison type for a row is decided from every value in the row, not from
+The comparison TYPE for a row is decided from every value in the row, not from
 whichever provider label happens to sort first alphabetically. Deciding it
 from one arbitrary member means the same two values -- 345015 and
 "$345,015.00" -- verify as agreeing or disagreeing depending only on which
@@ -27,22 +27,76 @@ provider's name sorts first, which would make a prospect's own naming of their
 providers change what the report shows for an identical extraction. The rule
 is: "number" only if EVERY value in the row parses unambiguously as a number
 (via compare.py's own _to_number, the same parser compare_field itself uses
-for numeric fields); otherwise "string". That is deterministic and
-order-independent, and it degrades honestly at the edges -- when only some
-values parse as numbers, falling back to a text comparison is not a guess, it
-is refusing to fabricate a shared numeric type neither side actually offered.
+for numeric fields); otherwise "string". That degrades honestly at the edges
+-- when only some values parse as numbers, falling back to a text comparison
+is not a guess, it is refusing to fabricate a shared numeric type neither side
+actually offered.
+
+Fixing the type alone is not enough once a row has three or more cells, which
+is the routine case here: PROVIDERS configures several providers, each with an
+SDK and a direct half, so one (docId, field) row commonly holds many cells.
+compare_field's numeric match is a TOLERANCE (abs(a - b) <= 0.01), and
+tolerance-based equality is not transitive -- 100.008 is close enough to both
+100.0 and 100.016, but 100.0 and 100.016 are 0.016 apart, over tolerance.
+Comparing every other cell only against whichever one happens to be the
+reference (a star topology) therefore reports a different verdict depending
+purely on which cell that was, i.e. on provider naming again. The fix is
+EVERY unordered pair, not a star: a row disagrees if any pair mismatches,
+agrees if none mismatch and at least one pair matches, and is ambiguous only
+if every pair came back unverified. Enumerating all pairs is order-independent
+by construction -- it does not depend on argument, unlike a single arbitrary
+reference -- and it is the honest reading: if two providers genuinely differ
+by more than the tolerance, that is a real disagreement worth showing even
+when some third value happens to sit between them.
+
+`distinct` counts unique ANSWERS, not mismatches against an arbitrary
+reference -- {100, 200, 200} has two distinct answers, not three, and a count
+that fabricates a third would overstate disagreement in exactly the direction
+this module exists to avoid overstating it. It is computed by normalising
+every value the row's chosen way (the parsed number when the row is numeric,
+otherwise the same text normalisation compare_field itself applies) and
+counting unique results -- well-defined, order-independent, and it can never
+exceed the number of cells in the row.
 """
 
 from __future__ import annotations
 
+from itertools import combinations
 from typing import Any
 
-from .compare import _to_number, compare_field
+from .compare import (
+    _AMBIGUOUS_SLASH_DATE,
+    _js_string,
+    _normalise_text,
+    _to_number,
+    _to_ymd,
+    compare_field,
+)
 
 
 def _label(record: dict[str, Any]) -> str:
     half = "sdk" if record.get("withNutrient") else "direct"
     return f"{record['providerId']}:{half}"
+
+
+def _looks_numeric(value: Any) -> bool:
+    """True only when a value is safe evidence that this row's shared type is
+    "number". _to_number will happily parse a date-shaped string like
+    "1/2/2026" into 122026.0 by stripping the slashes — correct behaviour for
+    compare_field, which is only ever handed a value after the CALLER has
+    already decided the field is numeric, but the wrong signal here, where
+    agreement() is the one inferring the type from the values themselves. A
+    string that looks like a date must never count as numeric evidence, even
+    when _to_number can mangle it into one — otherwise two ambiguous slash
+    dates get compared as numbers instead of falling into compare_field's
+    date handling, and report a false "disagreed" on a pair the comparator
+    was never actually able to judge.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if _to_ymd(text) is not None or _AMBIGUOUS_SLASH_DATE.match(text):
+            return False
+    return _to_number(value) is not None
 
 
 def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -64,23 +118,28 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             # the disagreement rate with fields nobody contested.
             if len(values) < 2:
                 continue
-            labels = sorted(values)
             # Decided from every value in the row, never from one arbitrary
             # member -- see the module docstring for why that would make the
             # verdict depend on provider naming order.
             type_ = (
                 "number"
-                if all(_to_number(v) is not None for v in values.values())
+                if all(_looks_numeric(v) for v in values.values())
                 else "string"
             )
-            reference = values[labels[0]]
-            verdicts = [
-                compare_field(values[label], {"value": reference}, type_)
-                for label in labels[1:]
+
+            # All unordered pairs, not a star against one arbitrary reference:
+            # compare_field's numeric tolerance is not transitive, so a star
+            # topology's verdict depends on which cell happened to be picked
+            # as the reference -- i.e. on provider naming again. Enumerating
+            # every pair is order-independent by construction and catches a
+            # real disagreement (like 100.0 vs. 100.016 above) even when a
+            # third value sits between them.
+            pair_verdicts = [
+                compare_field(a, {"value": b}, type_)
+                for a, b in combinations(values.values(), 2)
             ]
-            disagreed = any(v == "mismatch" for v in verdicts)
-            agreed = any(v == "match" for v in verdicts)
-            distinct = 1 + sum(1 for v in verdicts if v == "mismatch")
+            disagreed = any(v == "mismatch" for v in pair_verdicts)
+            agreed = any(v == "match" for v in pair_verdicts)
             # Three states, not a boolean. A row where every pairwise
             # comparison came back "unverified" (compare_field could not judge
             # any of them, e.g. "4/1/2026" against "2026-01-04") must not
@@ -94,6 +153,17 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 state = "agreed"
             else:
                 state = "ambiguous"
+
+            # Unique ANSWERS, not mismatches against an arbitrary reference --
+            # see the module docstring for why the latter overstates
+            # disagreement. Normalised the same way the row's type decided:
+            # the parsed number, or compare_field's own text normalisation.
+            if type_ == "number":
+                normalised = {_to_number(v) for v in values.values()}
+            else:
+                normalised = {_normalise_text(_js_string(v)) for v in values.values()}
+            distinct = len(normalised)
+
             rows.append(
                 {
                     "docId": doc_id,
