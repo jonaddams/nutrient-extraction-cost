@@ -89,6 +89,24 @@ def test_summary_separates_the_two_halves_of_each_provider():
     assert rows[False]["accuracy"] == 0.5
 
 
+def test_an_empty_extraction_is_scored_not_treated_as_unscoreable():
+    """A provider that answers and finds nothing returns {}, not None. That
+    must be SCORED — every key-covered field becomes a mismatch — not treated
+    as unscoreable. score_records' gate is `extracted is None`, an identity
+    check that {} does not satisfy, so this is already correct. But nothing
+    else in the suite pins that gate: a future change to `if not fields or not
+    extracted:` would treat {} as falsy too, silently undoing a Critical fix
+    from an earlier task, and a provider that declines by returning {} would
+    escape scoring entirely and look more reliable than one that guessed and
+    got it wrong. This test exists to catch exactly that regression."""
+    out = score_records([_rec("inv", "bedrock", True, {})], _key())
+    assert out[0]["score"] is not None
+    assert out[0]["score"]["verdicts"]["invoiceNumber"] == "mismatch"
+    assert out[0]["score"]["verdicts"]["totalAmount"] == "mismatch"
+    assert out[0]["score"]["matched"] == 0
+    assert out[0]["score"]["verified"] == 2
+
+
 def test_summary_counts_unverified_fields_separately_from_unscoreable_records():
     """`unscoreable` counts whole records the harness could not read at all (or
     the key has no document entry for); `unverifiedFields` counts individual
