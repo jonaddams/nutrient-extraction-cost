@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import prices, report
 from .providers import PROVIDERS, Provider, available, direct_request
 from .proxy import RecordingProxy
 
@@ -324,6 +325,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--yes", action="store_true", help="skip the confirmation prompt"
     )
+    parser.add_argument(
+        "--prices",
+        default=None,
+        help="price table to use instead of the bundled one, e.g. your negotiated rates",
+    )
     args = parser.parse_args(argv)
 
     chosen = available()
@@ -401,6 +407,16 @@ def main(argv: list[str] | None = None) -> int:
             half = "with Nutrient" if r["withNutrient"] else "direct"
             reason = r.get("note") or f"status {r['status']}"
             print(f"  {r['docId']} / {r['providerId']} / {half}: {reason}")
+
+    table = prices.load(args.prices)
+    summary = report.summarise(
+        records, table, models={p.id: p.default_model for p in chosen}
+    )
+    (out_dir / "report.json").write_text(report.render_json(summary))
+    (out_dir / "report.html").write_text(report.render_html(summary))
+    print()
+    print(report.render_terminal(summary))
+    print(f"\nreport -> {out_dir / 'report.html'}")
     return 0
 
 

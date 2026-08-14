@@ -1,0 +1,12 @@
+{
+  "checkedOn": "2026-08-14",
+  "note": "Rates are per million tokens, in USD, at published list prices. Bedrock is partner-priced by AWS and is NOT interchangeable with Anthropic first-party rates. Claude Sonnet 5's introductory input rate of 2.00 ends 2026-08-31, reverting to the 3.00 listed here. Providers absent from this table are reported as not priced rather than as free: no list price was confirmed for the default OpenAI model, and a local runtime has no per-token price at all — its cost is hardware and electricity, which this tool does not attempt to model. Override with --prices to use your negotiated rates.",
+  "rates": {
+    "anthropic": {
+      "claude-sonnet-5": {"inputPerMTok": 3.0, "outputPerMTok": 15.0}
+    },
+    "bedrock": {
+      "qwen.qwen3-vl-235b-a22b-instruct": {"inputPerMTok": 0.53, "outputPerMTok": 2.66}
+    }
+  }
+}
