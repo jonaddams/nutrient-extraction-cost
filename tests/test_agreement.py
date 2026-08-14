@@ -7,9 +7,16 @@ def _rec(doc, pid, with_nutrient, extracted):
 
 
 def test_providers_that_agree_are_marked_agreed():
+    """Deliberately the "unlucky" arrangement: "anthropic" sorts before
+    "bedrock" and holds the STRING value here. Under the old
+    field_type(reference)-from-one-arbitrary-member logic, that made the row
+    compare as text and falsely disagree. It must agree regardless of which
+    provider happens to hold which value -- see
+    test_agreement_state_does_not_depend_on_which_provider_holds_which_value
+    for the property pinned directly."""
     rows = agreement([
-        _rec("inv", "bedrock", True, {"total": "$345,015.00"}),
-        _rec("inv", "anthropic", True, {"total": 345015}),
+        _rec("inv", "anthropic", True, {"total": "$345,015.00"}),
+        _rec("inv", "bedrock", True, {"total": 345015}),
     ])
     row = next(r for r in rows if r["field"] == "total")
     assert row["agree"] is True
@@ -121,3 +128,45 @@ def test_agreed_disagreed_and_ambiguous_reconcile_to_the_total_field_count():
         summary["agreed"] + summary["disagreed"] + summary["ambiguous"]
         == summary["fields"]
     )
+
+
+def test_agreement_state_does_not_depend_on_which_provider_holds_which_value():
+    """The comparison type must be decided from the whole row, not from
+    whichever provider label happens to sort first alphabetically. Before
+    this fix, the same two values -- 345015 and "$345,015.00" -- agreed or
+    disagreed depending only on which provider's name sorted first and which
+    value that provider happened to hold: field_type(reference) used
+    whichever value belonged to the alphabetically-first label, so a number
+    held by the first-sorting provider gave a numeric (agreeing) comparison,
+    while a string held by the first-sorting provider gave a textual
+    (falsely disagreeing) one. A prospect renaming their own providers must
+    never change what a report says about an identical extraction, so this
+    pins the property directly rather than relying on one lucky example."""
+
+    def _state(pid_a, value_a, pid_b, value_b):
+        rows = agreement([
+            _rec("inv", pid_a, True, {"total": value_a}),
+            _rec("inv", pid_b, True, {"total": value_b}),
+        ])
+        return next(r for r in rows if r["field"] == "total")["state"]
+
+    # "alpha" sorts before "zulu" in both calls, so swapping which one holds
+    # the number vs. the formatted string exercises exactly the alphabetical
+    # tie-break the old code used to decide the comparison type.
+    assert _state("alpha", 345015, "zulu", "$345,015.00") == "agreed"
+    assert _state("alpha", "$345,015.00", "zulu", 345015) == "agreed"
+
+
+def test_a_row_where_only_some_values_parse_as_numbers_falls_back_to_string():
+    """When one side cannot be read as a number at all -- not merely
+    formatted differently -- guessing a shared numeric type would be
+    fabricating agreement neither side actually offered. Falling back to a
+    text comparison is the honest answer; it is fine that the fallback
+    correctly disagrees here, since 100 and "unknown" really are different
+    answers."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"total": 100}),
+        _rec("inv", "anthropic", True, {"total": "unknown"}),
+    ])
+    row = next(r for r in rows if r["field"] == "total")
+    assert row["state"] == "disagreed"

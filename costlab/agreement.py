@@ -18,14 +18,26 @@ as "ambiguous" rather than silently becoming "agreed" — reporting 100%
 agreement from a comparison that was never made would be a fabricated claim in
 a prospect-facing artifact, and it would understate disagreement, cutting
 against the very case this tool exists to make.
+
+The comparison type for a row is decided from every value in the row, not from
+whichever provider label happens to sort first alphabetically. Deciding it
+from one arbitrary member means the same two values -- 345015 and
+"$345,015.00" -- verify as agreeing or disagreeing depending only on which
+provider's name sorts first, which would make a prospect's own naming of their
+providers change what the report shows for an identical extraction. The rule
+is: "number" only if EVERY value in the row parses unambiguously as a number
+(via compare.py's own _to_number, the same parser compare_field itself uses
+for numeric fields); otherwise "string". That is deterministic and
+order-independent, and it degrades honestly at the edges -- when only some
+values parse as numbers, falling back to a text comparison is not a guess, it
+is refusing to fabricate a shared numeric type neither side actually offered.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from .answers import field_type
-from .compare import compare_field
+from .compare import _to_number, compare_field
 
 
 def _label(record: dict[str, Any]) -> str:
@@ -53,11 +65,17 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if len(values) < 2:
                 continue
             labels = sorted(values)
+            # Decided from every value in the row, never from one arbitrary
+            # member -- see the module docstring for why that would make the
+            # verdict depend on provider naming order.
+            type_ = (
+                "number"
+                if all(_to_number(v) is not None for v in values.values())
+                else "string"
+            )
             reference = values[labels[0]]
             verdicts = [
-                compare_field(
-                    values[label], {"value": reference}, field_type(reference)
-                )
+                compare_field(values[label], {"value": reference}, type_)
                 for label in labels[1:]
             ]
             disagreed = any(v == "mismatch" for v in verdicts)
