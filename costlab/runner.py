@@ -24,11 +24,12 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
 from . import prices, report
+from .answers import load_answers, schema_for
 from .providers import PROVIDERS, Provider, available, direct_request
 from .proxy import RecordingProxy
 
@@ -391,6 +392,9 @@ def run(
                                 (time.perf_counter() - started) * 1000, 1
                             ),
                             "extracted": extracted,
+                            "schemaFieldCount": len(
+                                doc.schema.get("properties", {})
+                            ),
                             **summary,
                             **({"note": note} if note else {}),
                         }
@@ -435,6 +439,17 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="price table to use instead of the bundled one, e.g. your negotiated rates",
     )
+    parser.add_argument(
+        "--mode",
+        choices=("cost", "accuracy"),
+        default="cost",
+        help=(
+            "cost: one shared schema for every document, so payload differences "
+            "are attributable to the document. accuracy: each document's own "
+            "answer-key fields, which makes results scoreable but NOT token-"
+            "comparable with a cost run."
+        ),
+    )
     args = parser.parse_args(argv)
 
     chosen = available()
@@ -464,6 +479,23 @@ def main(argv: list[str] | None = None) -> int:
     if not corpus:
         print(f"No documents found in {args.corpus}", file=sys.stderr)
         return 2
+
+    if args.mode == "accuracy":
+        key = load_answers()
+        rescoped = []
+        for doc in corpus:
+            schema = schema_for(key, doc.id)
+            if schema is None:
+                print(f"{doc.id}: no answer key entry, skipping in accuracy mode")
+                continue
+            rescoped.append(replace(doc, schema=schema))
+        corpus = rescoped
+        if not corpus:
+            print(
+                "No documents in this corpus have answer-key entries.",
+                file=sys.stderr,
+            )
+            return 2
 
     cells = plan_cells(chosen)
     print(f"{len(corpus)} document(s) x {len(cells)} cell(s) = "

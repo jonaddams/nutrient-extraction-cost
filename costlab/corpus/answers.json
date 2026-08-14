@@ -1,0 +1,98 @@
+{
+  "checkedOn": "2026-08-14",
+  "note": "Every value was read directly off the document — an HTML twin, a visual render of the page, or the PDF's own text layer — by a human, never derived from a model's output or from raw OCR taken at face value. `source` is the line each value was read from; it is the evidence behind the word \"verified\". The fourteen small-document entries are copied from the samples repo's app/python-sdk/extraction-studio/lib/verified.ts (docIds remapped: e.g. its invoice-ac20251047 is this corpus's invoice-ac-2025-1047). The three large-document entries are copied from the samples repo's public/documents/large-corpus-answers.json, whose `printed` field is the as-printed source line, mapped here to `source`. Two fields are deliberately excluded, for different reasons, and must stay excluded: scanned-invoice.invoiceNumber, because the document prints \"No 00162\" as one unbroken string with no colon separating a label from a value, so \"00162\" and \"No 00162\" are both defensible reads and grading either would mark a provider wrong for a formatting judgement rather than an extraction error; and emergency-dept-billing-worksheet.recordId, because the value was genuinely redacted out of the document (Nutrient's own redaction API was applied to it), so there is nothing left in the text layer to grade. A field with no key entry scores as unverified, not wrong.",
+  "documents": {
+    "invoice-ac-2025-1047": {
+      "invoiceNumber": {"value": "AC-2025-1047", "source": "Invoice No: AC-2025-1047"},
+      "issueDate": {"value": "March 1, 2025", "source": "Date: March 1, 2025"},
+      "totalAmount": {"value": 345015, "source": "Amount Due $345,015.00"}
+    },
+    "lumen-invoice": {
+      "invoiceNumber": {"value": "616770524", "source": "Invoice Number 616770524"},
+      "issueDate": {"value": "November 16, 2022", "source": "Invoice Date November 16, 2022"},
+      "totalAmount": {"value": 88.06, "source": "Total Amount Due USD 88.06"}
+    },
+    "scanned-invoice": {
+      "issueDate": {"value": "20/09/2022", "source": "Billing date 20/09/2022"},
+      "totalAmount": {"value": 1165.1, "source": "TOTAL 1,165.10€"}
+    },
+    "happy-tooth-invoice-excel": {
+      "invoiceNumber": {"value": "5465", "source": "Invoice #5465"},
+      "issueDate": {"value": "4/1/2026", "source": "4/1/2026"},
+      "totalAmount": {"value": 4201.45, "source": "TOTAL $4,201.45"}
+    },
+    "construction-pay-application": {
+      "projectName": {"value": "Cedar Hollow Family Health Center - New Outpatient Building", "source": "PROJECT Cedar Hollow Family Health Center - New Outpatient Building"},
+      "projectNumber": {"value": "24-118", "source": "PROJECT NO. 24-118"},
+      "applicationNumber": {"value": "14", "source": "APPLICATION NO. 14"},
+      "contractSumToDate": {"value": 5036400, "source": "CONTRACT SUM TO DATE (Line 1 +/- 2) $5,036,400.00"},
+      "retainage": {"value": 197455, "source": "Total Retainage $197,455.00"},
+      "currentPaymentDue": {"value": 456665, "source": "CURRENT PAYMENT DUE $456,665.00"}
+    },
+    "bill-of-lading": {
+      "billOfLadingNumber": {"value": "BL-2026-9910A", "source": "BOL NUMBER: BL-2026-9910A"},
+      "shipper": {"value": "Apex Industrial Supply Ltd.", "source": "SHIPPER (FROM): Apex Industrial Supply Ltd."},
+      "consignee": {"value": "EuroHub Logistics Center", "source": "CONSIGNEE (TO): EuroHub Logistics Center"},
+      "carrier": {"value": "Inter-Continental Freight Carriers Inc.", "source": "CARRIER: Inter-Continental Freight Carriers Inc."},
+      "trailerNumber": {"value": "TR-8841-EU", "source": "TRAILER NO: TR-8841-EU"},
+      "totalWeightKg": {"value": 1565.2, "source": "17  TOTAL  1,565.20"}
+    },
+    "emergency-dept-billing-worksheet": {
+      "patientName": {"value": "John Doe", "source": "PATIENT NAME: JOHN DOE"},
+      "admissionDate": {"value": "12/04/2016", "source": "Date of Admission: 12/04/2016"},
+      "facilitySubTotal": {"value": 4300, "source": "FACILITY SUB-TOTAL EVALUATION: [RECONCILED] $4,300.00"},
+      "outOfPocketMaximum": {"value": 1250, "source": "The absolute net out-of-pocket maximum financial exposure for the primary named insured party during this isolated episode of acute emergency care is capped at exactly $1,250.00"}
+    },
+    "meridian-income-statement": {
+      "periodEnding": {"value": "December 31, 2025", "source": "Period Ending December 31, 2025"},
+      "totalRevenue": {"value": 4820000, "source": "Total revenue 4,820,000"},
+      "netIncome": {"value": 612000, "source": "Net income 612,000"}
+    },
+    "meridian-balance-sheet": {
+      "periodEnding": {"value": "December 31, 2025", "source": "Period Ending December 31, 2025"},
+      "netIncome": {"value": 612000, "source": "Net income of 612,000 for the period ties to the accompanying income statement"},
+      "totalAssets": {"value": 4500000, "source": "Total assets 4,500,000"},
+      "totalLiabilities": {"value": 2200000, "source": "Total liabilities 2,200,000"}
+    },
+    "northgate-auto-claim-fnol": {
+      "claimNumber": {"value": "CLM-2026-004417", "source": "Claim Number CLM-2026-004417"},
+      "policyNumber": {"value": "MAP-7781204-03", "source": "Policy Number MAP-7781204-03"},
+      "insuredName": {"value": "Daniel R. Whitfield", "source": "Insured Name Daniel R. Whitfield"},
+      "dateOfLoss": {"value": "March 14, 2026", "source": "Date of Loss March 14, 2026"},
+      "estimatedDamage": {"value": 8450, "source": "Total estimated damage 8,450.00"}
+    },
+    "apricot-cake-recipe": {
+      "documentTitle": {"value": "Apricot Cake.", "source": "Apricot Cake."}
+    },
+    "dear-magnus-thank-you-note": {
+      "documentTitle": {"value": "NOTES", "source": "NOTES"}
+    },
+    "heavenly-hamburgers-recipe": {
+      "documentTitle": {"value": "Heavenly Hamburgers", "source": "Heavenly Here's what's cookin': Hamburgers"}
+    },
+    "employment-application": {
+      "documentTitle": {"value": "Employment Application", "source": "Employment Application"}
+    },
+    "northgate-claim-file": {
+      "claimNumber": {"value": "NG-2026-004417", "source": "NG-2026-004417"},
+      "policyNumber": {"value": "NAP-88213-06", "source": "NAP-88213-06"},
+      "dateOfLoss": {"value": "2026-01-19", "source": "2026-01-19"},
+      "insuredName": {"value": "Harriet Okonjo-Vale", "source": "Harriet Okonjo-Vale"},
+      "totalClaimed": {"value": 48215.6, "source": "48,215.60"}
+    },
+    "meridian-annual-report": {
+      "fiscalYearEnd": {"value": "2025-12-31", "source": "2025-12-31"},
+      "totalRevenue": {"value": 184602000, "source": "184,602,000"},
+      "netIncome": {"value": 21455000, "source": "21,455,000"},
+      "totalAssets": {"value": 402118000, "source": "402,118,000"},
+      "sharesOutstanding": {"value": 48300000, "source": "48,300,000"}
+    },
+    "regional-health-record": {
+      "recordId": {"value": "RGH-77-401925", "source": "RGH-77-401925"},
+      "admissionDate": {"value": "2026-02-03", "source": "2026-02-03"},
+      "dischargeDate": {"value": "2026-02-11", "source": "2026-02-11"},
+      "primaryDiagnosis": {"value": "Community-acquired pneumonia", "source": "Community-acquired pneumonia"},
+      "totalCharges": {"value": 63940.25, "source": "63,940.25"}
+    }
+  }
+}
