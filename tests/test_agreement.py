@@ -58,3 +58,66 @@ def test_summary_counts_agreed_and_disagreed_fields():
     assert out["agreed"] == 1
     assert out["disagreed"] == 1
     assert out["rate"] == 0.5
+
+
+def test_a_pair_the_comparator_cannot_judge_is_ambiguous_not_agreed():
+    """"4/1/2026" against "2026-01-04" is a real case, not a contrived one:
+    compare_field refuses to guess a date convention and returns "unverified"
+    in both directions. Before this fix, the row silently became "agreed",
+    reporting 100% agreement from a comparison that was never made -- a
+    fabricated claim in a prospect-facing artifact that also understates
+    disagreement, cutting against the case this tool exists to make. The row
+    must be "ambiguous", not "agreed", and must not show up in a report's
+    disagreement list either."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"issueDate": "4/1/2026"}),
+        _rec("inv", "anthropic", True, {"issueDate": "2026-01-04"}),
+    ])
+    row = next(r for r in rows if r["field"] == "issueDate")
+    assert row["state"] == "ambiguous"
+    assert row["agree"] is False
+    # Would show up in a prospect-facing disagreement list if this were
+    # miscounted as "disagreed" instead of "ambiguous".
+    assert [r for r in rows if r["state"] == "disagreed"] == []
+
+    summary = agreement_summary(rows)
+    assert summary["ambiguous"] == 1
+    assert summary["agreed"] == 0
+    assert summary["disagreed"] == 0
+    # Excluded from the rate's denominator entirely -- not folded into either
+    # side, and not reported as a disagreement a prospect would see.
+    assert summary["rate"] is None
+
+
+def test_a_summary_of_only_ambiguous_rows_reports_no_rate():
+    """Neither 0.0 (which would claim total disagreement) nor 1.0 (which
+    would claim total agreement) is honest here: nothing was actually
+    judged, so the rate must be None, consistent with every other "nothing
+    comparable" case in this codebase."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"issueDate": "4/1/2026"}),
+        _rec("inv", "anthropic", True, {"issueDate": "2026-01-04"}),
+    ])
+    summary = agreement_summary(rows)
+    assert summary["rate"] is None
+
+
+def test_agreed_disagreed_and_ambiguous_reconcile_to_the_total_field_count():
+    """`fields` is the total row count, so the three buckets must add back up
+    to it exactly -- a report that shows fields, agreed, disagreed and
+    ambiguous side by side must always reconcile, with no row silently
+    uncounted or double-counted."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {
+            "total": 345015, "vendor": "same", "issueDate": "4/1/2026",
+        }),
+        _rec("inv", "anthropic", True, {
+            "total": 999, "vendor": "same", "issueDate": "2026-01-04",
+        }),
+    ])
+    summary = agreement_summary(rows)
+    assert summary["fields"] == 3
+    assert (
+        summary["agreed"] + summary["disagreed"] + summary["ambiguous"]
+        == summary["fields"]
+    )
