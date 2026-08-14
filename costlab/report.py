@@ -42,6 +42,18 @@ THINKING_CAVEAT = (
     "in its usage block. Output cost is not proportional to returned text."
 )
 
+# The reason the headline projection is priced from INPUT tokens only.
+OUTPUT_CAVEAT = (
+    "Output tokens are not comparable between the two halves. The SDK asks for "
+    "grounded metadata the direct call does not, and a direct call is free to "
+    "be verbose — in one measured run a single document's direct call emitted "
+    "about 7,500 more output tokens than its SDK counterpart, which alone was "
+    "enough to flip the aggregate and make the SDK look cheaper overall. The "
+    "headline figure is therefore priced from input tokens, which measure the "
+    "same document on both sides. The total including output is shown "
+    "separately and should not be read as a like-for-like saving."
+)
+
 
 def summarise(
     records: list[dict[str, Any]],
@@ -85,6 +97,10 @@ def summarise(
         sdk_cost = table.cost(provider_id, model, sdk_in, sdk_out)
         direct_cost = table.cost(provider_id, model, direct_in, direct_out)
         priced = sdk_cost is not None and direct_cost is not None
+        # Priced from input tokens alone. Input measures the same document on
+        # both sides; output does not, because the two calls are asked for
+        # different things. See OUTPUT_CAVEAT.
+        delta_input_cost = table.cost(provider_id, model, sdk_in - direct_in, 0)
         by_document.append(
             {
                 "docId": doc_id,
@@ -105,6 +121,7 @@ def summarise(
                 "deltaCost": (
                     sdk_cost - direct_cost if priced else None
                 ),
+                "deltaInputCost": delta_input_cost,
                 "priced": priced,
             }
         )
@@ -151,6 +168,13 @@ def summarise(
                 # deltaMin and deltaMax diverge, this projection is not safe and
                 # the spread column is the warning.
                 "deltaCostPer100k": (
+                    sum(r["deltaInputCost"] for r in priced_rows)
+                    / len(priced_rows)
+                    * 100_000
+                    if priced_rows
+                    else None
+                ),
+                "deltaCostPer100kIncludingOutput": (
                     sum(r["deltaCost"] for r in priced_rows)
                     / len(priced_rows)
                     * 100_000
@@ -167,7 +191,12 @@ def summarise(
         "byDocument": by_document,
         "byProvider": by_provider,
         "unmeasurable": unmeasurable,
-        "caveats": [COORDINATES_CAVEAT, TOKENIZER_CAVEAT, THINKING_CAVEAT],
+        "caveats": [
+            COORDINATES_CAVEAT,
+            OUTPUT_CAVEAT,
+            TOKENIZER_CAVEAT,
+            THINKING_CAVEAT,
+        ],
     }
 
 
@@ -198,7 +227,7 @@ def render_terminal(summary: dict[str, Any]) -> str:
             else "n/a"
         )
         per_100k = (
-            f"{_money(row['deltaCostPer100k'])} per 100k docs"
+            f"{_money(row['deltaCostPer100k'])} per 100k docs (input)"
             if row["deltaCostPer100k"] is not None
             else "not priced"
         )
@@ -208,6 +237,11 @@ def render_terminal(summary: dict[str, Any]) -> str:
             f"{row['deltaOutputTokens']:>+6,} "
             f"({spread} in per call)  {per_100k}"
         )
+        if row["deltaCostPer100kIncludingOutput"] is not None:
+            lines.append(
+                f"  {'':28} including output (not like-for-like): "
+                f"{_money(row['deltaCostPer100kIncludingOutput'])} per 100k docs"
+            )
 
     if summary["unmeasurable"]:
         lines.append("")
@@ -250,8 +284,8 @@ def render_html(summary: dict[str, Any]) -> str:
             if r["deltaMin"] is not None
             else "n/a"
         )
-        + f"</td><td class=n>{e(_money(r['deltaCost']))}</td>"
-        f"<td class='n d'>{e(_money(r['deltaCostPer100k']))}</td></tr>"
+        + f"</td><td class='n d'>{e(_money(r['deltaCostPer100k']))}</td>"
+        f"<td class=n>{e(_money(r['deltaCostPer100kIncludingOutput']))}</td></tr>"
         for r in summary["byProvider"]
     )
 
@@ -301,7 +335,8 @@ substitute your own negotiated rates before quoting them.</p>
 <table>
   <tr><th>provider</th><th class=n>docs</th><th class=n>delta input</th>
       <th class=n>delta output</th><th class=n>per-call spread</th>
-      <th class=n>delta $ measured</th><th class=n>delta $ / 100k docs</th></tr>
+      <th class=n>$ / 100k docs (input)</th>
+      <th class=n>$ / 100k incl. output</th></tr>
 {prov_rows}
 </table>
 </div>

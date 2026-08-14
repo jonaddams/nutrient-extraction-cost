@@ -87,14 +87,17 @@ def load_corpus(corpus_dir: Path) -> list[Doc]:
     corpus_dir = Path(corpus_dir)
     manifest = corpus_dir / "manifest.json"
     if manifest.exists():
-        entries = json.loads(manifest.read_text())
+        # {"documents": {docId: {"file": ..., "category": ..., "schema": ...}}}
+        # Keyed by id rather than a list so it joins directly against an answer
+        # key of the same shape, which is what the accuracy layer will need.
+        entries = json.loads(manifest.read_text())["documents"]
         return [
             Doc(
-                id=e["id"],
-                path=corpus_dir / e["file"],
-                schema=e.get("schema", DEFAULT_SCHEMA),
+                id=doc_id,
+                path=corpus_dir / entry["file"],
+                schema=entry.get("schema", DEFAULT_SCHEMA),
             )
-            for e in entries
+            for doc_id, entry in entries.items()
         ]
     return [
         Doc(id=p.stem, path=p, schema=DEFAULT_SCHEMA)
@@ -135,20 +138,32 @@ def summarise_attempts(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _largest_text_part(body: dict[str, Any]) -> str:
-    """The largest text part across a captured request's messages.
+def _document_text(body: dict[str, Any]) -> str:
+    """The extracted document content out of a captured request.
 
     This is how the no-Nutrient half gets its document text: from whatever the
     SDK actually sent, not from a second extraction of our own. Holding the
     extracted content constant is what makes the delta attributable to the
     SDK's scaffolding rather than to two different text extractions.
 
-    Every captured user message carries a short scaffolding part and one large
-    part holding the extracted document content, so the largest part is the
-    document.
+    Only USER messages are considered, and that restriction is the whole point.
+    A captured request carries the SDK's system prompt (~1,700 characters of
+    instructions) plus a user message holding a short "Document content:" label
+    and one part with the extracted content. Picking the largest text part
+    across *all* messages silently picks the system prompt whenever a document
+    extracts to less text than that — which is exactly what happens on
+    handwritten images with no text layer.
+
+    That failure is quiet and plausible-looking: the direct call receives the
+    SDK's own instructions in place of the document, still returns a usage
+    block, and the delta comes out slightly wrong rather than obviously broken.
+    Two handwritten samples reported +517 and +658 against a +468 constant
+    before this was restricted to user messages.
     """
     best = ""
     for message in body.get("messages") or []:
+        if message.get("role") != "user":
+            continue
         content = message.get("content")
         if isinstance(content, str):
             if len(content) > len(best):
@@ -188,7 +203,7 @@ def _run_sdk_cell(provider: Provider, doc: Doc, proxy: RecordingProxy, port: int
         request.instructions = ""
         Vision.set(document).extract_structured(request)
 
-    return _largest_text_part(proxy.last_request_body or {})
+    return _document_text(proxy.last_request_body or {})
 
 
 def _run_direct_cell(

@@ -1,0 +1,90 @@
+{
+  "note": "One shared schema is used for every document unless an entry overrides it, so a payload difference between documents is attributable to the document rather than to a varying field count. Both size ranges are bundled deliberately: the SDK's overhead is a constant number of tokens per call, which a corpus of only small documents overstates as a percentage and only large ones understate.",
+  "documents": {
+    "invoice-ac-2025-1047": {
+      "file": "invoice-ac-2025-1047.pdf",
+      "category": "invoices",
+      "pages": 1
+    },
+    "lumen-invoice": {
+      "file": "lumen-invoice.pdf",
+      "category": "invoices",
+      "pages": 1
+    },
+    "scanned-invoice": {
+      "file": "scanned-invoice.pdf",
+      "category": "invoices",
+      "pages": 1
+    },
+    "happy-tooth-invoice-excel": {
+      "file": "happy-tooth-invoice-excel.pdf",
+      "category": "invoices",
+      "pages": 1
+    },
+    "construction-pay-application": {
+      "file": "construction-pay-application.pdf",
+      "category": "construction",
+      "pages": 1
+    },
+    "bill-of-lading": {
+      "file": "bill-of-lading.pdf",
+      "category": "logistics",
+      "pages": 1
+    },
+    "emergency-dept-billing-worksheet": {
+      "file": "emergency-dept-billing-worksheet.pdf",
+      "category": "healthcare",
+      "pages": 1
+    },
+    "meridian-income-statement": {
+      "file": "meridian-income-statement.pdf",
+      "category": "finance",
+      "pages": 1
+    },
+    "meridian-balance-sheet": {
+      "file": "meridian-balance-sheet.pdf",
+      "category": "finance",
+      "pages": 1
+    },
+    "northgate-auto-claim-fnol": {
+      "file": "northgate-auto-claim-fnol.pdf",
+      "category": "claims",
+      "pages": 1
+    },
+    "apricot-cake-recipe": {
+      "file": "apricot-cake-recipe.jpg",
+      "category": "handwriting",
+      "pages": 1
+    },
+    "dear-magnus-thank-you-note": {
+      "file": "dear-magnus-thank-you-note.jpg",
+      "category": "handwriting",
+      "pages": 1
+    },
+    "heavenly-hamburgers-recipe": {
+      "file": "heavenly-hamburgers-recipe.jpeg",
+      "category": "handwriting",
+      "pages": 1
+    },
+    "employment-application": {
+      "file": "employment-application.jpg",
+      "category": "handwriting",
+      "pages": 1
+    },
+    "northgate-claim-file": {
+      "file": "northgate-claim-file.pdf",
+      "category": "claims",
+      "pages": 12
+    },
+    "meridian-annual-report": {
+      "file": "meridian-annual-report.pdf",
+      "category": "finance",
+      "pages": 25
+    },
+    "regional-health-record": {
+      "file": "regional-health-record.pdf",
+      "category": "healthcare",
+      "pages": 40
+    }
+  }
+}

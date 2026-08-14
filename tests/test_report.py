@@ -150,6 +150,35 @@ def test_the_dollar_delta_is_reconcilable_from_the_token_columns_shown():
     assert "+30" in render_terminal(out)
 
 
+def test_one_verbose_direct_call_cannot_flip_the_headline_projection():
+    """Measured on the 17-document corpus: one document's direct call emitted
+    ~7,500 more output tokens than its SDK counterpart, and because output prices
+    ~5x input that single outlier dragged the aggregate from +$21 to -$87 per
+    100k — i.e. it made the SDK look cheaper overall. The headline is priced from
+    input tokens, which measure the same document on both sides. The
+    output-inclusive total is still reported, separately and labelled.
+    """
+    recs = [
+        _rec("normal", "bedrock", True, 1000),
+        _rec("normal", "bedrock", False, 532),
+        _rec("outlier", "bedrock", True, 1000),
+        _rec("outlier", "bedrock", False, 532),
+    ]
+    recs[3]["usage"]["outputTokens"] = 7_500  # the verbose direct call
+    out = summarise(
+        recs, _priced_table(), models={"bedrock": "qwen.qwen3-vl-235b-a22b-instruct"}
+    )
+    prov = out["byProvider"][0]
+    assert prov["deltaInputTokens"] == 936
+    # Input-priced headline stays positive and reflects the constant.
+    assert prov["deltaCostPer100k"] > 0
+    # The output-inclusive figure goes negative, and is kept visible rather than
+    # silently becoming the headline.
+    assert prov["deltaCostPer100kIncludingOutput"] < 0
+    text = render_terminal(out)
+    assert "input" in text and "not like-for-like" in text
+
+
 def test_at_volume_projection_scales_the_measured_mean():
     """A per-document delta of $0.0003 is true and useless; the decision is made
     at volume. The projection is linear, which is only legitimate because the
