@@ -28,7 +28,7 @@ def test_the_fixture_is_the_one_the_other_repository_ships():
     both repositories. If it fails, the copies differ — reconcile them, do not
     just update the constant."""
     digest = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
-    assert digest == "1fde4d15792a4afc7338888948b5608793f328957b4454bc26723b9aef9cb292", (
+    assert digest == "01c5bd9ebdacf9f867f7f704ee1a4f086be603eb34dabdb9b556d04cd7c1997c", (
         f"golden-cases.json changed. New hash: {digest}. "
         "Update BOTH repositories, then update this constant."
     )
@@ -44,3 +44,34 @@ def test_summarise_excludes_unverified_from_the_denominator():
 def test_summarise_of_nothing_is_not_a_division_by_zero_waiting_to_happen():
     assert summarise_verdicts([]) == {"matched": 0, "verified": 0}
     assert summarise_verdicts(["unverified"]) == {"matched": 0, "verified": 0}
+
+
+def test_ambiguous_slash_date_is_unverified_not_a_mismatch():
+    """Python-only case: this is a DELIBERATE, permanent divergence from the
+    TypeScript comparator, not a bug to reconcile. It must never move into the
+    shared fixture, because the two implementations genuinely disagree here.
+
+    The TypeScript comparator resolves "03/01/2025" against "March 1, 2025" as
+    a match — it builds a JS Date via Date.parse, which silently assumes the US
+    month/day/year convention for a bare slash date. That is a guess about a
+    regional convention this codebase has no way to verify, and the project's
+    own spec forbids Date.parse for exactly that reason.
+
+    This Python port refuses the same guess it already refuses for numbers:
+    "1.165,10" (a number that could be either "1165.10" or "1.16510"
+    depending on which mark is the decimal separator) returns "unverified"
+    rather than fabricating a value by picking one reading. A slash date is
+    ambiguous the same way, so a slash-shaped string that cannot be resolved to
+    a calendar day must not fall through to a plain text mismatch against a
+    date the other side DID resolve. "unverified" is the honest verdict: not
+    "the provider is wrong" (a mismatch would say that), but "this codebase
+    cannot confidently say either way."
+    """
+    assert (
+        compare_field("03/01/2025", {"value": "March 1, 2025"}, "string")
+        == "unverified"
+    )
+    assert (
+        compare_field("March 1, 2025", {"value": "03/01/2025"}, "string")
+        == "unverified"
+    )

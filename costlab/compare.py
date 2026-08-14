@@ -42,6 +42,12 @@ _LONG_DAY_FIRST = re.compile(r"^(\d{1,2})\s+([A-Za-z]+)\.?,?\s+(\d{4})$")
 _DASHES = re.compile("[‐‑‒–—−]")
 _WHITESPACE = re.compile(r"\s+")
 
+# A slash-separated date is genuinely ambiguous (US month/day/year vs.
+# international day/month/year) and deliberately left unresolved by _to_ymd.
+# See the guard in compare_field for how that ambiguity is handled without
+# either guessing a convention or accusing a provider of a mismatch.
+_AMBIGUOUS_SLASH_DATE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
+
 
 def _to_number(value: Any) -> float | None:
     """A finite number, or None when the text cannot be read unambiguously."""
@@ -86,6 +92,20 @@ def _normalise_text(value: str) -> str:
     # only move a verdict toward "match", never toward an accusation.
     out = re.sub(r"[.,]", "", out)
     return _WHITESPACE.sub(" ", out).strip().lower()
+
+
+def _js_string(value: Any) -> str:
+    """Stringify the way JavaScript's String() does for whole-number floats.
+
+    Python's str(345015.0) is "345015.0" where JS's String(345015.0) is
+    "345015", and _normalise_text then strips the period and corrupts the
+    digits to "3450150". The TypeScript comparator this is a port of returns
+    "match" for 345015.0 against "345015"; without this, Python returns
+    "mismatch" — a public accusation the original does not make.
+    """
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
 
 
 def _to_ymd(value: str) -> tuple[int, int, int] | None:
@@ -145,8 +165,8 @@ def compare_field(extracted: Any, verified: dict | None, type_: str) -> Verdict:
 
         return "match" if norm(extracted) == norm(verified.get("value")) else "mismatch"
 
-    a_text = str(extracted)
-    b_text = str(verified.get("value"))
+    a_text = _js_string(extracted)
+    b_text = _js_string(verified.get("value"))
 
     # Dates first: "2025-03-01" and "March 1, 2025" are the same answer and a
     # string comparison would call that a mismatch. Only when BOTH sides resolve
@@ -155,6 +175,25 @@ def compare_field(extracted: Any, verified: dict | None, type_: str) -> Verdict:
     b_ymd = _to_ymd(b_text)
     if a_ymd is not None and b_ymd is not None:
         return "match" if a_ymd == b_ymd else "mismatch"
+
+    # Deliberate divergence from the TypeScript original: a slash date like
+    # "03/01/2025" is genuinely ambiguous (US month/day/year vs. day/month/year)
+    # and _to_ymd refuses to guess, so it never resolves. The TypeScript
+    # comparator resolves it anyway via Date.parse, which silently picks the US
+    # convention — exactly the kind of unearned guess this design already
+    # refuses for numbers ("1.165,10" -> unverified rather than a fabricated
+    # value). Replicating Date.parse's guess was considered and rejected; the
+    # spec forbids Date.parse outright and the reasoning for numbers applies
+    # identically here. So when one side resolves to a calendar day and the
+    # other is only ambiguous-slash-shaped (not resolved), the honest answer is
+    # "cannot confidently compare" — unverified, not a text mismatch. This is
+    # deliberately narrow: it must not broaden to "either side has a digit",
+    # which would swallow cases like "88.06" that must keep falling through to
+    # a plain text comparison.
+    if a_ymd is not None and b_ymd is None and _AMBIGUOUS_SLASH_DATE.match(b_text.strip()):
+        return "unverified"
+    if b_ymd is not None and a_ymd is None and _AMBIGUOUS_SLASH_DATE.match(a_text.strip()):
+        return "unverified"
 
     return "match" if _normalise_text(a_text) == _normalise_text(b_text) else "mismatch"
 
