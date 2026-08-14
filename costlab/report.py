@@ -18,8 +18,11 @@ import html as html_mod
 import json
 from typing import Any
 
+from .agreement import agreement, agreement_summary
+from .answers import AnswerKey
 from .prices import PriceTable
 from .providers import PROVIDERS
+from .score import score_records, score_summary
 
 # Stated wherever the two halves are compared on price. They are not
 # feature-equivalent, and a comparison that omits this is the most misleading
@@ -59,6 +62,7 @@ def summarise(
     records: list[dict[str, Any]],
     table: PriceTable,
     models: dict[str, str] | None = None,
+    key: AnswerKey | None = None,
 ) -> dict[str, Any]:
     """Per-document and per-provider totals, with the unmeasurable set aside.
 
@@ -185,12 +189,26 @@ def summarise(
             }
         )
 
+    scored = score_records(records, key) if key else []
+    accuracy = score_summary(scored) if scored else []
+    agreement_rows = agreement(records)
+
+    # Accuracy mode gives each document its own schema, so its token counts are
+    # not comparable with a shared-schema cost run. Detect a mixed set rather
+    # than presenting one table over both.
+    field_counts = {r["schemaFieldCount"] for r in records if "schemaFieldCount" in r}
+    mixed_schemas = len(field_counts) > 1
+
     return {
         "checkedOn": table.checked_on,
         "priceNote": table.note,
         "byDocument": by_document,
         "byProvider": by_provider,
         "unmeasurable": unmeasurable,
+        "accuracy": accuracy,
+        "agreement": agreement_rows,
+        "agreementSummary": agreement_summary(agreement_rows),
+        "mixedSchemas": mixed_schemas,
         "caveats": [
             COORDINATES_CAVEAT,
             OUTPUT_CAVEAT,
@@ -250,6 +268,55 @@ def render_terminal(summary: dict[str, Any]) -> str:
             "excluded from every total above."
         )
 
+    if summary["accuracy"]:
+        lines.append("")
+        lines.append("Accuracy (fields the answer key covers)")
+        for row in summary["accuracy"]:
+            half = "with Nutrient" if row["withNutrient"] else "direct       "
+            if row["accuracy"] is None:
+                shown = "not scoreable"
+            else:
+                shown = f"{row['matched']}/{row['verified']} ({row['accuracy']:.0%})"
+            lines.append(f"  {row['providerId']:10} {half}  {shown}")
+            if row["unscoreable"]:
+                lines.append(
+                    f"  {'':10} {'':13}  {row['unscoreable']} cell(s) not scoreable"
+                )
+            if row["unverifiedFields"]:
+                lines.append(
+                    f"  {'':10} {'':13}  {row['unverifiedFields']} field(s) not in "
+                    "the answer key, excluded from accuracy"
+                )
+
+    if summary["agreementSummary"]["fields"]:
+        a = summary["agreementSummary"]
+        lines.append("")
+        # None, never 0.0 — nothing judged is not total disagreement. See
+        # agreement_summary's own docstring.
+        rate_shown = "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
+        lines.append(
+            f"Agreement: {a['agreed']}/{a['fields']} fields "
+            f"({rate_shown}) — {a['disagreed']} disagreement(s), "
+            f"{a['ambiguous']} ambiguous (excluded from the rate above; the "
+            "comparator could not confidently judge them)"
+        )
+        # Filtered on `state`, never on the legacy `agree` boolean: `agree` is
+        # False for BOTH disagreed and ambiguous rows, and an ambiguous row is
+        # a pair the comparator explicitly could not judge — listing it here
+        # would fabricate a disagreement.
+        for row in summary["agreement"]:
+            if row["state"] != "disagreed":
+                continue
+            shown = ", ".join(f"{k}={v!r}" for k, v in sorted(row["values"].items()))
+            lines.append(f"  {row['docId']}.{row['field']}: {shown}")
+
+    if summary["mixedSchemas"]:
+        lines.append("")
+        lines.append(
+            "These records mix schemas of different sizes, so their token counts "
+            "are not comparable. Run cost and accuracy separately."
+        )
+
     lines.append("")
     lines.append(f"Dollar figures use list prices checked {summary['checkedOn']}.")
     for caveat in summary["caveats"]:
@@ -294,6 +361,78 @@ def render_html(summary: dict[str, Any]) -> str:
         f"<p class=warn>{summary['unmeasurable']} cell(s) reported no usage and "
         "are excluded from every total on this page.</p>"
         if summary["unmeasurable"]
+        else ""
+    )
+
+    accuracy_section = ""
+    if summary["accuracy"]:
+        accuracy_rows = "\n".join(
+            f"<tr><td>{e(r['providerId'])}</td>"
+            f"<td>{'with Nutrient' if r['withNutrient'] else 'direct'}</td>"
+            f"<td class=n>"
+            + (
+                "not scoreable"
+                if r["accuracy"] is None
+                else f"{r['matched']}/{r['verified']} ({r['accuracy']:.0%})"
+            )
+            + f"</td><td class=n>{r['unscoreable']}</td>"
+            f"<td class=n>{r['unverifiedFields']}</td></tr>"
+            for r in summary["accuracy"]
+        )
+        accuracy_section = f"""
+<h2>Accuracy</h2>
+<p class=sub>Scored against the answer key. A field the key does not cover is
+never counted against a provider, and a cell the harness could not read
+counts as "not scoreable" rather than as a zero.</p>
+<div class=scroll>
+<table>
+  <tr><th>provider</th><th>half</th><th class=n>accuracy</th>
+      <th class=n>not scoreable</th><th class=n>fields not in key</th></tr>
+{accuracy_rows}
+</table>
+</div>
+"""
+
+    agreement_section = ""
+    if summary["agreementSummary"]["fields"]:
+        agreement_note = (
+            "<h2>Where the providers disagree</h2><p class=sub>Each row is a field "
+            "where two configurations returned different answers. This is the part "
+            "worth dwelling on: looking at two different values, you cannot tell "
+            "which is right without a citation back to the page to check — and a "
+            "citation is exactly what the grounded half returns and the direct half "
+            "does not.</p>"
+        )
+        a = summary["agreementSummary"]
+        rate_shown = "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
+        # Filtered on `state`, never on the legacy `agree` boolean: `agree` is
+        # False for both disagreed AND ambiguous rows, and listing an ambiguous
+        # row here — a pair the comparator explicitly could not judge — would
+        # fabricate a disagreement in the exact artifact this feature exists to
+        # produce.
+        disagreement_rows = "\n".join(
+            f"<tr><td>{e(row['docId'])}</td><td>{e(row['field'])}</td>"
+            f"<td>{e(', '.join(f'{k}={v!r}' for k, v in sorted(row['values'].items())))}</td></tr>"
+            for row in summary["agreement"]
+            if row["state"] == "disagreed"
+        )
+        agreement_section = f"""
+{agreement_note}
+<p class=sub>{a['agreed']}/{a['fields']} fields agreed ({rate_shown}) — {a['disagreed']}
+disagreement(s) below, and {a['ambiguous']} ambiguous field(s) excluded from the rate
+because the comparator could not confidently judge them.</p>
+<div class=scroll>
+<table>
+  <tr><th>document</th><th>field</th><th>values</th></tr>
+{disagreement_rows}
+</table>
+</div>
+"""
+
+    mixed_note = (
+        "<p class=warn>These records mix schemas of different sizes, so their "
+        "token counts are not comparable. Run cost and accuracy separately.</p>"
+        if summary["mixedSchemas"]
         else ""
     )
 
@@ -346,6 +485,9 @@ so it matters most on the smallest documents and fades on the largest. The
 100k-document column is a linear projection of the measured mean, and it is only
 meaningful while that spread stays narrow — if it widens, read the per-document
 rows instead.</p>
+{mixed_note}
+{accuracy_section}
+{agreement_section}
 
 <h2>Reading this honestly</h2>
 <ul>

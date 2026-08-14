@@ -55,3 +55,32 @@ def test_field_type_maps_a_key_value_to_a_comparator_type(value, expected):
 
 def test_a_supplied_key_is_read_from_a_path():
     ...  # completed in Task 7, where --answers lands
+
+
+def test_a_supplied_csv_key_is_read(tmp_path):
+    """A prospect with a spreadsheet of known values should not have to author
+    JSON to use this."""
+    p = tmp_path / "key.csv"
+    p.write_text(
+        "docId,field,value,source\n"
+        "inv,invoiceNumber,AC-2025-1047,Invoice No: AC-2025-1047\n"
+        "inv,totalAmount,345015,Amount Due\n"
+    )
+    from costlab.answers import load_answers_csv
+
+    key = load_answers_csv(p)
+    assert key.documents["inv"]["invoiceNumber"]["value"] == "AC-2025-1047"
+    # Numeric-looking values become numbers so they compare with tolerance
+    # rather than as text.
+    assert key.documents["inv"]["totalAmount"]["value"] == 345015
+
+
+def test_a_csv_missing_required_columns_fails_loudly(tmp_path):
+    """Silently reading zero rows would report every provider as unscoreable and
+    look like a model problem."""
+    p = tmp_path / "bad.csv"
+    p.write_text("document,field\ninv,invoiceNumber\n")
+    from costlab.answers import load_answers_csv
+
+    with pytest.raises(ValueError, match="docId"):
+        load_answers_csv(p)

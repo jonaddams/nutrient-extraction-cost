@@ -22,6 +22,39 @@ block, then prices them from a dated table you can replace.
 they do less: no grounded source locations, no confidence components. The delta is the price of
 those features, not waste. Every surface that compares the two says so.
 
+## Accuracy
+
+Three modes, in increasing order of what they need from you.
+
+**Cross-provider agreement** needs nothing at all, and is the default on your own documents. It
+reports every field where two configurations returned different answers. This is the part worth
+dwelling on: looking at two different values, you cannot tell which is right without a citation
+back to the page — and a citation is exactly what the grounded half returns and the direct half
+does not.
+
+**The bundled answer key** scores true accuracy on the 17 shipped documents. Every value in it was
+read directly off the document and carries the line it came from.
+
+**Your own answer key** scores true accuracy on your documents:
+
+    costlab --corpus ./my-docs --answers ./my-key.csv --mode accuracy
+
+CSV columns are `docId,field,value,source`. JSON is also accepted, in the shape of
+`costlab/corpus/answers.json`.
+
+Three things the scoring deliberately does:
+
+- **A field with no answer key is never counted against a provider.** Your score should not depend
+  on how complete the key is.
+- **A field the key covers that came back empty counts as wrong**, not as unknown. "Didn't answer"
+  and "answered wrong" both mean a human still has to go and check.
+- **Anything not confidently comparable is reported as unverified rather than as an error.** Every
+  reported mismatch is a claim that a provider got something wrong, so the bar for making one is
+  deliberately high.
+
+Accuracy mode gives each document its own schema, taken from the answer key, so its token counts
+are **not** comparable with a cost run's. Run them separately.
+
 ## Install and run
 
 Requires Python 3.10 or newer.
@@ -48,6 +81,8 @@ Output lands in `out/`: `records.json` (one record per document per cell), `repo
 | `--corpus DIR` | Documents to run. A bare directory of PDFs or images works; a `manifest.json` lets you set per-document schemas. |
 | `--providers a,b` | Restrict to specific providers. Default is every one whose credential is set. |
 | `--prices FILE` | Use your negotiated rates instead of the bundled list prices. |
+| `--mode cost\|accuracy` | `cost` (default): one shared schema for every document. `accuracy`: each document's own answer-key fields — see [Accuracy](#accuracy). |
+| `--answers PATH` | Score against this answer key instead of the bundled one. JSON or CSV (`docId,field,value,source`). Implies scoring even outside `--mode accuracy`. |
 | `--no-capture-bodies` | Do not write request or response bodies to disk. |
 | `--out DIR` | Where to write results. Defaults to `out/`. |
 | `--yes` | Skip the confirmation prompt. |

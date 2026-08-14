@@ -35,6 +35,43 @@ def load_answers(path: str | Path | None = None) -> AnswerKey:
     )
 
 
+def load_answers_csv(path: str | Path) -> AnswerKey:
+    """A prospect's key as a spreadsheet: docId, field, value, source.
+
+    Required columns are checked up front and their absence raises. Reading zero
+    rows silently would report every provider as unscoreable, which looks like a
+    model problem and is not one.
+    """
+    import csv
+
+    rows = list(csv.DictReader(Path(path).read_text().splitlines()))
+    required = {"docId", "field", "value"}
+    present = set(rows[0]) if rows else set()
+    missing = required - present
+    if missing:
+        raise ValueError(
+            f"answer key CSV is missing required column(s): {', '.join(sorted(missing))}. "
+            f"Found: {', '.join(sorted(present)) or 'nothing'}"
+        )
+
+    documents: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in rows:
+        raw = (row.get("value") or "").strip()
+        # A numeric-looking value becomes a number so it compares with tolerance
+        # rather than as text: "345015.00" and 345015 are the same answer.
+        try:
+            value: Any = float(raw) if raw and raw.replace(".", "", 1).lstrip("-").isdigit() else raw
+        except ValueError:
+            value = raw
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
+        documents.setdefault(row["docId"], {})[row["field"]] = {
+            "value": value,
+            "source": (row.get("source") or "supplied answer key").strip(),
+        }
+    return AnswerKey(checked_on="supplied", documents=documents)
+
+
 def field_type(value: Any) -> str:
     """The `type_` argument `compare_field` expects for a key value.
 

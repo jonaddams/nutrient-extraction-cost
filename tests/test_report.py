@@ -213,3 +213,85 @@ def test_json_render_round_trips():
         _priced_table(),
     )
     assert json.loads(render_json(out))["byDocument"][0]["deltaInputTokens"] == 400
+
+
+# --- Task 7: accuracy and agreement sections, and the mixed-schema warning.
+
+
+def test_report_shows_accuracy_per_half_and_never_a_zero_for_unscoreable():
+    from costlab.answers import AnswerKey
+
+    key = AnswerKey(checked_on="2026-08-14", documents={
+        "a": {"total": {"value": 100, "source": "Total 100"}}})
+    recs = [
+        {**_rec("a", "bedrock", True, 1000), "extracted": {"total": 100}},
+        {**_rec("a", "bedrock", False, 600), "extracted": None},
+    ]
+    out = summarise(recs, _priced_table(), key=key)
+    rows = {r["withNutrient"]: r for r in out["accuracy"]}
+    assert rows[True]["accuracy"] == 1.0
+    assert rows[False]["accuracy"] is None
+    assert rows[False]["unscoreable"] == 1
+    text = render_terminal(out)
+    assert "not scoreable" in text
+    # Correction to the original spec assertion: the terminal renderer formats
+    # accuracy with "{:.0%}", so a correct 100% render legitimately contains
+    # the substring "0%" (as part of "100%"). The real requirement is that an
+    # unscoreable cell never renders as a ZERO score — i.e. never "(0%)".
+    assert "(0%)" not in text
+
+
+def test_html_explains_what_a_disagreement_means_for_the_reader():
+    """A disagreement table with no explanation is trivia. The point is that a
+    reader cannot resolve it without a citation to check."""
+    recs = [
+        {**_rec("a", "bedrock", True, 1000), "extracted": {"total": 100}},
+        {**_rec("a", "anthropic", True, 1400), "extracted": {"total": 999}},
+    ]
+    out = summarise(recs, _priced_table())
+    html = render_html(out).lower()
+    assert "citation" in html
+
+
+def test_accuracy_and_cost_runs_are_not_silently_compared():
+    """Accuracy mode uses each document's own schema, so its token counts are
+    not comparable with a shared-schema cost run. A report mixing both must say
+    so rather than presenting one table."""
+    recs = [
+        {**_rec("a", "bedrock", True, 1000), "schemaFieldCount": 1},
+        {**_rec("a", "bedrock", False, 600), "schemaFieldCount": 5},
+    ]
+    out = summarise(recs, _priced_table())
+    assert out["mixedSchemas"] is True
+    assert "not comparable" in render_terminal(out).lower()
+
+
+def test_an_ambiguous_row_is_absent_from_the_rendered_disagreement_output():
+    """`agreement()` rows carry both a three-way `state` and a legacy two-way
+    `agree` boolean, and `agree` is False for BOTH "disagreed" and "ambiguous"
+    rows. Building the disagreement list from `agree` would put an ambiguous
+    row -- a pair the comparator explicitly could not judge -- into a list
+    captioned as providers disagreeing. This must not merely be counted
+    separately in the summary; it must be genuinely absent from the rendered
+    list of disagreements, in both renderers.
+    """
+    # "4/1/2026" and "2026-01-04" are the golden ambiguous-slash-date case:
+    # compare_field refuses to guess a date convention for either direction,
+    # so the pairwise verdict is "unverified" and the row lands as
+    # "ambiguous", never "agreed" and never "disagreed".
+    recs = [
+        {**_rec("a", "bedrock", True, 1000), "extracted": {"asOf": "4/1/2026"}},
+        {**_rec("a", "anthropic", True, 1400), "extracted": {"asOf": "2026-01-04"}},
+    ]
+    out = summarise(recs, _priced_table())
+    row = next(r for r in out["agreement"] if r["field"] == "asOf")
+    assert row["state"] == "ambiguous"
+    assert row["agree"] is False
+    assert out["agreementSummary"]["ambiguous"] == 1
+    assert out["agreementSummary"]["disagreed"] == 0
+
+    terminal_text = render_terminal(out)
+    assert "asOf" not in terminal_text
+
+    html = render_html(out)
+    assert "asOf" not in html

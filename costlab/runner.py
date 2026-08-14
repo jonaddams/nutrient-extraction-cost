@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from . import prices, report
-from .answers import load_answers, schema_for
+from .answers import load_answers, load_answers_csv, schema_for
 from .providers import PROVIDERS, Provider, available, direct_request
 from .proxy import RecordingProxy
 
@@ -450,6 +450,11 @@ def main(argv: list[str] | None = None) -> int:
             "comparable with a cost run."
         ),
     )
+    parser.add_argument(
+        "--answers",
+        default=None,
+        help="answer key to score against: JSON, or CSV with docId,field,value,source",
+    )
     args = parser.parse_args(argv)
 
     chosen = available()
@@ -480,8 +485,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No documents found in {args.corpus}", file=sys.stderr)
         return 2
 
-    if args.mode == "accuracy":
+    # Deliberately computed once, ahead of the run, so the same key both
+    # rescopes the accuracy-mode schema below AND scores the records once
+    # they come back — a prospect's own --answers key must govern both, not
+    # just the final report.
+    key = None
+    if args.answers:
+        key = (
+            load_answers_csv(args.answers)
+            if str(args.answers).lower().endswith(".csv")
+            else load_answers(args.answers)
+        )
+    elif args.mode == "accuracy":
         key = load_answers()
+
+    if args.mode == "accuracy":
         rescoped = []
         for doc in corpus:
             schema = schema_for(key, doc.id)
@@ -547,7 +565,7 @@ def main(argv: list[str] | None = None) -> int:
 
     table = prices.load(args.prices)
     summary = report.summarise(
-        records, table, models={p.id: p.default_model for p in chosen}
+        records, table, models={p.id: p.default_model for p in chosen}, key=key
     )
     (out_dir / "report.json").write_text(report.render_json(summary))
     (out_dir / "report.html").write_text(report.render_html(summary))
