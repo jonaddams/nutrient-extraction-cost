@@ -42,10 +42,15 @@ _LONG_DAY_FIRST = re.compile(r"^(\d{1,2})\s+([A-Za-z]+)\.?,?\s+(\d{4})$")
 _DASHES = re.compile("[‐‑‒–—−]")
 _WHITESPACE = re.compile(r"\s+")
 
-# A slash-separated date is genuinely ambiguous (US month/day/year vs.
-# international day/month/year) and deliberately left unresolved by _to_ymd.
-# See the guard in compare_field for how that ambiguity is handled without
-# either guessing a convention or accusing a provider of a mismatch.
+# A slash-separated date is ambiguous only when BOTH leading components could
+# plausibly be the month (i.e. both are <= 12) — "20/09/2022" cannot be
+# month-20, so it is unambiguously day/month/year and _to_ymd resolves it
+# below. When both components are <= 12 ("4/1/2026") there is no way to tell
+# US month/day/year from international day/month/year apart, and _to_ymd
+# deliberately leaves it unresolved. See the guard in compare_field for how
+# that remaining ambiguity is handled without either guessing a convention or
+# accusing a provider of a mismatch.
+_SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 _AMBIGUOUS_SLASH_DATE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")
 
 
@@ -142,6 +147,18 @@ def _to_ymd(value: str) -> tuple[int, int, int] | None:
         month = _MONTHS.get(day_first.group(2).lower())
         if month:
             return (int(day_first.group(3)), month, int(day_first.group(1)))
+
+    slash = _SLASH_DATE.match(text)
+    if slash:
+        first, second, year = int(slash.group(1)), int(slash.group(2)), int(slash.group(3))
+        # Unambiguous only when exactly one of the two leading components
+        # cannot be a month. Guessing is never acceptable here (see the
+        # module docstring's number-parsing rationale for why): when both are
+        # <= 12, leave it unresolved rather than pick a regional convention.
+        if first > 12 and second <= 12:
+            return (year, second, first)  # day/month/year
+        if second > 12 and first <= 12:
+            return (year, first, second)  # month/day/year
 
     return None
 

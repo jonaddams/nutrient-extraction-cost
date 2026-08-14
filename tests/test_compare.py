@@ -75,3 +75,35 @@ def test_ambiguous_slash_date_is_unverified_not_a_mismatch():
         compare_field("March 1, 2025", {"value": "03/01/2025"}, "string")
         == "unverified"
     )
+
+
+def test_unambiguous_slash_date_resolves_normally():
+    """Python-only case, alongside the ambiguous one above: a slash date is
+    only genuinely ambiguous when BOTH leading components could be a month.
+    "20/09/2022" cannot be month-20, so it unambiguously reads as day/month/
+    year and must resolve and compare like any other date — a provider that
+    answers in ISO against this key value must not be marked unverified.
+
+    This is drawn from three real slash dates in the bundled answer key
+    (an invoice's issue date, another invoice's issue date, and a billing
+    worksheet's admission date); before this fix all three silently dropped
+    out of scoring against a provider that (correctly) answered in ISO."""
+    assert (
+        compare_field("2022-09-20", {"value": "20/09/2022"}, "string") == "match"
+    )
+    assert (
+        compare_field("20/09/2022", {"value": "2022-09-20"}, "string") == "match"
+    )
+    assert (
+        compare_field("2022-09-21", {"value": "20/09/2022"}, "string") == "mismatch"
+    )
+
+
+def test_both_components_low_slash_date_stays_unverified():
+    """"4/1/2026" could be April 1st or January 4th — both components are
+    <= 12, so this stays genuinely ambiguous even against an ISO date the
+    provider got right by one reading. Do not extend the >12 resolution
+    logic to guess a convention here."""
+    assert (
+        compare_field("2026-01-04", {"value": "4/1/2026"}, "string") == "unverified"
+    )
