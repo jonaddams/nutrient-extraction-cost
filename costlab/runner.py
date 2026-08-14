@@ -182,15 +182,21 @@ def extracted_values(payload: Any, *, with_nutrient: bool) -> dict[str, Any] | N
     """The field values one cell produced, or None if none could be read.
 
     None and {} are different findings and must never be conflated. An empty
-    dict scores every field as a mismatch, which reports the provider as
-    catastrophically wrong; None records that the harness could not read the
-    answer, which is a statement about the harness.
+    dict is a fully parsed field map that happens to be empty — a readable
+    answer meaning "found nothing" — and it must score as a mismatch on every
+    keyed field; None records that the harness could not read the answer at
+    all, which is a statement about the harness, not the provider. Collapsing
+    {} into None would let a provider escape scoring entirely by declining to
+    answer, which is the one conflation this function exists to prevent.
 
     The two halves genuinely differ in shape. The SDK returns an envelope with
-    the values under "extraction" beside its own grounding metadata. A direct
-    call returns a JSON string inside a chat completion (choices) or an
-    Anthropic content block, and that string is model output: it may be fenced,
-    prefaced with prose, or not be an object at all.
+    the values under "extraction" beside its own grounding metadata — an empty
+    "extraction" there is the SDK's own structured field saying it found
+    nothing, not raw model text needing recovery. A direct call returns a JSON
+    string inside a chat completion (choices) or an Anthropic content block,
+    and that string is model output: it may be fenced, prefaced with prose, or
+    not be an object at all — those cases never parse to a dict, so None is
+    correct for them.
     """
     if payload is None:
         return None
@@ -207,7 +213,7 @@ def extracted_values(payload: Any, *, with_nutrient: bool) -> dict[str, Any] | N
         if not isinstance(parsed, dict):
             return None
         values = parsed.get("extraction", parsed)
-        return values if isinstance(values, dict) and values else None
+        return values if isinstance(values, dict) else None
 
     if not isinstance(parsed, dict):
         return None
@@ -226,7 +232,7 @@ def extracted_values(payload: Any, *, with_nutrient: bool) -> dict[str, Any] | N
     if not isinstance(content, str):
         return None
     values = _loads_or_none(content)
-    return values if isinstance(values, dict) and values else None
+    return values if isinstance(values, dict) else None
 
 
 def _loads_or_none(text: str) -> Any:
@@ -284,7 +290,11 @@ def _run_sdk_cell(
 def _run_direct_cell(
     provider: Provider, doc: Doc, port: int, document_text: str, proxy: RecordingProxy
 ) -> dict[str, Any] | None:
-    """POST the minimal no-Nutrient request through the same proxy."""
+    """POST the minimal no-Nutrient request through the same proxy.
+
+    Returns the values extracted from the response (for scoring), mirroring
+    what _run_sdk_cell returns for the with-Nutrient half.
+    """
     body = direct_request(
         provider, provider.default_model, document_text, doc.schema
     )

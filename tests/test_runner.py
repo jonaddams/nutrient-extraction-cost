@@ -262,3 +262,21 @@ def test_a_fenced_json_block_still_parses():
         ]
     }
     assert extracted_values(body, with_nutrient=False) == {"invoiceNumber": "AC-1"}
+
+
+def test_an_empty_but_readable_extraction_is_not_none():
+    """A provider that answers {} found nothing — that is a readable answer,
+    and it must score as a mismatch on every keyed field. Collapsing it to
+    None makes the record unscoreable, which lets declining to answer improve
+    a provider's score against one that guessed and got it wrong.
+
+    Regression: extracted_values used to return `values if isinstance(values,
+    dict) and values else None`, so a truthy dict was required and an empty
+    one silently became None on both halves. Fixed to check only the type.
+    """
+    assert extracted_values(
+        {"choices": [{"message": {"content": "{}"}}]}, with_nutrient=False
+    ) == {}
+    assert extracted_values(
+        '{"extraction": {}, "metadata": {}}', with_nutrient=True
+    ) == {}
