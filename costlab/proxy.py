@@ -49,6 +49,16 @@ class RecordingProxy:
         # so this is sized for the slowest honest case, not the typical one.
         self.timeout = timeout
         self.records: list[dict[str, Any]] = []
+        # The most recent outbound request body, IN MEMORY ONLY. The runner needs
+        # it to build the no-Nutrient call from the same extracted document text
+        # the SDK sent, which is what makes the two halves comparable. It is
+        # deliberately NOT part of `records`: records get serialised into
+        # reports, and document content must never ride along. It is also not
+        # written to disk when capture_bodies is False.
+        #
+        # "Last" is only meaningful because the runner drives one call at a time
+        # per proxy. Do not read it from concurrent callers.
+        self.last_request_body: dict[str, Any] | None = None
         self._label = "unlabelled"
         self._server: http.server.ThreadingHTTPServer | None = None
         # ThreadingHTTPServer handles requests in parallel, so claiming a
@@ -148,6 +158,7 @@ class RecordingProxy:
             seq = len(self.records) + 1
             record["seq"] = seq
             self.records.append(record)
+            self.last_request_body = request_body
         if self.capture_bodies:
             (self.out_dir / f"{seq}.json").write_text(
                 json.dumps(
