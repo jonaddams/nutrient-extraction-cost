@@ -329,12 +329,32 @@ def render_terminal(summary: dict[str, Any]) -> str:
         # None, never 0.0 — nothing judged is not total disagreement. See
         # agreement_summary's own docstring.
         rate_shown = "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
+        # The fraction is over JUDGED fields, not over every row: printing
+        # agreed/fields beside a rate of agreed/judged makes the two disagree
+        # the moment anything is excluded, and the larger denominator is the
+        # one that flatters. Excluded rows are named on their own line rather
+        # than folded into either number.
+        judged = a["agreed"] + a["disagreed"]
         lines.append(
-            f"Agreement: {a['agreed']}/{a['fields']} fields "
-            f"({rate_shown}) — {a['disagreed']} disagreement(s), "
-            f"{a['ambiguous']} ambiguous (excluded from the rate above; the "
-            "comparator could not confidently judge them)"
+            f"Agreement: {a['agreed']}/{judged} fields judged "
+            f"({rate_shown}) — {a['disagreed']} disagreement(s)"
         )
+        excluded = []
+        if a["ambiguous"]:
+            excluded.append(
+                f"{a['ambiguous']} ambiguous (the comparator could not "
+                "confidently judge them)"
+            )
+        if a.get("unanswered"):
+            excluded.append(
+                f"{a['unanswered']} that no provider answered (nothing to "
+                "agree about)"
+            )
+        if excluded:
+            lines.append(
+                f"  excluded from the rate: {'; '.join(excluded)}. "
+                f"{a['fields']} field(s) considered in total."
+            )
         # Filtered on `state`, never on the legacy `agree` boolean: `agree` is
         # False for BOTH disagreed and ambiguous rows, and an ambiguous row is
         # a pair the comparator explicitly could not judge — listing it here
@@ -467,9 +487,11 @@ alongside it rather than as a like-for-like comparison.</p>
         )
         agreement_section = f"""
 {agreement_note}
-<p class=sub>{a['agreed']}/{a['fields']} fields agreed ({rate_shown}) — {a['disagreed']}
-disagreement(s) below, and {a['ambiguous']} ambiguous field(s) excluded from the rate
-because the comparator could not confidently judge them.</p>
+<p class=sub>{a['agreed']}/{a['agreed'] + a['disagreed']} judged fields agreed
+({rate_shown}) — {a['disagreed']} disagreement(s) below. Excluded from that rate:
+{a['ambiguous']} field(s) the comparator could not confidently judge, and
+{a.get('unanswered', 0)} that no provider answered at all — nobody answered, so there is
+nothing to agree about. {a['fields']} field(s) were considered in total.</p>
 <div class=scroll>
 <table>
   <tr><th>document</th><th>field</th><th>values</th></tr>

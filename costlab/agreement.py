@@ -318,14 +318,32 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     pair_verdicts.append(compare_field(a, {"value": b}, type_))
             disagreed = any(v == "mismatch" for v in pair_verdicts)
             agreed = any(v == "match" for v in pair_verdicts)
-            # Three states, not a boolean. A row where every pairwise
-            # comparison came back "unverified" (compare_field could not judge
-            # any of them, e.g. "4/1/2026" against "2026-01-04") must not
-            # collapse into "agreed" — that would report 100% agreement from a
-            # comparison that was never made, which is both a fabricated claim
-            # and, in the direction that matters most, an understatement of
-            # disagreement.
-            if disagreed:
+            # Four states, not a boolean. Two of them exist to keep claims the
+            # tool never measured out of the headline rate:
+            #
+            # "ambiguous" — every pairwise comparison came back "unverified"
+            # (compare_field could not judge any of them, e.g. "4/1/2026"
+            # against "2026-01-04"). Collapsing that into "agreed" would report
+            # agreement from a comparison that was never made.
+            #
+            # "unanswered" — NO provider produced a value for this field. The
+            # pair rule above is right that two absences do not disagree, but
+            # that is a statement about the pair, not about the providers'
+            # answers: nobody answered, so there is nothing to agree about.
+            # Counting these as agreements inflated the headline badly — four
+            # requested fields where providers differed on one and nobody
+            # answered the other three reported "Agreement: 3/4 fields (75%)",
+            # three quarters of it derived from comparisons never made. Note
+            # this errs AGAINST the case the tool exists to make, which is
+            # precisely why it survived: an overstatement in the flattering
+            # direction gets challenged, one in the modest direction does not.
+            #
+            # The row is kept rather than skipped so it stays visible and so
+            # the reconciliation identity below holds; it is excluded from the
+            # rate's numerator and denominator alike.
+            if all(_is_absent(v) for v in values.values()):
+                state = "unanswered"
+            elif disagreed:
                 state = "disagreed"
             elif agreed:
                 state = "agreed"
@@ -367,14 +385,19 @@ def agreement_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     agreed = sum(1 for r in rows if r["state"] == "agreed")
     disagreed = sum(1 for r in rows if r["state"] == "disagreed")
     ambiguous = sum(1 for r in rows if r["state"] == "ambiguous")
+    unanswered = sum(1 for r in rows if r["state"] == "unanswered")
     judged = agreed + disagreed
     return {
         "fields": len(rows),
         "agreed": agreed,
         "disagreed": disagreed,
         "ambiguous": ambiguous,
+        "unanswered": unanswered,
         # None, never 0.0: nothing judged is not total disagreement. Ambiguous
-        # rows are excluded from both numerator and denominator, not folded
-        # into either side.
+        # and unanswered rows are excluded from both numerator and denominator,
+        # not folded into either side — the rate answers "when the providers
+        # both answered and the comparison could be made, how often did they
+        # agree?", and every row outside that condition is reported separately
+        # rather than silently counted as agreement.
         "rate": agreed / judged if judged else None,
     }

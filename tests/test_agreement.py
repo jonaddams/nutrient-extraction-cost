@@ -189,23 +189,34 @@ def test_a_summary_of_only_ambiguous_rows_reports_no_rate():
     assert summary["rate"] is None
 
 
-def test_agreed_disagreed_and_ambiguous_reconcile_to_the_total_field_count():
-    """`fields` is the total row count, so the three buckets must add back up
-    to it exactly -- a report that shows fields, agreed, disagreed and
-    ambiguous side by side must always reconcile, with no row silently
-    uncounted or double-counted."""
+def test_every_bucket_reconciles_to_the_total_field_count():
+    """`fields` is the total row count, so the four buckets must add back up to
+    it exactly -- a report showing fields, agreed, disagreed, ambiguous and
+    unanswered side by side must always reconcile, with no row silently
+    uncounted or double-counted. Two of those buckets are excluded from the
+    rate, so the identity is what lets a reader see how much was excluded
+    rather than having to infer it."""
     rows = agreement([
         _rec("inv", "bedrock", True, {
             "total": 345015, "vendor": "same", "issueDate": "4/1/2026",
+            "poNumber": None,
         }),
         _rec("inv", "anthropic", True, {
             "total": 999, "vendor": "same", "issueDate": "2026-01-04",
+            "poNumber": "",
         }),
     ])
     summary = agreement_summary(rows)
-    assert summary["fields"] == 3
+    assert summary["fields"] == 4
+    assert summary["agreed"] == 1        # vendor
+    assert summary["disagreed"] == 1     # total
+    assert summary["ambiguous"] == 1     # issueDate, two unresolvable readings
+    assert summary["unanswered"] == 1    # poNumber, nobody answered
     assert (
-        summary["agreed"] + summary["disagreed"] + summary["ambiguous"]
+        summary["agreed"]
+        + summary["disagreed"]
+        + summary["ambiguous"]
+        + summary["unanswered"]
         == summary["fields"]
     )
 
@@ -350,12 +361,21 @@ def test_absence_agreement_is_order_independent():
         assert forward == backward, (value_a, value_b, forward, backward)
 
 
-def test_both_absent_values_agree_and_count_as_one_distinct_answer():
-    """Two providers that both found nothing have not disagreed about
-    anything. None, "", and "." are the same non-answer wearing different
-    clothes -- _normalise_text(".") is "", so a punctuation placeholder and a
-    blank field are indistinguishable -- so any pair of them must agree, and
-    must count as a single distinct answer rather than as two or three."""
+def test_a_field_no_provider_answered_is_unanswered_not_agreed():
+    """Two providers that both found nothing have not DISAGREED -- but they
+    have not agreed about an answer either, because there is no answer. None,
+    "", and "." are the same non-answer wearing different clothes
+    (_normalise_text(".") is ""), so every pair of them is one distinct
+    non-answer; the row's state is "unanswered", and it stays out of the
+    agreement rate entirely.
+
+    Counting these as agreements inflated the headline badly: four requested
+    fields where the providers differed on one and nobody answered the other
+    three reported "Agreement: 3/4 fields (75%)", three quarters of it from
+    comparisons never made. The error ran AGAINST the case this tool exists to
+    make, which is exactly why it survived a whole-branch review -- an
+    overstatement in the flattering direction gets challenged.
+    """
     absent_pairs = [
         (None, None), ("", ""), (".", "."),
         (None, ""), ("", "."), (None, "."),
@@ -366,8 +386,33 @@ def test_both_absent_values_agree_and_count_as_one_distinct_answer():
             _rec("inv", "anthropic", True, {"total": absent_b}),
         ])
         row = next(r for r in rows if r["field"] == "total")
-        assert row["state"] == "agreed", (absent_a, absent_b)
+        assert row["state"] == "unanswered", (absent_a, absent_b)
         assert row["distinct"] == 1, (absent_a, absent_b)
+        summary = agreement_summary(rows)
+        assert summary["unanswered"] == 1, (absent_a, absent_b)
+        assert summary["agreed"] == 0, (absent_a, absent_b)
+        # Nothing was judged, so there is no rate to report.
+        assert summary["rate"] is None, (absent_a, absent_b)
+
+
+def test_unanswered_fields_do_not_inflate_the_agreement_rate():
+    """The exact shape that produced the fabricated headline: several fields
+    requested, the providers differ on one, and no provider answers the rest.
+    The rate must describe only the fields that were actually judged."""
+    requested = ["invoiceNumber", "issueDate", "vendorName", "totalAmount"]
+    rows = agreement([
+        {**_rec("inv", "bedrock", True, {"totalAmount": 100}),
+         "requestedFields": requested},
+        {**_rec("inv", "anthropic", True, {"totalAmount": 999}),
+         "requestedFields": requested},
+    ])
+    summary = agreement_summary(rows)
+    assert summary["fields"] == 4
+    assert summary["unanswered"] == 3
+    assert summary["agreed"] == 0
+    assert summary["disagreed"] == 1
+    # Was 0.75 before this fix, from three comparisons that never happened.
+    assert summary["rate"] == 0.0
 
 
 def test_exactly_one_absent_value_disagrees():
