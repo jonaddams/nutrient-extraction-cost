@@ -36,14 +36,94 @@ def test_providers_that_disagree_are_flagged_with_both_values():
     assert set(row["values"].values()) == {345015, 999}
 
 
-def test_a_field_only_one_cell_produced_is_not_a_disagreement():
-    """One opinion is not a conflict. Counting it as one would inflate the
-    disagreement rate with fields nobody contested."""
+def test_a_field_only_one_provider_was_asked_about_is_not_a_disagreement():
+    """One opinion is not a conflict -- but only when it really is one
+    opinion. This test used to assert the bug: it passed `{}` for the second
+    provider and expected NO row, which encoded "answered and found nothing"
+    as "was never asked". That directly contradicted
+    test_exactly_one_absent_value_disagrees below, which says exactly one
+    absent value makes a pair disagree, on the identical situation.
+
+    The genuine case is a field the other provider's schema never mentioned:
+    `requestedFields` records what each cell was actually asked for, so a
+    field outside it is a question nobody put to that provider, not an
+    absence. Counting that as a disagreement would inflate the rate with
+    fields nobody contested."""
+    records = [
+        _rec("inv", "bedrock", True, {"total": 345015, "vendor": "Acme"}),
+        _rec("inv", "anthropic", True, {"total": 345015}),
+    ]
+    records[0]["requestedFields"] = ["total", "vendor"]
+    records[1]["requestedFields"] = ["total"]
+    rows = agreement(records)
+    assert [r["field"] for r in rows] == ["total"]
+    assert next(r for r in rows if r["field"] == "total")["state"] == "agreed"
+
+
+def test_a_cell_that_did_not_run_produces_no_row_at_all():
+    """`None` is a cell that did not run -- the harness has no answer from it,
+    not an answer of "nothing". It must not take part, which leaves one lone
+    opinion on the field and therefore no row."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"total": 345015}),
+        _rec("inv", "anthropic", True, None),
+    ])
+    assert [r["field"] for r in rows] == []
+
+
+def test_a_provider_that_answered_nothing_disagrees_rather_than_vanishing():
+    """`{}` is a provider that ANSWERED and found nothing, and that is a real
+    difference from a provider that found a value -- the same case
+    test_exactly_one_absent_value_disagrees pins with an explicit None.
+
+    Before the fix, `if not extracted: continue` collapsed `{}` into "did not
+    run", so with two providers the field disappeared from the report
+    entirely, and with three providers it inverted the headline: measured on
+    the branch, a third provider returning {"total": None, "date": None} gave
+    agreed 0 / disagreed 2 / rate 0.0, while the SAME provider returning {}
+    gave agreed 2 / disagreed 0 / rate 1.0. Same reality, opposite headline.
+    It is reachable in ordinary use: neither half of a cell forces every
+    requested key to come back."""
     rows = agreement([
         _rec("inv", "bedrock", True, {"total": 345015}),
         _rec("inv", "anthropic", True, {}),
     ])
-    assert [r["field"] for r in rows] == []
+    row = next(r for r in rows if r["field"] == "total")
+    assert row["state"] == "disagreed"
+    assert row["values"] == {"bedrock:sdk": 345015, "anthropic:sdk": None}
+    assert row["distinct"] == 2
+
+    # And the three-provider headline is the same whichever way the silent
+    # provider expresses its silence -- an omitted key and an explicit null
+    # are the same non-answer.
+    def _summary(third):
+        return agreement_summary(agreement([
+            _rec("inv", "a", True, {"total": 100, "date": "2026-01-04"}),
+            _rec("inv", "b", True, {"total": 100, "date": "2026-01-04"}),
+            _rec("inv", "c", True, third),
+        ]))
+
+    assert _summary({"total": None, "date": None}) == _summary({})
+    assert _summary({})["disagreed"] == 2
+    assert _summary({})["agreed"] == 0
+
+
+def test_a_provider_that_omits_one_key_still_contributes_an_absence():
+    """Row membership must not be the union of keys providers HAPPENED to
+    emit. A provider that returned `total` but left `vendor` out has not
+    withdrawn from the vendor row -- it answered nothing there, which is a
+    difference worth showing."""
+    rows = agreement([
+        _rec("inv", "bedrock", True, {"total": 100, "vendor": "Acme"}),
+        _rec("inv", "anthropic", True, {"total": 100}),
+    ])
+    by_field = {r["field"]: r for r in rows}
+    assert sorted(by_field) == ["total", "vendor"]
+    assert by_field["total"]["state"] == "agreed"
+    assert by_field["vendor"]["state"] == "disagreed"
+    assert by_field["vendor"]["values"] == {
+        "bedrock:sdk": "Acme", "anthropic:sdk": None
+    }
 
 
 def test_cells_that_extracted_nothing_are_ignored_entirely():
@@ -327,12 +407,13 @@ def test_distinct_of_one_never_implies_disagreement():
         [100, "$100.00"],
         [345015, "$345,015.00", 345015.0],
         ["same", "same", "same"],
-        # Two identical ambiguous slash dates: compare_field's both-sided
-        # slash-date guard returns "unverified" here even though the raw
-        # text is identical, so this lands on "ambiguous" rather than
-        # "agreed" -- a separate, narrower quirk of compare.py that this
-        # round does not touch, but still satisfies the invariant under
-        # test: "ambiguous" is not "disagreed".
+        # Two identical ambiguous slash dates. compare_field's both-sided
+        # slash-date guard used to return "unverified" here even though the
+        # raw text was identical, landing the row on "ambiguous"; the
+        # text-equality short-circuit added ahead of that guard now returns
+        # "match", so this lands on "agreed". Either way the invariant under
+        # test holds -- neither is "disagreed" -- and "agreed" is the more
+        # honest of the two: a value cannot be a wrong reading of itself.
         ["4/1/2026", "4/1/2026"],
     ]
     for values in value_sets:

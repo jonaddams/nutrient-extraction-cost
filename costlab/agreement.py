@@ -100,6 +100,36 @@ field are the same non-answer in different clothes). Given that:
 Only with absence handled this way is the per-pair verdict actually
 order-independent; enumerating all pairs was necessary but not sufficient.
 
+Which RECORDS take part, and which FIELDS each of them is answerable for, are
+two separate questions, and getting either wrong inverts the headline number.
+
+A record takes part when `extracted is not None`. `is None`, never falsiness:
+`{}` is a provider that ANSWERED and found nothing, `None` is a cell that did
+not run at all. That is the exact conflation runner.extracted_values and
+score.py were built to prevent (score.py's gate is already `extracted is
+None`), and `if not extracted: continue` reintroduced it here. Measured on the
+branch, three providers where "c" finds nothing: c returning
+{"total": None, "date": None} gave agreed 0, disagreed 2, rate 0.0, while c
+returning {} gave agreed 2, disagreed 0, rate 1.0 — the same reality, opposite
+headlines, and the second one silently contradicts this module's own rule that
+exactly one absent value makes a pair disagree. It is not a contrived input
+either: runner.py sets strict_structured_output = False and the direct request
+omits "strict": true, so neither half guarantees every requested key comes back.
+
+Row membership was the second half of the same bug: building the field set from
+the keys a provider HAPPENED to emit meant a provider that omitted a field
+contributed nothing to that field rather than an absence, so with two providers
+and one returning {} the field vanished from the report entirely. A
+participating record must instead answer for every field the row considers,
+contributing an absent value where it emitted no key. `_field_sets` decides
+what "the fields it answers for" means: a record that records the fields it was
+ASKED for (`requestedFields`, written by the runner from the document's
+requested schema) answers for exactly those, so a field its schema never
+mentioned stays a question nobody put to it rather than becoming a fabricated
+absence. Only when no schema is available does the union of emitted keys stand
+in for it — and then every participating record answers for all of them, which
+is what turns a silently-omitted key back into the absence it actually is.
+
 `distinct` counts unique ANSWERS, not mismatches against an arbitrary
 reference -- {100, 200, 200} has two distinct answers, not three, and a count
 that fabricates a third would overstate disagreement in exactly the direction
@@ -182,23 +212,67 @@ def _looks_numeric(value: Any) -> bool:
     return _to_number(value) is not None
 
 
+def _field_sets(
+    participating: list[tuple[str, dict[str, Any]]],
+) -> dict[str, set[str]]:
+    """Which fields each participating record is answerable for.
+
+    Preferred source is the record's own `requestedFields` — the properties of
+    the schema the runner actually asked that cell for. A field the schema
+    never mentioned is not an absence; it is a question nobody put to that
+    provider, and scoring it as a non-answer would manufacture disagreements
+    out of two providers being asked different things.
+
+    When no record declares a schema (hand-built records in tests, or an older
+    results file), the union of every field ANY participating record emitted is
+    the only evidence available, and every participating record answers for all
+    of it. That is deliberate and is the fix for the vanishing-field bug: a
+    provider that simply omitted a key then contributes an absence to that
+    field instead of dropping the field from the report.
+    """
+    fallback: set[str] = set()
+    for _, record in participating:
+        fallback |= set(record["extracted"])
+    return {
+        label: set(record["requestedFields"])
+        if record.get("requestedFields")
+        else fallback
+        for label, record in participating
+    }
+
+
 def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    by_doc: dict[str, dict[str, dict[str, Any]]] = {}
+    by_doc: dict[str, list[tuple[str, dict[str, Any]]]] = {}
     for record in records:
-        extracted = record.get("extracted")
-        if not extracted:
+        # `is None`, never falsiness. `{}` is a provider that answered and
+        # found nothing and MUST take part; `None` is a cell that did not run
+        # and must not. See the module docstring for the measured pair of
+        # opposite headlines the falsy test produced.
+        if record.get("extracted") is None:
             continue
-        for field, value in extracted.items():
-            by_doc.setdefault(record["docId"], {}).setdefault(field, {})[
-                _label(record)
-            ] = value
+        by_doc.setdefault(record["docId"], []).append((_label(record), record))
 
     rows: list[dict[str, Any]] = []
     for doc_id in sorted(by_doc):
-        for field in sorted(by_doc[doc_id]):
-            values = by_doc[doc_id][field]
+        participating = by_doc[doc_id]
+        answerable = _field_sets(participating)
+        fields: set[str] = set()
+        for names in answerable.values():
+            fields |= names
+        for field in sorted(fields):
+            # Every record answerable for this field contributes a value, and
+            # a record that emitted no such key contributes None — an absence,
+            # which the pairwise rules below treat as the real difference it
+            # is, rather than letting it silently shrink the row.
+            values = {
+                label: record["extracted"].get(field)
+                for label, record in participating
+                if field in answerable[label]
+            }
             # One opinion is not a conflict. Counting it as one would inflate
-            # the disagreement rate with fields nobody contested.
+            # the disagreement rate with fields nobody contested — a field only
+            # one provider was ever asked about is the case this protects, not
+            # a field a provider was asked about and left out of its answer.
             if len(values) < 2:
                 continue
             # Decided from every PRESENT value in the row, never from one

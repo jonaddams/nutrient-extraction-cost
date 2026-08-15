@@ -1,7 +1,7 @@
 """The verdict for one extracted field. Pure, and deliberately narrow.
 
-A port of the TypeScript comparator the extraction studio ships. The two are
-pinned together by costlab/corpus/golden-cases.json, which both test suites
+A port of a TypeScript comparator maintained in a companion repository. The two
+are pinned together by costlab/corpus/golden-cases.json, which both test suites
 run: neither side can change a verdict without turning the other red.
 
 Biased toward "unverified" by design. Every "mismatch" is a public claim that a
@@ -184,6 +184,34 @@ def compare_field(extracted: Any, verified: dict | None, type_: str) -> Verdict:
 
     a_text = _js_string(extracted)
     b_text = _js_string(verified.get("value"))
+
+    # Identical text, before any ambiguity guard runs. A value cannot be a wrong
+    # reading of ITSELF: if a provider returned exactly what the key prints,
+    # there is nothing left to be uncertain about and no regional convention has
+    # been guessed by saying so. Without this, two bundled answer-key values —
+    # happy-tooth-invoice-excel.issueDate ("4/1/2026") and
+    # emergency-dept-billing-worksheet.admissionDate ("12/04/2016"), both with
+    # leading components <= 12 — could never be scored at all: the both-sided
+    # slash-date guard below returned "unverified" even against a provider that
+    # echoed the printed form verbatim, so every bundled run reported two
+    # fields as "could not be confidently compared" with no way to ever fix it.
+    #
+    # Placed here, after the number and boolean branches have already returned,
+    # so it can only ever pre-empt the DATE paths, and it cannot weaken any of
+    # them: two strings that normalise identically also resolve to the same
+    # calendar day (or to no day at all), so every date branch below would
+    # reach "match" for this input anyway. The one behaviour it does change is
+    # the both-sided ambiguous case, which is the point. It deliberately does
+    # NOT weaken the empty/None rule above — that check fires first, so a
+    # provider that declined to answer a field the key covers still scores
+    # "mismatch" rather than matching an empty key value.
+    #
+    # A provider that NORMALISES such a date to ISO still scores "unverified",
+    # which is the honest outcome: nothing here can tell 4 January from 1 April.
+    # This case is deliberately absent from golden-cases.json — slash-date
+    # handling is a permanent Python-only divergence, documented below.
+    if _normalise_text(a_text) == _normalise_text(b_text):
+        return "match"
 
     # Dates first: "2025-03-01" and "March 1, 2025" are the same answer and a
     # string comparison would call that a mismatch. Only when BOTH sides resolve

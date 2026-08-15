@@ -234,14 +234,28 @@ def render_terminal(summary: dict[str, Any]) -> str:
     lines.append("Per document (input tokens)")
     lines.append(
         f"  {'document':28} {'provider':10} {'SDK':>9} {'direct':>9} "
-        f"{'delta':>8} {'delta $':>12}"
+        f"{'delta':>8} {'delta $ (input)':>16} {'incl. output':>14}"
     )
     for row in summary["byDocument"]:
+        # `deltaInputCost`, not `deltaCost`. This table is headed "(input
+        # tokens)" and every other column in it is an input-token measurement;
+        # pricing the row from the output-INCLUSIVE delta put a figure of the
+        # opposite sign under an input heading. A reader saw "the SDK sent 468
+        # more tokens and cost two cents less" — exactly the not-like-for-like
+        # reading OUTPUT_CAVEAT exists to head off. The output-inclusive figure
+        # is still shown, in its own labelled column, mirroring how the
+        # per-provider table already separates the two.
         lines.append(
             f"  {row['docId'][:28]:28} {row['providerId']:10} "
             f"{row['sdkInputTokens']:>9,} {row['directInputTokens']:>9,} "
-            f"{row['deltaInputTokens']:>+8,} {_money(row['deltaCost']):>12}"
+            f"{row['deltaInputTokens']:>+8,} {_money(row['deltaInputCost']):>16} "
+            f"{_money(row['deltaCost']):>14}"
         )
+    lines.append(
+        "  'delta $ (input)' prices the input-token delta, which measures the "
+        "same document on both sides. 'incl. output' adds the output-token "
+        "difference and is not like-for-like."
+    )
 
     lines.append("")
     lines.append("Per provider")
@@ -278,6 +292,19 @@ def render_terminal(summary: dict[str, Any]) -> str:
     if summary["accuracy"]:
         lines.append("")
         lines.append("Accuracy (fields the answer key covers)")
+        # The two halves of a provider are shown side by side, but they are not
+        # guaranteed to be computed over the same documents: the harness skips
+        # a direct cell whenever its SDK cell failed (there is then no captured
+        # document text to send), and either half can be unscoreable on a given
+        # document. Reading the two figures as a like-for-like difference when
+        # they cover different document counts would be exactly the kind of
+        # unmeasured claim this tool must not make, so say so rather than
+        # leaving the reader to assume.
+        lines.append(
+            "  The two halves of a provider may be computed over different "
+            "document counts when a cell was unscoreable; 'not scoreable' "
+            "below shows how many."
+        )
         for row in summary["accuracy"]:
             half = "with Nutrient" if row["withNutrient"] else "direct       "
             if row["accuracy"] is None:
@@ -341,11 +368,15 @@ def render_html(summary: dict[str, Any]) -> str:
     """A self-contained page. No external requests, so it can be mailed on."""
     e = html_mod.escape
 
+    # `deltaInputCost` in the headline delta $ column, `deltaCost` beside it and
+    # explicitly labelled — see render_terminal for why publishing the
+    # output-inclusive figure under an input-token heading misleads.
     doc_rows = "\n".join(
         f"<tr><td>{e(r['docId'])}</td><td>{e(r['providerId'])}</td>"
         f"<td class=n>{r['sdkInputTokens']:,}</td>"
         f"<td class=n>{r['directInputTokens']:,}</td>"
         f"<td class='n d'>{r['deltaInputTokens']:+,}</td>"
+        f"<td class='n d'>{e(_money(r['deltaInputCost']))}</td>"
         f"<td class=n>{e(_money(r['deltaCost']))}</td></tr>"
         for r in summary["byDocument"]
     )
@@ -396,6 +427,12 @@ counts as "not scoreable" rather than as a zero. A field the key DOES cover,
 but whose comparison could not be made confidently — an ambiguous date or
 number format — is excluded from the accuracy figure and counted separately
 below, not treated as a mismatch and not treated as missing from the key.</p>
+<p class=sub>The two halves of a provider are listed side by side but may be
+computed over <strong>different document counts</strong>: the harness skips a
+direct cell whenever its SDK cell failed, and either half can be unscoreable on
+a given document. The <em>not scoreable</em> column shows how many cells
+contributed nothing, so a difference between the two halves should be read
+alongside it rather than as a like-for-like comparison.</p>
 <div class=scroll>
 <table>
   <tr><th>provider</th><th>half</th><th class=n>accuracy</th>
@@ -477,10 +514,16 @@ substitute your own negotiated rates before quoting them.</p>
 <div class=scroll>
 <table>
   <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
-      <th class=n>direct input</th><th class=n>delta</th><th class=n>delta $</th></tr>
+      <th class=n>direct input</th><th class=n>delta</th>
+      <th class=n>delta $ (input)</th>
+      <th class=n>delta $ incl. output (not like-for-like)</th></tr>
 {doc_rows}
 </table>
 </div>
+<p class=sub>The <strong>delta $ (input)</strong> column prices the input-token
+delta, which measures the same document on both sides. The column beside it adds
+the output-token difference and is not like-for-like — the two calls are asked
+for different things, and output is priced several times higher than input.</p>
 
 <h2>Per provider</h2>
 <div class=scroll>

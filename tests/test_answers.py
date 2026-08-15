@@ -53,8 +53,36 @@ def test_field_type_maps_a_key_value_to_a_comparator_type(value, expected):
     assert field_type(value) == expected
 
 
-def test_a_supplied_key_is_read_from_a_path():
-    ...  # completed in Task 7, where --answers lands
+def test_a_supplied_key_is_read_from_a_path(tmp_path):
+    """`--answers key.json` reads that file instead of the bundled key, and
+    nothing of the bundled key leaks into it. This body was a bare `...` --
+    a test that asserted nothing while still being counted in the suite, so
+    the JSON half of `--answers` (which landed in Task 7) had no coverage at
+    all while appearing to have some."""
+    p = tmp_path / "key.json"
+    p.write_text(json.dumps({
+        "checkedOn": "2026-08-14",
+        "note": "supplied by a prospect",
+        "documents": {
+            "inv": {
+                "invoiceNumber": {"value": "AC-2025-1047", "source": "Invoice No"},
+                "totalAmount": {"value": 345015, "source": "Amount Due"},
+            }
+        },
+    }))
+
+    key = load_answers(p)
+    assert key.checked_on == "2026-08-14"
+    assert key.note == "supplied by a prospect"
+    assert set(key.documents) == {"inv"}
+    assert key.documents["inv"]["totalAmount"]["value"] == 345015
+    # The bundled corpus must not bleed through a supplied key.
+    assert key.fields_for("lumen-invoice") == {}
+    # And a supplied key drives the derived schema the same way the bundled
+    # one does.
+    assert set(schema_for(key, "inv")["properties"]) == {
+        "invoiceNumber", "totalAmount"
+    }
 
 
 def test_a_supplied_csv_key_is_read(tmp_path):

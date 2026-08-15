@@ -364,3 +364,97 @@ def test_the_unverified_fields_wording_says_not_confidently_compared_not_missing
     html = render_html(out).lower()
     assert "not confidently compared" in html
     assert "not in key" not in html
+
+
+# --- Final review: the per-document delta $, and the accuracy disclosure.
+
+
+def test_the_per_document_delta_dollars_is_the_input_priced_figure():
+    """The per-document table is headed "(input tokens)" and every other column
+    in it is an input-token measurement, but the delta $ column rendered
+    `deltaCost`, which INCLUDES output. With a verbose direct call the two have
+    opposite signs, so the table read "the SDK sent 468 more tokens and cost
+    two cents less" -- exactly the not-like-for-like reading OUTPUT_CAVEAT and
+    the README exist to head off, and the reason the headline is input-priced
+    in the first place. `deltaInputCost` was computed and stored but never
+    rendered anywhere.
+
+    Both figures belong on the page, as the per-provider table already does it:
+    the input-priced one under the delta $ heading, the output-inclusive one
+    beside it and labelled as such."""
+    recs = [
+        _rec("verbose-doc", "bedrock", True, 2000),
+        _rec("verbose-doc", "bedrock", False, 1532),
+    ]
+    recs[1]["usage"]["outputTokens"] = 7_500  # the verbose direct call
+    out = summarise(
+        recs, _priced_table(), models={"bedrock": "qwen.qwen3-vl-235b-a22b-instruct"}
+    )
+    row = out["byDocument"][0]
+    # The two genuinely disagree in sign here -- that is the whole point.
+    assert row["deltaInputCost"] > 0
+    assert row["deltaCost"] < 0
+
+    input_priced = f"${row['deltaInputCost']:,.4f}"
+    output_inclusive = f"${row['deltaCost']:,.4f}"
+
+    text = render_terminal(out)
+    doc_line = next(line for line in text.splitlines() if "verbose-doc" in line)
+    assert input_priced in doc_line
+    # The output-inclusive figure is still shown, but it is not the one
+    # standing alone under the input heading.
+    assert output_inclusive in doc_line
+    assert doc_line.index(input_priced) < doc_line.index(output_inclusive)
+    assert "delta $ (input)" in text
+    assert "incl. output" in text
+
+    html = render_html(out)
+    assert input_priced in html
+    assert output_inclusive in html
+    assert "delta $ (input)" in html
+    assert "not like-for-like" in html
+
+
+def test_the_per_document_output_inclusive_column_is_labelled_where_it_is_shown():
+    """A second dollar column is worse than none if a reader cannot tell which
+    is which. Wherever the output-inclusive figure appears it must be named,
+    and named as not like-for-like, in both renderers."""
+    recs = [
+        _rec("a", "bedrock", True, 1000),
+        _rec("a", "bedrock", False, 600),
+    ]
+    out = summarise(
+        recs, _priced_table(), models={"bedrock": "qwen.qwen3-vl-235b-a22b-instruct"}
+    )
+    text = render_terminal(out).lower()
+    assert "incl. output" in text
+    assert "not like-for-like" in text
+
+    html = render_html(out).lower()
+    assert "delta $ incl. output (not like-for-like)" in html
+
+
+def test_the_accuracy_section_discloses_the_halves_may_cover_different_documents():
+    """`score_summary` puts a provider's two halves side by side, but the
+    harness skips a direct cell whenever its SDK cell failed, so the two
+    accuracies are routinely computed over different document sets and then
+    presented as the answer to this tool's central question. The calculation is
+    not restructured -- the disclosure is, in both renderers, pointing at the
+    `unscoreable` count that says how many cells contributed nothing."""
+    from costlab.answers import AnswerKey
+
+    key = AnswerKey(checked_on="2026-08-14", documents={
+        "a": {"total": {"value": 100, "source": "Total 100"}}})
+    recs = [
+        {**_rec("a", "bedrock", True, 1000), "extracted": {"total": 100}},
+        {**_rec("a", "bedrock", False, 600), "extracted": None},
+    ]
+    out = summarise(recs, _priced_table(), key=key)
+
+    text = render_terminal(out).lower()
+    assert "different document counts" in text
+    assert "unscoreable" in text or "not scoreable" in text
+
+    html = render_html(out).lower()
+    assert "different document counts" in html
+    assert "not scoreable" in html

@@ -12,10 +12,10 @@ CASES = json.loads(FIXTURE.read_text())["cases"]
 
 @pytest.mark.parametrize("case", CASES, ids=[c["name"] for c in CASES])
 def test_golden_case(case):
-    """Every case here also runs against the TypeScript comparator in the
-    extraction studio. Neither implementation can change a verdict without
-    failing a test the other side runs too — that shared contract is the only
-    thing keeping a port from drifting away from the original."""
+    """Every case here also runs against the TypeScript comparator this is a
+    port of. Neither implementation can change a verdict without failing a test
+    the other side runs too — that shared contract is the only thing keeping a
+    port from drifting away from the original."""
     assert (
         compare_field(case["extracted"], case["verified"], case["type"])
         == case["expected"]
@@ -28,7 +28,7 @@ def test_the_fixture_is_the_one_the_other_repository_ships():
     both repositories. If it fails, the copies differ — reconcile them, do not
     just update the constant."""
     digest = hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
-    assert digest == "01c5bd9ebdacf9f867f7f704ee1a4f086be603eb34dabdb9b556d04cd7c1997c", (
+    assert digest == "9a27801f510b1a4130777cef7a8652abe6f392ba8d09e2fb73ca31509ebfdab1", (
         f"golden-cases.json changed. New hash: {digest}. "
         "Update BOTH repositories, then update this constant."
     )
@@ -121,3 +121,73 @@ def test_two_unresolvable_slash_dates_against_each_other_stay_unverified():
     be "unverified" here too, not a text mismatch."""
     assert compare_field("1/2/2026", {"value": "4/1/2026"}, "string") == "unverified"
     assert compare_field("4/1/2026", {"value": "1/2/2026"}, "string") == "unverified"
+
+
+def test_a_value_identical_to_the_key_matches_even_when_the_form_is_ambiguous():
+    """Two bundled answer-key values are printed on their documents in a slash
+    form whose day and month cannot be told apart -- happy-tooth-invoice-excel
+    .issueDate "4/1/2026" and emergency-dept-billing-worksheet.admissionDate
+    "12/04/2016", every leading component <= 12. Before the text-equality
+    short-circuit, the both-sided ambiguity guard returned "unverified" for
+    them even against a provider that returned the key value VERBATIM, so
+    every bundled run printed "2 field(s) the key covers but could not be
+    confidently compared" and no provider could ever be scored on either
+    field.
+
+    A value cannot be a wrong reading of itself, and saying so guesses no
+    regional convention. The key values themselves are not changed: they are
+    human-verified as printed."""
+    for printed in ("4/1/2026", "12/04/2016"):
+        assert compare_field(printed, {"value": printed}, "string") == "match"
+
+    # And a provider that NORMALISES one of them to ISO is still unverified --
+    # honest, because nothing here can tell 4 January from 1 April.
+    assert (
+        compare_field("2026-01-04", {"value": "4/1/2026"}, "string") == "unverified"
+    )
+
+
+def test_the_text_equality_short_circuit_does_not_weaken_the_other_paths():
+    """It is placed after the number and boolean branches and before the date
+    handling, so it can only ever pre-empt a date path -- and never in a
+    direction that hides a real difference.
+
+    Specifically: declining to answer a field the key covers must still be a
+    mismatch (the empty/None rule fires before it), a numeric field must still
+    be judged numerically, and a boolean must still be judged as a boolean."""
+    # "Didn't answer" must not become a match against an empty key value.
+    assert compare_field("", {"value": ""}, "string") == "mismatch"
+    assert compare_field(None, {"value": ""}, "string") == "mismatch"
+    # The number branch still owns numeric fields: identical text is beside
+    # the point when the values parse.
+    assert compare_field("1.165,10", {"value": "1.165,10"}, "number") == "unverified"
+    assert compare_field("345,015", {"value": 345015}, "number") == "match"
+    # The boolean branch still owns boolean fields.
+    assert compare_field("TRUE", {"value": "true"}, "boolean") == "match"
+    assert compare_field("true", {"value": "false"}, "boolean") == "mismatch"
+    # A genuinely different pair of ambiguous slash dates stays unverified --
+    # the short-circuit only fires on identical text.
+    assert compare_field("1/2/2026", {"value": "4/1/2026"}, "string") == "unverified"
+
+
+def test_the_suite_runs_outside_utc():
+    """costlab/compare.py's `_to_ymd` docstring claims "the date tests run
+    under a non-UTC TZ precisely to catch a port that forgets this". That was
+    false as committed -- there was no conftest.py, no pytest config, no CI and
+    no TZ anywhere, so a UTC machine happily stayed green against exactly the
+    bug the design exists to prevent. conftest.py now sets Asia/Kolkata
+    (UTC+05:30, a half-hour offset, which catches more than a whole-hour one)
+    and this test is what keeps the docstring's claim honest.
+
+    A developer running `TZ=UTC pytest` deliberately is respected by
+    conftest.py's `setdefault`, so this test skips rather than failing them."""
+    import os
+    import time
+
+    tz = os.environ.get("TZ")
+    if tz == "UTC":
+        pytest.skip("TZ=UTC was requested explicitly for this run")
+    assert tz, "conftest.py must set a TZ for the suite"
+    assert tz != "UTC"
+    # Actually in effect, not merely set in the environment.
+    assert time.timezone != 0 or time.altzone != 0

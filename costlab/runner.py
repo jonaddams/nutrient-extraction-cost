@@ -432,6 +432,20 @@ def run(
                             "schemaFieldCount": len(
                                 doc.schema.get("properties", {})
                             ),
+                            # The field NAMES, not just the count: agreement()
+                            # needs to tell "this provider was asked and left
+                            # the key out" (an absence, and a real difference)
+                            # from "this provider was never asked" (not a
+                            # difference at all). Neither half of a cell
+                            # guarantees every requested key comes back —
+                            # strict_structured_output is False above and the
+                            # direct request omits "strict": true — so an
+                            # omitted key is ordinary, and without this the
+                            # field would silently drop out of the report
+                            # instead of showing an absence.
+                            "requestedFields": sorted(
+                                doc.schema.get("properties", {})
+                            ),
                             "schemaSource": doc.schema_source,
                             **summary,
                             **({"note": note} if note else {}),

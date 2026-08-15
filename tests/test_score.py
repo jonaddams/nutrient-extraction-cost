@@ -110,9 +110,16 @@ def test_an_empty_extraction_is_scored_not_treated_as_unscoreable():
 def test_summary_counts_unverified_fields_separately_from_unscoreable_records():
     """`unscoreable` counts whole records the harness could not read at all (or
     the key has no document entry for); `unverifiedFields` counts individual
-    fields within a SCOREABLE record that the key does not cover. A key that
-    only covers one of two fields must show a scoreable record with one
-    unverified field, not fold that into `unscoreable`."""
+    fields within a SCOREABLE record that the key DOES cover but whose
+    comparison could not be made confidently -- an ambiguous date format, a
+    number that will not parse. `score_records` only ever builds a verdict for
+    a field the key has an entry for, so a field the key does not cover can
+    never reach this count; the first half of this test asserts exactly that
+    (a record extracting a field outside the key shows unverifiedFields == 0).
+    The old wording here said the opposite, "fields the key does not cover" --
+    the exact phrasing an earlier commit existed to correct in score.py and
+    report.py, left behind here where it then contradicted the assertion
+    below it."""
     key = AnswerKey(
         checked_on="2026-08-14",
         documents={"inv": {"invoiceNumber": {"value": "AC-2025-1047", "source": "..."}}},
