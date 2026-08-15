@@ -253,17 +253,52 @@ def test_html_explains_what_a_disagreement_means_for_the_reader():
     assert "citation" in html
 
 
-def test_accuracy_and_cost_runs_are_not_silently_compared():
-    """Accuracy mode uses each document's own schema, so its token counts are
-    not comparable with a shared-schema cost run. A report mixing both must say
-    so rather than presenting one table."""
+def test_a_multi_document_accuracy_run_with_differing_field_counts_does_not_warn():
+    """Each document's key-derived schema legitimately has a different field
+    count -- the bundled corpus alone spans 1 to 6 fields per document -- and
+    that variation is expected within a single accuracy run. The earlier,
+    field-count-based version of this check computed `mixedSchemas` from
+    `schemaFieldCount` varying across records, which fired on every ordinary
+    multi-document accuracy run and printed "Run cost and accuracy
+    separately" to a reader who ran only accuracy mode. `schemaSource` being
+    uniformly "answer-key" here, despite the field counts differing, must not
+    warn.
+    """
     recs = [
-        {**_rec("a", "bedrock", True, 1000), "schemaFieldCount": 1},
-        {**_rec("a", "bedrock", False, 600), "schemaFieldCount": 5},
+        {**_rec("a", "bedrock", True, 1000), "schemaFieldCount": 1,
+         "schemaSource": "answer-key"},
+        {**_rec("a", "bedrock", False, 600), "schemaFieldCount": 1,
+         "schemaSource": "answer-key"},
+        {**_rec("b", "bedrock", True, 1200), "schemaFieldCount": 6,
+         "schemaSource": "answer-key"},
+        {**_rec("b", "bedrock", False, 700), "schemaFieldCount": 6,
+         "schemaSource": "answer-key"},
+    ]
+    out = summarise(recs, _priced_table())
+    assert out["mixedSchemas"] is False
+    # Specifically the mixed-schema warning, not the (unrelated, always
+    # present) tokenizer caveat, which also contains the substring "not
+    # comparable" -- see TOKENIZER_CAVEAT.
+    assert "run cost and accuracy separately" not in render_terminal(out).lower()
+
+
+def test_a_report_genuinely_mixing_shared_and_key_derived_schemas_warns():
+    """The case the warning exists for: some records used the shared cost-mode
+    schema and others used a key-derived one in the SAME report, which is the
+    situation that actually makes token counts incomparable."""
+    recs = [
+        {**_rec("a", "bedrock", True, 1000), "schemaFieldCount": 1,
+         "schemaSource": "shared"},
+        {**_rec("a", "bedrock", False, 600), "schemaFieldCount": 1,
+         "schemaSource": "shared"},
+        {**_rec("b", "bedrock", True, 1200), "schemaFieldCount": 5,
+         "schemaSource": "answer-key"},
+        {**_rec("b", "bedrock", False, 700), "schemaFieldCount": 5,
+         "schemaSource": "answer-key"},
     ]
     out = summarise(recs, _priced_table())
     assert out["mixedSchemas"] is True
-    assert "not comparable" in render_terminal(out).lower()
+    assert "run cost and accuracy separately" in render_terminal(out).lower()
 
 
 def test_an_ambiguous_row_is_absent_from_the_rendered_disagreement_output():
@@ -295,3 +330,37 @@ def test_an_ambiguous_row_is_absent_from_the_rendered_disagreement_output():
 
     html = render_html(out)
     assert "asOf" not in html
+
+
+# --- Fix round 1: unverifiedFields wording, and mixedSchemas false positives.
+
+
+def test_the_unverified_fields_wording_says_not_confidently_compared_not_missing_from_key():
+    """`unverifiedFields` counts fields the answer key DOES cover, whose
+    comparison could not be made confidently (an ambiguous date, an
+    unparseable number) -- `score_records` never builds a verdict for a field
+    the key has no entry for, so a field missing from the key can never reach
+    this count. The old wording ("field(s) not in the answer key") claimed
+    the opposite: the key HAS an "asOf" entry here, and a reader misled by
+    that wording would go add a key entry that already exists instead of
+    fixing the ambiguous date format that is the real, fixable cause.
+    """
+    from costlab.answers import AnswerKey
+
+    key = AnswerKey(checked_on="2026-08-14", documents={
+        "a": {"asOf": {"value": "2026-01-04", "source": "Dated 2026-01-04"}}})
+    recs = [
+        {**_rec("a", "bedrock", True, 1000), "extracted": {"asOf": "4/1/2026"}},
+    ]
+    out = summarise(recs, _priced_table(), key=key)
+    row = out["accuracy"][0]
+    assert row["unverifiedFields"] == 1
+
+    text = render_terminal(out)
+    assert "could not be confidently compared" in text
+    assert "not in the answer key" not in text
+    assert "not in key" not in text
+
+    html = render_html(out).lower()
+    assert "not confidently compared" in html
+    assert "not in key" not in html

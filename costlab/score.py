@@ -57,12 +57,18 @@ def score_summary(scored: list[dict[str, Any]]) -> list[dict[str, Any]]:
     Two different counts of "not scored" live here, and they must stay
     distinct: `unscoreable` counts whole RECORDS the harness could not read at
     all or that the key has no document entry for (score is None) — it shows
-    how many rows contributed nothing. `unverifiedFields` counts individual FIELDS
-    within scoreable records that came back "unverified" — the key had no entry
-    for that particular field, so summarise_verdicts already excluded it from
-    the accuracy denominator. Without surfacing this count, a report could show
-    a high accuracy computed over far fewer fields than the key actually
-    contains, with nothing saying so.
+    how many rows contributed nothing. `unverifiedFields` counts individual
+    FIELDS *within scoreable records* that came back "unverified" — these are
+    fields the key DOES cover (score_records only ever builds a verdict for a
+    field the key has an entry for), but the comparison could not be made
+    confidently: an ambiguous date format, a number that would not parse. The
+    key having no entry at all for a field is a different case entirely — that
+    field is simply never asked about here, so it never reaches this count.
+    Mislabeling this as "fields the key doesn't cover" would send a reader off
+    to add key entries that already exist, instead of fixing the ambiguous
+    format that is the actual, fixable cause. Without surfacing this count at
+    all, a report could show a high accuracy computed over far fewer fields
+    than the key actually covers, with nothing saying why some were excluded.
     """
     buckets: dict[tuple[str, bool], dict[str, int]] = {}
     for record in scored:

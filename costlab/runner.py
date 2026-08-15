@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from . import prices, report
-from .answers import load_answers, load_answers_csv, schema_for
+from .answers import AnswerKey, load_answers, load_answers_csv, schema_for
 from .providers import PROVIDERS, Provider, available, direct_request
 from .proxy import RecordingProxy
 
@@ -62,6 +62,14 @@ class Doc:
     id: str
     path: Path
     schema: dict[str, Any]
+    # "shared" (the cost-mode default, or a manifest's own per-document
+    # schema — neither is derived from an answer key) or "answer-key" (this
+    # document's schema came from `schema_for`, scoped to one key's fields).
+    # Recorded on every result so a report can tell a genuine mix of the two
+    # from an ordinary accuracy run whose key-derived field counts simply
+    # vary document to document — see `rescope_to_key` and report.py's
+    # `mixed_schemas` for why field count alone cannot make that distinction.
+    schema_source: str = "shared"
 
 
 def plan_cells(providers: list[Provider]) -> list[Cell]:
@@ -106,6 +114,35 @@ def load_corpus(corpus_dir: Path) -> list[Doc]:
         for p in sorted(corpus_dir.iterdir())
         if p.suffix.lower() in _DOC_SUFFIXES
     ]
+
+
+def rescope_to_key(corpus: list[Doc], key: AnswerKey) -> list[Doc]:
+    """Reschema every document to exactly the answer key's fields for it.
+
+    This is what actually makes a run scoreable, and it must run whenever a
+    key is supplied — via `--mode accuracy`'s bundled default OR via
+    `--answers` in ANY mode, never gated on `--mode` alone. Skipping it
+    outside `--mode accuracy` was a real bug: `--answers` set the scoring key
+    but left every document's request schema at the shared cost-mode default,
+    so the model was never asked about the key's fields at all, and every one
+    of them then scored a confident, fabricated mismatch — the exact failure
+    this whole plan has fought, reached through a schema gap instead of a
+    `None` gap. `--answers mine.csv` with no `--mode` is the most natural
+    command a prospect would type, so this path must not be the wrong one.
+
+    A document with no entry in the key is dropped, not given an empty
+    schema: an empty schema extracts nothing and would score every field as a
+    mismatch, reporting a provider as completely wrong for a document we
+    never asked it about.
+    """
+    rescoped = []
+    for doc in corpus:
+        schema = schema_for(key, doc.id)
+        if schema is None:
+            print(f"{doc.id}: no answer key entry, skipping")
+            continue
+        rescoped.append(replace(doc, schema=schema, schema_source="answer-key"))
+    return rescoped
 
 
 def summarise_attempts(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -395,6 +432,7 @@ def run(
                             "schemaFieldCount": len(
                                 doc.schema.get("properties", {})
                             ),
+                            "schemaSource": doc.schema_source,
                             **summary,
                             **({"note": note} if note else {}),
                         }
@@ -486,9 +524,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     # Deliberately computed once, ahead of the run, so the same key both
-    # rescopes the accuracy-mode schema below AND scores the records once
-    # they come back — a prospect's own --answers key must govern both, not
-    # just the final report.
+    # rescopes the schema below AND scores the records once they come back —
+    # a prospect's own --answers key must govern both, not just the final
+    # report.
     key = None
     if args.answers:
         key = (
@@ -499,21 +537,27 @@ def main(argv: list[str] | None = None) -> int:
     elif args.mode == "accuracy":
         key = load_answers()
 
-    if args.mode == "accuracy":
-        rescoped = []
-        for doc in corpus:
-            schema = schema_for(key, doc.id)
-            if schema is None:
-                print(f"{doc.id}: no answer key entry, skipping in accuracy mode")
-                continue
-            rescoped.append(replace(doc, schema=schema))
-        corpus = rescoped
+    # Rescoping runs whenever a key exists, regardless of --mode — never
+    # gated on `args.mode == "accuracy"` alone. `--answers` sets a scoring key
+    # independently of --mode, and `--answers mine.csv` with no --mode is the
+    # most natural command a prospect would type; gating rescoping on --mode
+    # left that command silently asking the model only for the shared
+    # cost-mode schema, so every one of the key's fields scored a confident,
+    # fabricated mismatch instead of an honest unscoreable gap. See
+    # rescope_to_key's own docstring.
+    if key is not None:
+        corpus = rescope_to_key(corpus, key)
         if not corpus:
             print(
                 "No documents in this corpus have answer-key entries.",
                 file=sys.stderr,
             )
             return 2
+        print(
+            "Answer key supplied: each document is scoped to ask only for "
+            "that key's fields, not the shared schema. Token counts from "
+            "this run are NOT comparable with a cost-mode run's."
+        )
 
     cells = plan_cells(chosen)
     print(f"{len(corpus)} document(s) x {len(cells)} cell(s) = "

@@ -84,3 +84,19 @@ def test_a_csv_missing_required_columns_fails_loudly(tmp_path):
 
     with pytest.raises(ValueError, match="docId"):
         load_answers_csv(p)
+
+
+def test_a_header_only_csv_reports_the_empty_data_problem_not_missing_columns(tmp_path):
+    """A CSV with a valid header and zero data rows previously computed
+    `present` from the first data ROW, so it had none to read and reported
+    "missing required column(s): docId, field, value. Found: nothing" -- a
+    message that sends a prospect to rename columns that are already
+    correct. The header IS valid here; the actual, fixable problem is that
+    there is no data below it, and the error must say that instead.
+    """
+    p = tmp_path / "empty.csv"
+    p.write_text("docId,field,value,source\n")
+    from costlab.answers import load_answers_csv
+
+    with pytest.raises(ValueError, match="no data rows"):
+        load_answers_csv(p)

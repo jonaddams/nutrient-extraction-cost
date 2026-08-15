@@ -82,7 +82,7 @@ Output lands in `out/`: `records.json` (one record per document per cell), `repo
 | `--providers a,b` | Restrict to specific providers. Default is every one whose credential is set. |
 | `--prices FILE` | Use your negotiated rates instead of the bundled list prices. |
 | `--mode cost\|accuracy` | `cost` (default): one shared schema for every document. `accuracy`: each document's own answer-key fields — see [Accuracy](#accuracy). |
-| `--answers PATH` | Score against this answer key instead of the bundled one. JSON or CSV (`docId,field,value,source`). Implies scoring even outside `--mode accuracy`. |
+| `--answers PATH` | Score against this answer key instead of the bundled one. JSON or CSV (`docId,field,value,source`). Rescopes every document's request to that key's fields **regardless of `--mode`** — a cost-mode run supplying `--answers` still asks each document only for the key's fields, so its token counts are no longer comparable with an ordinary cost run's. |
 | `--no-capture-bodies` | Do not write request or response bodies to disk. |
 | `--out DIR` | Where to write results. Defaults to `out/`. |
 | `--yes` | Skip the confirmation prompt. |

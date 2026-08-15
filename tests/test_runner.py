@@ -1,12 +1,18 @@
 import json
+import sys
+import types
+from pathlib import Path
 
 from costlab.providers import PROVIDERS
 from costlab.runner import (
     Cell,
+    Doc,
+    DEFAULT_SCHEMA,
     _document_text,
     extracted_values,
     load_corpus,
     plan_cells,
+    rescope_to_key,
     summarise_attempts,
 )
 
@@ -280,3 +286,80 @@ def test_an_empty_but_readable_extraction_is_not_none():
     assert extracted_values(
         '{"extraction": {}, "metadata": {}}', with_nutrient=True
     ) == {}
+
+
+# --- Fix round 1: --answers must rescope schemas outside --mode accuracy too.
+
+
+def test_rescope_to_key_scopes_the_schema_to_exactly_the_keys_fields():
+    """The unit under `main()`'s wiring: given a key, every document with an
+    entry gets a schema built from exactly that key's fields, tagged
+    "answer-key" so a report can tell a genuine schema mix (see report.py's
+    mixed_schemas) from an ordinary accuracy run's differing field counts. A
+    document with no key entry is dropped, not given an empty schema, which
+    would score every field as a mismatch for a document never asked about."""
+    from costlab.answers import AnswerKey
+
+    key = AnswerKey(checked_on="2026-08-14", documents={
+        "inv": {"total": {"value": 100, "source": "Total 100"}}})
+    docs = [
+        Doc(id="inv", path=Path("inv.pdf"), schema=DEFAULT_SCHEMA),
+        Doc(id="no-entry", path=Path("other.pdf"), schema=DEFAULT_SCHEMA),
+    ]
+    rescoped = rescope_to_key(docs, key)
+    assert [d.id for d in rescoped] == ["inv"]
+    assert set(rescoped[0].schema["properties"]) == {"total"}
+    assert rescoped[0].schema_source == "answer-key"
+
+
+def test_answers_flag_rescopes_schemas_even_in_cost_mode(tmp_path, monkeypatch):
+    """Reproduces the critical fix-round finding: `--answers` sets a scoring
+    key independently of `--mode`, but before this fix the schema rescoping
+    that asks each document for the key's fields only ran when `--mode
+    accuracy` was ALSO passed. A cost-mode run supplying only `--answers`
+    (the most natural command a prospect would type) still requested
+    DEFAULT_SCHEMA's lone `documentTitle` field, and every key field the
+    model was never asked about would then score a confident, fabricated
+    0% rather than an honest unscoreable gap. This drives `main()` itself
+    (with `run()` stubbed out -- no live calls) and inspects the corpus it
+    actually built.
+    """
+    (tmp_path / "inv.pdf").write_bytes(b"%PDF-1.4 fake")
+    key_path = tmp_path / "key.csv"
+    key_path.write_text("docId,field,value,source\ninv,total,100,Total 100\n")
+
+    captured = {}
+
+    def fake_run(corpus, cells, out_dir, capture_bodies=True):
+        captured["corpus"] = corpus
+        return []
+
+    monkeypatch.setattr("costlab.runner.run", fake_run)
+    monkeypatch.setenv("NUTRIENT_LICENSE_KEY", "test-key")
+    monkeypatch.setitem(
+        sys.modules,
+        "nutrient_sdk",
+        types.SimpleNamespace(
+            License=types.SimpleNamespace(register_key=lambda k: None)
+        ),
+    )
+
+    from costlab.runner import main
+
+    rc = main(
+        [
+            "--corpus", str(tmp_path),
+            "--providers", "local",
+            "--answers", str(key_path),
+            "--mode", "cost",
+            "--yes",
+            "--out", str(tmp_path / "out"),
+        ]
+    )
+    assert rc == 0
+    corpus = captured["corpus"]
+    assert len(corpus) == 1
+    # The whole point: in --mode cost, this used to stay DEFAULT_SCHEMA
+    # ({"documentTitle"}) despite --answers being supplied.
+    assert set(corpus[0].schema["properties"]) == {"total"}
+    assert corpus[0].schema_source == "answer-key"

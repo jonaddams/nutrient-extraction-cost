@@ -38,20 +38,38 @@ def load_answers(path: str | Path | None = None) -> AnswerKey:
 def load_answers_csv(path: str | Path) -> AnswerKey:
     """A prospect's key as a spreadsheet: docId, field, value, source.
 
-    Required columns are checked up front and their absence raises. Reading zero
-    rows silently would report every provider as unscoreable, which looks like a
-    model problem and is not one.
+    Required columns are checked up front, against the CSV's HEADER, and their
+    absence raises. The header is read from the reader's own `fieldnames`
+    rather than from the first data row: a file with a valid header and zero
+    data rows has `fieldnames` populated but no rows, and reading the header
+    from a row would misreport that file as missing every required column
+    ("Found: nothing") when the real problem is that it has no data — sending
+    a prospect to rename columns that are already correct. Genuinely missing
+    columns (including a file with no header row at all, where `fieldnames`
+    is None) still raise the column-name error, unchanged.
+
+    Reading zero DATA rows is its own, separate failure, checked only once the
+    header itself is confirmed correct: silently reporting zero rows would
+    report every provider as unscoreable, which looks like a model problem and
+    is not one.
     """
     import csv
 
-    rows = list(csv.DictReader(Path(path).read_text().splitlines()))
+    reader = csv.DictReader(Path(path).read_text().splitlines())
     required = {"docId", "field", "value"}
-    present = set(rows[0]) if rows else set()
+    present = set(reader.fieldnames or [])
     missing = required - present
     if missing:
         raise ValueError(
             f"answer key CSV is missing required column(s): {', '.join(sorted(missing))}. "
             f"Found: {', '.join(sorted(present)) or 'nothing'}"
+        )
+
+    rows = list(reader)
+    if not rows:
+        raise ValueError(
+            "answer key CSV has a valid header but no data rows — add at least "
+            "one docId,field,value row."
         )
 
     documents: dict[str, dict[str, dict[str, Any]]] = {}

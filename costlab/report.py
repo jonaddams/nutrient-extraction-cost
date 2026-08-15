@@ -193,11 +193,18 @@ def summarise(
     accuracy = score_summary(scored) if scored else []
     agreement_rows = agreement(records)
 
-    # Accuracy mode gives each document its own schema, so its token counts are
-    # not comparable with a shared-schema cost run. Detect a mixed set rather
-    # than presenting one table over both.
-    field_counts = {r["schemaFieldCount"] for r in records if "schemaFieldCount" in r}
-    mixed_schemas = len(field_counts) > 1
+    # A key-derived schema gives each document its own field count, and that is
+    # EXPECTED and correct within a single accuracy run — one document's key
+    # entry may cover one field, another six, and that must never warn. What
+    # must warn is a report that genuinely mixes a shared cost-mode schema
+    # with key-derived schemas in the same set of records, because THAT mix is
+    # what makes token counts incomparable. So the warning is keyed on
+    # `schemaSource` ("shared" vs "answer-key"), never on the field count
+    # itself — the earlier, field-count-based version of this check fired on
+    # every ordinary multi-document accuracy run, since the bundled corpus's
+    # key entries alone span 1 to 6 fields.
+    schema_sources = {r.get("schemaSource") for r in records if r.get("schemaSource")}
+    mixed_schemas = len(schema_sources) > 1
 
     return {
         "checkedOn": table.checked_on,
@@ -284,8 +291,9 @@ def render_terminal(summary: dict[str, Any]) -> str:
                 )
             if row["unverifiedFields"]:
                 lines.append(
-                    f"  {'':10} {'':13}  {row['unverifiedFields']} field(s) not in "
-                    "the answer key, excluded from accuracy"
+                    f"  {'':10} {'':13}  {row['unverifiedFields']} field(s) the key "
+                    "covers but could not be confidently compared, excluded from "
+                    "accuracy"
                 )
 
     if summary["agreementSummary"]["fields"]:
@@ -313,8 +321,9 @@ def render_terminal(summary: dict[str, Any]) -> str:
     if summary["mixedSchemas"]:
         lines.append("")
         lines.append(
-            "These records mix schemas of different sizes, so their token counts "
-            "are not comparable. Run cost and accuracy separately."
+            "These records mix a shared cost-mode schema with answer-key-derived "
+            "schemas, so their token counts are not comparable. Run cost and "
+            "accuracy separately."
         )
 
     lines.append("")
@@ -383,11 +392,14 @@ def render_html(summary: dict[str, Any]) -> str:
 <h2>Accuracy</h2>
 <p class=sub>Scored against the answer key. A field the key does not cover is
 never counted against a provider, and a cell the harness could not read
-counts as "not scoreable" rather than as a zero.</p>
+counts as "not scoreable" rather than as a zero. A field the key DOES cover,
+but whose comparison could not be made confidently — an ambiguous date or
+number format — is excluded from the accuracy figure and counted separately
+below, not treated as a mismatch and not treated as missing from the key.</p>
 <div class=scroll>
 <table>
   <tr><th>provider</th><th>half</th><th class=n>accuracy</th>
-      <th class=n>not scoreable</th><th class=n>fields not in key</th></tr>
+      <th class=n>not scoreable</th><th class=n>not confidently compared</th></tr>
 {accuracy_rows}
 </table>
 </div>
@@ -430,8 +442,9 @@ because the comparator could not confidently judge them.</p>
 """
 
     mixed_note = (
-        "<p class=warn>These records mix schemas of different sizes, so their "
-        "token counts are not comparable. Run cost and accuracy separately.</p>"
+        "<p class=warn>These records mix a shared cost-mode schema with "
+        "answer-key-derived schemas, so their token counts are not comparable. "
+        "Run cost and accuracy separately.</p>"
         if summary["mixedSchemas"]
         else ""
     )
