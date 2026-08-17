@@ -418,6 +418,21 @@ def run(
                             note = "no captured document text"
                     except Exception as exc:  # noqa: BLE001
                         note = f"{type(exc).__name__}: {exc}"
+                        if cell.with_nutrient and not document_text:
+                            # The SDK's request reached the proxy before the SDK
+                            # gave up on the response, so the text the direct
+                            # half needs is captured even though the exception
+                            # unwound past _run_sdk_cell's return. Recover it
+                            # from the record rather than losing the direct half
+                            # too: an SDK-side failure and an unmeasurable
+                            # direct cell are different findings, and reporting
+                            # "no captured document text" for a request that WAS
+                            # captured is simply wrong. the upstream SDK defect's empty-content
+                            # surface raises here on every document, which cost
+                            # one 17-document run every row it could have had.
+                            document_text = _document_text(
+                                proxy.last_request_body or {}
+                            )
 
                     summary = summarise_attempts(proxy.records[before:])
                     results.append(

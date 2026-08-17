@@ -363,3 +363,74 @@ def test_answers_flag_rescopes_schemas_even_in_cost_mode(tmp_path, monkeypatch):
     # ({"documentTitle"}) despite --answers being supplied.
     assert set(corpus[0].schema["properties"]) == {"total"}
     assert corpus[0].schema_source == "answer-key"
+
+
+def test_a_raising_sdk_half_still_leaves_the_direct_half_measurable(
+    tmp_path, monkeypatch
+):
+    """A raised SDK exception must not take the direct half down with it.
+
+    That upstream SDK defect surfaces two ways against a local runtime. When the provider returns
+    mangled content the SDK returns zero fields and the direct half runs
+    normally; when it returns EMPTY content the SDK raises
+    `VisionAiExtraction: local returned no text content`. The request has
+    already reached the proxy either way, so the document text the direct half
+    needs is captured either way — but the exception unwinds before
+    `_run_sdk_cell` can return it, and the direct half used to be skipped with
+    the note "no captured document text", which is false. One whole 17-document
+    run produced 17 successful captured calls and zero measurable rows.
+    """
+    import costlab.runner as runner
+
+    document_text = "Document body line. " * 40
+    seen: dict[str, str] = {}
+
+    def raising_sdk_cell(provider, doc, proxy, port):
+        # The request reaches the proxy, and only then does the SDK give up.
+        proxy.last_request_body = {
+            "messages": [
+                {"role": "system", "content": "You are a document AI component."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Document content:"},
+                        {"type": "text", "text": document_text},
+                    ],
+                },
+            ]
+        }
+        raise RuntimeError(
+            "VisionException: 1 context(s) failed: VisionAiExtraction: "
+            "local returned no text content"
+        )
+
+    def recording_direct_cell(provider, doc, port, text, proxy):
+        seen["document_text"] = text
+        return {"documentTitle": "read by the direct half"}
+
+    monkeypatch.setattr(runner, "_run_sdk_cell", raising_sdk_cell)
+    monkeypatch.setattr(runner, "_run_direct_cell", recording_direct_cell)
+
+    doc = Doc(id="doc", path=tmp_path / "doc.pdf", schema=DEFAULT_SCHEMA)
+    results = runner.run(
+        corpus=[doc],
+        cells=[
+            Cell(provider_id="local", with_nutrient=True),
+            Cell(provider_id="local", with_nutrient=False),
+        ],
+        out_dir=tmp_path / "out",
+        capture_bodies=False,
+    )
+
+    sdk = next(r for r in results if r["withNutrient"])
+    direct = next(r for r in results if not r["withNutrient"])
+
+    # The SDK half still records its failure honestly.
+    assert sdk["extracted"] is None
+    assert "returned no text content" in sdk["note"]
+
+    # The direct half ran, on the text the proxy captured.
+    assert direct["extracted"] == {"documentTitle": "read by the direct half"}
+    assert document_text in seen["document_text"]
+    # And it must not claim the text was never captured, because it was.
+    assert "no captured document text" not in (direct.get("note") or "")
