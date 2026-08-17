@@ -213,16 +213,19 @@ provider:
 | Qwen3-VL 235B (Bedrock) | +468 | +468 to +468 | $24.80 |
 | OpenAI | +748 | +748 to +748 | not priced |
 | Qwen3-VL 8B / 30B (LM Studio) | +468 | +468 to +468 | not priced — no per-token price exists |
-| Qwen3.5 9B (LM Studio) | **+479** | +479 to +479 | not priced |
+| Qwen3.5 9B (LM Studio) | +479 | +479 to +479 | not priced |
+| Qwen3.5 35B-A3B (LM Studio) | +478 | +478 to +478 (12 of 17 docs) | not priced |
 
-So quote a figure with its provider *and model* attached, or not at all. The same scaffolding is
-**15× more per 100k documents** on Claude Sonnet 5 than on Bedrock's Qwen3-VL. And the last two rows
-are the sharper point: **the constant follows the tokenizer, not the vendor.** Two Qwen generations
-on the same host, sent the same text by the same SDK, read that text as 468 and 479 tokens. A newer
-model from a provider you already measured is a new measurement.
+So quote a figure with its provider *and model* attached, or not at all. The spread is real: the same
+scaffolding costs **15× more per 100k documents** on Claude Sonnet 5 than on Bedrock's Qwen3-VL.
 
-The local Qwen3-VL matching Bedrock's Qwen3-VL token-for-token is the same fact from the other side:
-one tokenizer, one number, regardless of where the weights run.
+**The unit is the model, not the vendor and not the tokenizer generation.** Qwen3.5 9B and Qwen3.5
+35B-A3B are the same generation on the same host, sent identical text by the same SDK, and they
+differ — 479 against 478. Each model applies its own chat template around the SDK's scaffolding, so
+even a sibling model is a new measurement. Meanwhile Qwen3-VL reads that same text as 468 whether the
+weights run on Bedrock or on a laptop, so *where* a model runs changes nothing.
+
+Which is the whole argument for measuring instead of quoting: there is no single number to publish.
 
 Two runs against Bedrock an hour apart also showed the absolute counts moving slightly on 2 of 17
 documents (1,049 → 1,058 input tokens on one), because the SDK's own text extraction is not
