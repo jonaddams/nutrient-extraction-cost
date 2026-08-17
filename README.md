@@ -130,15 +130,17 @@ extractions. This is why the with-Nutrient cell for a document runs before its d
 
 ## Provider support
 
-All four providers were verified end to end: each honours the SDK's endpoint override, and each
-returns a usage block the proxy can read.
+All four providers honour the SDK's endpoint override and return a usage block the proxy can read,
+so all four are measurable. The three cloud providers also **extract** correctly; LM Studio's
+with-Nutrient cells return zero fields for a reason that is not the SDK's or this tool's, described
+under [Local runtimes](#local-runtimes).
 
-| Provider | Credential | Wire protocol | Priced in the bundled table |
-|---|---|---|---|
-| Anthropic | `ANTHROPIC_API_KEY` | `POST /v1/messages` | yes |
-| OpenAI | `OPENAI_API_KEY` | `POST /v1/chat/completions` | no — see below |
-| Bedrock | `BEDROCK_API_KEY` | `POST /v1/chat/completions` | yes |
-| Local runtime | none | `POST /v1/chat/completions` | no — no per-token price exists |
+| Provider | Credential | Wire protocol | Priced in the bundled table | Extraction verified |
+|---|---|---|---|---|
+| Anthropic | `ANTHROPIC_API_KEY` | `POST /v1/messages` | yes | yes |
+| OpenAI | `OPENAI_API_KEY` | `POST /v1/chat/completions` | no — see below | yes |
+| Bedrock | `BEDROCK_API_KEY` | `POST /v1/chat/completions` | yes | yes |
+| Local runtime | none | `POST /v1/chat/completions` | no — no per-token price exists | **no — tokens only, see below** |
 
 A provider missing from the price table reports its token counts and **"not priced"** rather than
 `$0.00`. A zero would assert the calls were free, which is a different claim from not knowing what
@@ -146,19 +148,51 @@ they cost. Add your own rates with `--prices`.
 
 ### Local runtimes
 
-Defaults to LM Studio on `http://localhost:1234`, the runtime verified end to end. Ollama exposes
-the same dialect on `11434`:
+Defaults to LM Studio on `http://localhost:1234`. Ollama exposes the same dialect on `11434`:
 
 ```bash
 export LOCAL_BASE=http://localhost:11434
 export LOCAL_MODEL=your-model-id
 ```
 
-**On macOS, a local runtime on another host needs Local Network permission.** If the runtime is
-plainly up and reachable in a browser but the tool reports `[Errno 65] No route to host`, macOS is
-denying your Python interpreter local-network access — the connection is refused before it leaves
-the machine. Grant it in System Settings › Privacy & Security › Local Network, or run the runtime
-on the same machine, where loopback is unaffected.
+**The with-Nutrient cells do not currently work against LM Studio, and the failure is silent.**
+Measured 2026-08-17 against LM Studio serving `qwen/qwen3-vl-8b` and `qwen/qwen3-vl-30b`: the SDK
+requests structured output (`response_format: json_schema`) together with `logprobs`, and LM Studio
+then omits the grammar-forced tokens from the assembled `content` string. What comes back is the
+model's own words with every schema-determined span deleted —
+
+```
+ "Progress Invoice - Riverside Mixed-Use Development — Phase 2"},b2", "b3", "b4"]
+```
+
+— which is not parseable, so the SDK reports a successful call that extracted **zero fields**. Same
+request minus `logprobs` returns well-formed JSON from the same model, and Bedrock answers the
+identical `logprobs` + `json_schema` pair correctly, so this is LM Studio's assembly of `content`
+rather than the pair being unsupportable. Until it is fixed, a local run measures **tokens only**:
+the input-token delta is still exact, and the direct cells still return values, but treat any
+accuracy or agreement number from a local run as meaningless rather than as a poor score.
+
+**On macOS, a local runtime on another host needs Local Network permission — and there is usually
+no checkbox to grant it.** If the runtime is plainly up and reachable in a browser but the tool
+reports `[Errno 65] No route to host`, macOS is denying that specific interpreter local-network
+access; the connection is refused before it leaves the machine. The permission is **per binary**,
+and only bundled GUI apps ever get prompted, so an unbundled CLI interpreter is denied by default
+and never appears in System Settings › Privacy & Security › Local Network at all. Measured on one
+machine: Apple's `/usr/bin/python3` reached the host, while the uv-managed CPython 3.11 in this
+project's venv and Homebrew's 3.12 and 3.14 all failed instantly with `Errno 65`.
+
+Loopback is exempt from the permission, so the workarounds all end in talking to `127.0.0.1`:
+
+- run the runtime on the same machine, or
+- `ssh -N -L 1235:127.0.0.1:1234 you@that-host`, then `export LOCAL_BASE=http://127.0.0.1:1235`
+  (Apple's `ssh` is permitted; the host needs Remote Login enabled), or
+- relay the port with a permitted binary — a dozen-line `socket` forwarder run under
+  `/usr/bin/python3` listening on `127.0.0.1:1235` and connecting to the runtime's host is enough.
+
+Nothing in the failure names the permission: the SDK surfaces it as
+`502 Bad Gateway (Error Code: 3026) [Source: Vision]`, which reads like the model rejecting the
+request. If every cell fails instantly and identically, test the route from the *same interpreter*
+the tool runs under before suspecting the model.
 
 ## Reading the results honestly
 
@@ -168,11 +202,27 @@ Four things that will mislead you if you skip them.
 on OpenAI, 2,282 on Bedrock and 2,540 on Anthropic. A cross-provider token column compares
 tokenizers, not efficiency. Compare tokens *within* a provider, and cost *across* providers.
 
-**The overhead is a constant per call, not a percentage.** On the bundled 17-document corpus
-against Bedrock Qwen3-VL, the SDK added **exactly 468 input tokens to every single document** — a
-one-page receipt and a 40-page medical record alike, spread +468 to +468. That works out to about
-**$25 per 100,000 documents** at the bundled list price. Your own numbers will differ by provider
-and by document, which is why the tool exists rather than a published figure.
+**The overhead is a constant per call, not a percentage — and the constant is per provider.** On
+the bundled 17-document corpus, measured 2026-08-17, the SDK added the same number of input tokens
+to *every* document, from a one-page receipt to a 40-page medical record, but that number differs by
+provider:
+
+| Provider | Δ input per document | Spread across 17 docs | Per 100k documents (input) |
+|---|---|---|---|
+| Claude Sonnet 5 | +1,226 | +1,226 to +1,226 | $367.80 |
+| Qwen3-VL 235B (Bedrock) | +468 | +468 to +468 | $24.80 |
+| OpenAI | +748 | +748 to +748 | not priced |
+| Qwen3-VL (LM Studio, local) | +468 | +468 to +468 | not priced — no per-token price exists |
+
+So quote a figure with its provider attached or not at all: the same scaffolding is **15× more per
+100k documents** on Claude Sonnet 5 than on Bedrock's Qwen3-VL. The local Qwen matching Bedrock's
+Qwen token-for-token is the tokenizer, not a coincidence — the SDK sends the same extracted text
+both times.
+
+Two runs against Bedrock an hour apart also showed the absolute counts moving slightly on 2 of 17
+documents (1,049 → 1,058 input tokens on one), because the SDK's own text extraction is not
+bit-deterministic. **The delta was +468 in both runs regardless.** What the tool measures is stable
+even where its inputs are not.
 
 That constant is also why the bundled corpus deliberately mixes one-page receipts with a 40-page
 record: the same 468 tokens are a large fraction of a small document and a rounding error on a
