@@ -207,17 +207,22 @@ the bundled 17-document corpus, measured 2026-08-17, the SDK added the same numb
 to *every* document, from a one-page receipt to a 40-page medical record, but that number differs by
 provider:
 
-| Provider | Δ input per document | Spread across 17 docs | Per 100k documents (input) |
+| Provider / model | Δ input per document | Spread across 17 docs | Per 100k documents (input) |
 |---|---|---|---|
 | Claude Sonnet 5 | +1,226 | +1,226 to +1,226 | $367.80 |
 | Qwen3-VL 235B (Bedrock) | +468 | +468 to +468 | $24.80 |
 | OpenAI | +748 | +748 to +748 | not priced |
-| Qwen3-VL (LM Studio, local) | +468 | +468 to +468 | not priced — no per-token price exists |
+| Qwen3-VL 8B / 30B (LM Studio) | +468 | +468 to +468 | not priced — no per-token price exists |
+| Qwen3.5 9B (LM Studio) | **+479** | +479 to +479 | not priced |
 
-So quote a figure with its provider attached or not at all: the same scaffolding is **15× more per
-100k documents** on Claude Sonnet 5 than on Bedrock's Qwen3-VL. The local Qwen matching Bedrock's
-Qwen token-for-token is the tokenizer, not a coincidence — the SDK sends the same extracted text
-both times.
+So quote a figure with its provider *and model* attached, or not at all. The same scaffolding is
+**15× more per 100k documents** on Claude Sonnet 5 than on Bedrock's Qwen3-VL. And the last two rows
+are the sharper point: **the constant follows the tokenizer, not the vendor.** Two Qwen generations
+on the same host, sent the same text by the same SDK, read that text as 468 and 479 tokens. A newer
+model from a provider you already measured is a new measurement.
+
+The local Qwen3-VL matching Bedrock's Qwen3-VL token-for-token is the same fact from the other side:
+one tokenizer, one number, regardless of where the weights run.
 
 Two runs against Bedrock an hour apart also showed the absolute counts moving slightly on 2 of 17
 documents (1,049 → 1,058 input tokens on one), because the SDK's own text extraction is not
