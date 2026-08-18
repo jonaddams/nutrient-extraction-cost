@@ -394,6 +394,31 @@ your negotiated rates using <code>--prices</code>.</p>
 """
 
 
+CONTENT_NOTICE = (
+    "This file includes values extracted from the documents that were run, so "
+    "handle it the way you would handle those documents. Nothing was sent to "
+    "Nutrient: the tool has no telemetry and no Nutrient endpoint."
+)
+
+
+def _footer(summary: dict[str, Any], e) -> str:
+    """States what the file contains and what produced it.
+
+    No redaction mode: a report with its disagreements blacked out cannot make
+    the argument it exists to make, so this says plainly that the file carries
+    document content instead of hiding it.
+    """
+    block = summary.get("provenance") or {}
+    version = block.get("toolVersion", "not recorded")
+    return f"""
+<footer>
+<p>{e(CONTENT_NOTICE)}</p>
+<p>Measured by nutrient-extraction-cost {e(version)} · list prices checked
+{e(summary['checkedOn'])} · Nutrient, nutrient.io</p>
+</footer>
+"""
+
+
 def render(summary: dict[str, Any]) -> str:
     """A self-contained page. No external requests, so it can be mailed on."""
     e = html_mod.escape
@@ -416,6 +441,7 @@ def render(summary: dict[str, Any]) -> str:
 {_accuracy_band(summary, e)}
 {_honesty_band(summary, e)}
 {_appendix(summary, e)}
+{_footer(summary, e)}
 </div>
 </html>
 """

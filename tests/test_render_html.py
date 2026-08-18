@@ -282,3 +282,26 @@ def test_the_legacy_reading_this_honestly_section_is_not_duplicated():
     that repeated them verbatim is gone."""
     out = render_html.render(_summary())
     assert out.count("<h2>Reading this honestly</h2>") == 1
+
+
+def test_the_footer_says_the_file_carries_document_content():
+    """On a prospect's own run the disagreement values ARE their document text,
+    which makes this file sensitive. Say so rather than redacting: a report with
+    its disagreements blacked out cannot make its own argument."""
+    out = render_html.render(_summary())
+    assert "values extracted from the documents" in out
+
+
+def test_the_footer_carries_the_tool_version_and_price_date():
+    out = render_html.render(_summary())
+    footer = out[out.index("<footer"):]
+    assert "0.1.0" in footer
+    assert "2026-08-14" in footer
+
+
+def test_the_footer_uses_the_brand_casing():
+    """Sentence case for Nutrient, lowercase for the domain."""
+    footer = render_html.render(_summary())
+    footer = footer[footer.index("<footer"):]
+    assert "nutrient.io" in footer
+    assert "NUTRIENT" not in footer
