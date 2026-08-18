@@ -261,3 +261,24 @@ def test_a_sentence_spells_all_its_numbers_or_none_of_them():
 
     assert "21 documents, 1 model" in head
     assert "one model" not in head
+
+
+def test_the_provenance_grid_tiles_without_leaving_a_gap():
+    """Six facts on a four-column grid: four single cells, two spanning two.
+
+    The grid's own background is the hairline colour, so any column the cells
+    do not fill renders as a grey block rather than as whitespace. 4 + 2*2 = 8
+    is exactly two rows.
+    """
+    out = render_html.render(_two_doc_summary())
+    grid = out[out.index("class=prov-grid") : out.index("id=\"cost\"")]
+    assert grid.count("class='prov-cell wide'") == 2
+    assert grid.count("prov-cell") == 6
+
+
+def test_machine_shaped_values_are_set_in_mono():
+    """Dates, versions, model ids and env vars are mono; prose is not."""
+    out = render_html.render(_two_doc_summary())
+    grid = out[out.index("class=prov-grid") : out.index("id=\"cost\"")]
+    assert "<span class='prov-v mono'>2026-08-18T09:30:00-04:00</span>" in grid
+    assert "<span class='prov-v'>2 from acme-invoices</span>" in grid

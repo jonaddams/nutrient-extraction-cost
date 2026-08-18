@@ -176,13 +176,26 @@ section.band {
 /* Provenance: a hairline grid, one cell per fact. */
 .prov-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  /* Fixed four columns rather than auto-fit: the two long facts span two
+     columns each, so the six cells tile a 4-wide grid exactly. With auto-fit
+     an awkward container width leaves a column unfilled, and because the grid's
+     own background is the hairline colour, that gap renders as a grey block. */
+  grid-template-columns: repeat(4, 1fr);
   gap: 1px;
   background: var(--border-neutral-default-secondary);
   border: 1px solid var(--border-neutral-default-secondary);
   border-radius: var(--radius-card);
   overflow: hidden;
-  margin-bottom: 56px;
+  margin: 40px 0 56px;
+}
+.prov-cell.wide { grid-column: span 2; }
+
+@media (max-width: 900px) {
+  .prov-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .prov-grid { grid-template-columns: 1fr; }
+  .prov-cell.wide { grid-column: span 1; }
 }
 .prov-cell {
   background: var(--bg-neutral-default-primary);
@@ -199,6 +212,7 @@ section.band {
   color: hsla(32, 10%, 49%, 1);
 }
 .prov-v { font-size: 14px; }
+.prov-v.mono { font-family: var(--font-mono); font-size: 13px; }
 
 /* Cards: one per model in the cost band, one per statistic in accuracy. */
 .cards { display: flex; flex-wrap: wrap; gap: 16px; }
@@ -341,12 +355,12 @@ details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.
 <h1>What document extraction costs, with and without the Nutrient SDK</h1>
 <p class=standfirst>Seventeen documents, three models, each run twice: once through the Nutrient SDK and once as a direct model call. The SDK&#x27;s token overhead is a constant per call, and the two halves do not return the same thing.</p>
 </header>
-<div class=prov-grid><div class=prov-cell><span class=prov-k>Documents run</span><span class=prov-v>17 from Nutrient sample corpus</span></div>
-<div class=prov-cell><span class=prov-k>Run</span><span class=prov-v>2026-08-17T13:07:00-04:00</span></div>
-<div class=prov-cell><span class=prov-k>Price table checked</span><span class=prov-v>2026-08-14</span></div>
-<div class=prov-cell><span class=prov-k>Tool version</span><span class=prov-v>nutrient-extraction-cost 0.1.0</span></div>
-<div class=prov-cell><span class=prov-k>Models compared</span><span class=prov-v>anthropic / claude-sonnet-5 · bedrock / qwen.qwen3-vl-235b-a22b-instruct · openai / gpt-5.4</span></div>
-<div class=prov-cell><span class=prov-k>Credentials used</span><span class=prov-v>ANTHROPIC_API_KEY (set) · OPENAI_API_KEY (set) · BEDROCK_API_KEY (set)</span></div></div>
+<div class=prov-grid><div class='prov-cell'><span class=prov-k>Documents run</span><span class='prov-v'>17 from Nutrient sample corpus</span></div>
+<div class='prov-cell'><span class=prov-k>Run</span><span class='prov-v mono'>2026-08-17T13:07:00-04:00</span></div>
+<div class='prov-cell'><span class=prov-k>Price table checked</span><span class='prov-v mono'>2026-08-14</span></div>
+<div class='prov-cell'><span class=prov-k>Tool version</span><span class='prov-v mono'>nutrient-extraction-cost 0.1.0</span></div>
+<div class='prov-cell wide'><span class=prov-k>Models compared</span><span class='prov-v mono'>anthropic / claude-sonnet-5 · bedrock / qwen.qwen3-vl-235b-a22b-instruct · openai / gpt-5.4</span></div>
+<div class='prov-cell wide'><span class=prov-k>Credentials used</span><span class='prov-v mono'>ANTHROPIC_API_KEY (set) · OPENAI_API_KEY (set) · BEDROCK_API_KEY (set)</span></div></div>
 
 
 <section class=band id="cost">

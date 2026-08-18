@@ -119,18 +119,22 @@ def _header(summary: dict[str, Any], e) -> str:
         model_list = " · ".join(
             f"{m['providerId']} / {m['model']}" for m in block.get("models", [])
         )
+        # (label, value, monospace?, spans two columns?) — machine-shaped values
+        # are set in mono, the way the design does; the two long facts span two
+        # columns so the six cells tile the four-column grid exactly.
         facts = [
-            ("Documents run", f"{block['documentCount']} from {block['corpusName']}"),
-            ("Run", block["runDate"]),
-            ("Price table checked", block["priceTableDate"]),
-            ("Tool version", f"nutrient-extraction-cost {block['toolVersion']}"),
-            ("Models compared", model_list or "not recorded"),
-            ("Credentials used", " · ".join(block["keySources"])),
+            ("Documents run", f"{block['documentCount']} from {block['corpusName']}", False, False),
+            ("Run", block["runDate"], True, False),
+            ("Price table checked", block["priceTableDate"], True, False),
+            ("Tool version", f"nutrient-extraction-cost {block['toolVersion']}", True, False),
+            ("Models compared", model_list or "not recorded", True, True),
+            ("Credentials used", " · ".join(block["keySources"]), True, True),
         ]
         cells = "\n".join(
-            f"<div class=prov-cell><span class=prov-k>{e(k)}</span>"
-            f"<span class=prov-v>{e(str(v))}</span></div>"
-            for k, v in facts
+            f"<div class='prov-cell{' wide' if wide else ''}'>"
+            f"<span class=prov-k>{e(k)}</span>"
+            f"<span class='prov-v{' mono' if mono else ''}'>{e(str(v))}</span></div>"
+            for k, v, mono, wide in facts
         )
         cells = f"<div class=prov-grid>{cells}</div>"
 
