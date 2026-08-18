@@ -3,6 +3,8 @@
 import re
 from pathlib import Path
 
+import pytest
+
 from costlab import render_html, report
 from costlab.prices import PriceTable
 
@@ -44,9 +46,12 @@ def _rendered():
 
 
 def _assert_invariants(html: str, label: str) -> None:
-    assert not re.search(r'(src|href)\s*=\s*"(https?:)?//', html), (
-        f"{label} fetches something external"
+    fetch = re.compile(
+        r"""(url\(\s*['"]?|(?:src|href)\s*=\s*['"]?|@import\s+['"]?)"""
+        r"""(https?:)?//""",
+        re.IGNORECASE,
     )
+    assert not fetch.search(html), f"{label} fetches something external"
     assert "@font-face" not in html, f"{label} embeds a font"
     assert "base64" not in html, f"{label} embeds a binary"
     assert "/Users/" not in html, f"{label} leaks a local path"
@@ -85,3 +90,15 @@ def test_a_report_without_provenance_still_renders():
     assert out.startswith("<!doctype html>")
     assert out.rstrip().endswith("</html>")
     assert "None" not in out
+
+
+def test_the_fetch_invariant_actually_fires_on_a_css_url_reference():
+    """A guard that has never been shown to fire is a guard nobody knows works.
+
+    The old src=/href= regex would have sailed past a url(...) reference
+    inside an inlined stylesheet. This proves the widened check catches it.
+    """
+    with pytest.raises(AssertionError):
+        _assert_invariants(
+            '<style>.x{background:url(https://evil/x.css)}</style>', "synthetic"
+        )
