@@ -1,0 +1,136 @@
+/* costlab/brand/theme.css
+   Semantic tokens copied from the Nutrient design system, [data-theme="company"].
+   Never reference palette values directly — a brand refresh should be a copy of
+   this block and nothing else. */
+:root {
+  --font-sans: "ABC Monument Grotesk", system-ui, sans-serif;
+  --font-mono: "ABC Monument Grotesk Mono", ui-monospace, monospace;
+  --font-semi-mono: "ABC Monument Grotesk Semi-Mono", ui-monospace, monospace;
+
+  --text-neutral-primary: hsla(0, 13%, 9%, 1);
+  --text-neutral-tertiary: hsla(30, 16%, 35%, 1);
+  --text-neutral-alternate: hsla(0, 0%, 100%, 1);
+  --text-state-error: hsla(9, 49%, 27%, 1);
+  --text-state-success: hsla(131, 20%, 21%, 1);
+
+  --bg-neutral-default-primary: hsla(0, 0%, 100%, 1);
+  --bg-neutral-default-secondary: hsla(30, 20%, 92%, 1);
+  --bg-neutral-default-tertiary: hsla(13, 13%, 87%, 1);
+  --bg-neutral-alternate-primary: hsla(0, 13%, 9%, 1);
+  --bg-state-warning: hsla(43, 82%, 67%, 1);
+
+  --border-neutral-default-primary: hsla(30, 14%, 72%, 0.5);
+  --border-neutral-default-secondary: hsla(30, 16%, 35%, 1);
+
+  /* Cards are radius xl per the design system's rules of thumb; the token lives
+     in the site's tailwind config rather than tokens.css, so it is inlined. */
+  --radius-card: 24px;
+}
+
+body {
+  margin: 0;
+  padding: 40px 32px 64px;
+  background: var(--bg-neutral-default-primary);
+  color: var(--text-neutral-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.wrap { max-width: 1100px; margin: 0 auto; }
+
+/* Headings: variable weight 440 with negative tracking and line-height 1, per
+   the design system's rules of thumb. */
+h1, h2, h3 {
+  font-weight: 440;
+  line-height: 1;
+  margin: 0 0 12px;
+}
+h1 { font-size: 34px; letter-spacing: -0.96px; }
+h2 { font-size: 22px; letter-spacing: -0.48px; margin-top: 40px; }
+h3 { font-size: 17px; letter-spacing: -0.48px; margin-top: 28px; }
+
+/* Supertitles: semi-mono uppercase 12px, +0.24px tracking. */
+.supertitle {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  margin: 0 0 8px;
+}
+
+.logo { height: 28px; display: block; margin-bottom: 28px; }
+
+.sub { color: var(--text-neutral-tertiary); max-width: 680px; }
+
+.answer {
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 24px 28px;
+  background: var(--bg-neutral-default-primary);
+}
+
+.tiles { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0 8px; }
+.tile {
+  flex: 1 1 200px;
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
+}
+.tile .v { font-size: 26px; font-weight: 440; letter-spacing: -0.64px; }
+.tile .k {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+}
+
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+th, td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-neutral-default-primary);
+  vertical-align: top;
+}
+th {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  font-weight: normal;
+}
+td.n { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+td.d { font-weight: 440; }
+td.v { font-family: var(--font-mono); font-size: 13px; }
+
+.warn {
+  background: var(--bg-state-warning);
+  color: var(--text-neutral-primary);
+  border-radius: 12px;
+  padding: 12px 14px;
+  max-width: 680px;
+}
+
+.prov { font-size: 14px; }
+.prov td:first-child {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  width: 200px;
+}
+
+details { margin: 16px 0; }
+summary { cursor: pointer; font-weight: 440; }
+
+footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-neutral-default-secondary);
+  color: var(--text-neutral-tertiary);
+  font-size: 13px;
+}
