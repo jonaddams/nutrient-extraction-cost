@@ -14,6 +14,84 @@ from typing import Any
 from costlab import brand
 from costlab.report import _money
 
+# Measured on this corpus: 468 input tokens on Qwen3-VL, 479 on Qwen3.5 9B,
+# 1,226 on Claude Sonnet 5. The overhead is a constant per call, and the
+# constant is per model — not per vendor and not per tokenizer generation. A
+# different model, including a sibling from the same family, is a new
+# measurement, so the figure never transfers across the "per model" line.
+PER_MODEL_NOTE = (
+    "The overhead is a constant per call, and the constant is per model — not "
+    "per vendor and not per tokenizer generation. Measured on this corpus it "
+    "was 468 input tokens on Qwen3-VL, 479 on Qwen3.5 9B and 1,226 on Claude "
+    "Sonnet 5. A different model, including a sibling from the same family, is "
+    "a new measurement."
+)
+
+
+def _provenance_table(block: dict[str, Any] | None, e) -> str:
+    """The run's provenance, named plainly enough to be checked by a reader.
+
+    Returns "" when no provenance was recorded — an older or synthetic summary
+    should not render a table of blanks.
+    """
+    if not block:
+        return ""
+    models = ", ".join(
+        f"{m['providerId']} / {m['model']}" for m in block["models"]
+    ) or "not recorded"
+    rows = [
+        ("Documents run", f"{block['documentCount']} from {block['corpusName']}"),
+        ("Models compared", models),
+        ("Credentials used", ", ".join(block["keySources"])),
+        ("Run", block["runDate"]),
+        ("Price table checked", block["priceTableDate"]),
+        ("Tool version", block["toolVersion"]),
+    ]
+    body = "\n".join(
+        f"<tr><td>{e(k)}</td><td>{e(str(v))}</td></tr>" for k, v in rows
+    )
+    return f"<table class=prov>{body}</table>"
+
+
+def _answer_band(summary: dict[str, Any], e) -> str:
+    """Band 1: the answer, before any of the supporting detail.
+
+    One tile per model with its per-call constant and cost per 100k, then a
+    table with the per-call spread, then the sentence that keeps a reader from
+    generalising the constant to a sibling model.
+    """
+    tiles = "\n".join(
+        f"<div class=tile><div class=k>{e(r['label'])}</div>"
+        f"<div class=v>{r['deltaInputTokens'] // max(r['documents'], 1):+,} tokens</div>"
+        f"<div class=k>{e(_money(r['deltaCostPer100k']))} per 100k docs</div></div>"
+        for r in summary["byProvider"]
+    )
+    prov_rows = "\n".join(
+        f"<tr><td>{e(r['label'])}</td><td class=n>{r['documents']}</td>"
+        f"<td class='n d'>"
+        + (
+            f"{r['deltaMin']:+,} to {r['deltaMax']:+,}"
+            if r["deltaMin"] is not None
+            else "n/a"
+        )
+        + f"</td><td class='n d'>{e(_money(r['deltaCostPer100k']))}</td></tr>"
+        for r in summary["byProvider"]
+    )
+    return f"""
+<section class=answer>
+<p class=supertitle>Nutrient SDK overhead</p>
+<div class=tiles>
+{tiles}
+</div>
+<table>
+<thead><tr><th>model</th><th>documents measured</th><th>per-call spread</th>
+<th>cost per 100k docs (input)</th></tr></thead>
+{prov_rows}
+</table>
+<p class=sub>{e(PER_MODEL_NOTE)}</p>
+</section>
+"""
+
 
 def render(summary: dict[str, Any]) -> str:
     """A self-contained page. No external requests, so it can be mailed on."""
@@ -146,9 +224,13 @@ nothing to agree about. {a['fields']} field(s) were considered in total.</p>
         else ""
     )
 
+    logo = brand.asset("nutrient-logo.svg")
+    styles = brand.asset("theme.css") + "\n" + brand.asset("print.css")
+
     return f"""<!doctype html>
-<meta charset="utf-8">
-<title>Extraction cost comparison</title>
+<html lang=en>
+<meta charset=utf-8>
+<title>Extraction cost and accuracy — Nutrient SDK</title>
 <style>
   :root {{ color-scheme: light dark; }}
   body {{ font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; margin: 2rem auto;
@@ -164,6 +246,15 @@ nothing to agree about. {a['fields']} field(s) were considered in total.</p>
   ul {{ padding-left: 1.2rem; }}
   .scroll {{ overflow-x: auto; }}
 </style>
+<style>
+{styles}
+</style>
+<div class=wrap>
+{logo}
+<h1>What document extraction costs, with and without the Nutrient SDK</h1>
+{_provenance_table(summary.get("provenance"), e)}
+{_answer_band(summary, e)}
+
 <h1>Extraction cost, with and without the Nutrient SDK</h1>
 <p class=sub>Input tokens are the measurement. Dollars are computed from list
 prices checked <strong>{e(summary['checkedOn'])}</strong> and are secondary —
@@ -210,4 +301,6 @@ rows instead.</p>
 {caveats}
 </ul>
 <p class=sub>{e(summary['priceNote'])}</p>
+</div>
+</html>
 """

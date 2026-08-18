@@ -54,3 +54,38 @@ def test_it_is_a_complete_document():
     assert "<style>" in out
     assert "<h1>" in out
     assert "<h2>Reading this honestly</h2>" in out
+
+
+def test_the_answer_band_leads_with_the_per_model_constant():
+    out = render_html.render(_summary())
+    assert out.index("Nutrient SDK overhead") < out.index("<h2>Per document")
+
+
+def test_the_provenance_block_names_the_corpus_and_the_model():
+    out = render_html.render(_summary())
+    assert "acme-invoices" in out
+    assert "qwen3-vl" in out
+    assert "BEDROCK_API_KEY (set)" in out
+    assert "0.1.0" in out
+
+
+def test_the_brand_layer_is_inlined():
+    out = render_html.render(_summary())
+    assert "--text-neutral-primary" in out
+    assert 'fill="currentColor"' in out
+    assert "@media print" in out
+
+
+def test_the_constant_is_labelled_as_per_model():
+    """468 on Qwen3-VL, 479 on Qwen3.5-9b, 1,226 on Sonnet. The number does not
+    transfer to a sibling model, and the page has to say so."""
+    out = render_html.render(_summary())
+    assert "per model" in out
+
+
+def test_the_document_is_now_whole():
+    """A file we email to a prospect should be a complete document."""
+    out = render_html.render(_summary())
+    assert out.startswith("<!doctype html>")
+    assert "<html lang=en>" in out
+    assert out.rstrip().endswith("</html>")
