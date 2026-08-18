@@ -9,6 +9,7 @@ the answer.
 from __future__ import annotations
 
 import html as html_mod
+import re
 from typing import Any
 
 from costlab import brand
@@ -343,6 +344,17 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
 """
 
 
+def _code_flags(escaped: str) -> str:
+    """Set `--flag` names in code, without letting anything else through.
+
+    The price note is prose from prices.json, so it is escaped first; this only
+    ever wraps a run of `--word` that survived escaping. Escaping then
+    substituting a known-safe pattern keeps the inserted tags the only markup
+    that can reach the page.
+    """
+    return re.sub(r"(--[a-z][a-z-]*)", r"<code>\1</code>", escaped)
+
+
 def _caveats_band(summary: dict[str, Any], e) -> str:
     items = ""
     for n, caveat in enumerate(summary["caveats"], start=1):
@@ -383,8 +395,10 @@ the numbers say something they do not say.</p>
 <div class=cards>
 {items}
 </div>
+<div class=price-note>
 <p class=eyebrow>On the prices used</p>
-<p class=standfirst>{e(summary['priceNote'])}</p>
+<p>{_code_flags(e(summary['priceNote']))}</p>
+</div>
 </section>
 """
 

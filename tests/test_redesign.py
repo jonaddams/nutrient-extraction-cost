@@ -354,3 +354,20 @@ def test_a_missing_half_still_reads_as_a_difference():
     out = render_html.render(summary)
     assert "class='val diff'" in out
     assert "—" in out
+
+
+def test_the_price_note_is_an_accent_panel_with_its_flag_in_code():
+    out = render_html.render(_two_doc_summary())
+    assert "<div class=price-note>" in out
+    assert ".price-note {" in out and "--bg-state-warning" in out
+
+
+def test_marking_flags_as_code_cannot_introduce_other_markup():
+    """The note is prose from prices.json: escape first, then wrap only a
+    known-safe pattern, so the <code> tags are the only markup that can appear."""
+    hostile = render_html._code_flags(
+        __import__("html").escape("use --prices <script>alert(1)</script>")
+    )
+    assert "<code>--prices</code>" in hostile
+    assert "<script>" not in hostile
+    assert "&lt;script&gt;" in hostile

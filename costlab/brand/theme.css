@@ -390,3 +390,24 @@ details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.
 .spread td.doc { font-family: var(--font-mono); }
 .spread td.field { color: var(--text-neutral-tertiary); }
 .spread td.count strong { font-weight: 440; }
+
+/* The price note earns the accent fill: every dollar figure on the page is
+   computed from this table, so the conditions under which those rates hold —
+   an introductory rate that expires, partner pricing that is not
+   interchangeable — belong somewhere a reader cannot skim past. */
+.price-note {
+  background: var(--bg-state-warning);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.price-note .eyebrow { color: var(--text-neutral-primary); }
+.price-note p { margin: 0; font-size: 14px; max-width: 78ch; }
+.price-note code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 440;
+}

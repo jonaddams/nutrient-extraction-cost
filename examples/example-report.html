@@ -396,6 +396,27 @@ details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.
 .spread td.field { color: var(--text-neutral-tertiary); }
 .spread td.count strong { font-weight: 440; }
 
+/* The price note earns the accent fill: every dollar figure on the page is
+   computed from this table, so the conditions under which those rates hold —
+   an introductory rate that expires, partner pricing that is not
+   interchangeable — belong somewhere a reader cannot skim past. */
+.price-note {
+  background: var(--bg-state-warning);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.price-note .eyebrow { color: var(--text-neutral-primary); }
+.price-note p { margin: 0; font-size: 14px; max-width: 78ch; }
+.price-note code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 440;
+}
+
 /* costlab/brand/print.css
    A printed copy must be complete: the appendix cannot stay collapsed. */
 @media print {
@@ -503,8 +524,10 @@ the numbers say something they do not say.</p>
 <div class=cards>
 <div class=caveat><span class=caveat-n>01</span><h3>The delta is not waste</h3><p>The “without Nutrient” calls return no reliable page coordinates. They are cheaper because they do less: no grounded source locations, no confidence components. Do not read the delta as waste.</p></div><div class=caveat><span class=caveat-n>02</span><h3>Output tokens are not comparable</h3><p>Output tokens are not comparable between the two halves. The SDK asks for grounded metadata the direct call does not, and a direct call is free to be verbose — in one measured run a single document&#x27;s direct call emitted about 7,500 more output tokens than its SDK counterpart, which alone was enough to flip the aggregate and make the SDK look cheaper overall. The headline figure is therefore priced from input tokens, which measure the same document on both sides. The total including output is shown separately and should not be read as a like-for-like saving.</p></div><div class=caveat><span class=caveat-n>03</span><h3>Tokens do not compare across providers</h3><p>Token counts are not comparable across providers — each tokenises the same document differently, so a cross-provider token column compares tokenizers rather than efficiency. Compare tokens within a provider, and cost across them.</p></div><div class=caveat><span class=caveat-n>04</span><h3>Thinking tokens are billed as output</h3><p>Anthropic bills thinking tokens inside output tokens, itemised separately in its usage block. Output cost is not proportional to returned text.</p></div>
 </div>
+<div class=price-note>
 <p class=eyebrow>On the prices used</p>
-<p class=standfirst>Rates are per million tokens, in USD, at published list prices. Bedrock is partner-priced by AWS and is NOT interchangeable with Anthropic first-party rates. Claude Sonnet 5&#x27;s introductory input rate of 2.00 ends 2026-08-31, reverting to the 3.00 listed here. Providers absent from this table are reported as not priced rather than as free: no list price was confirmed for the default OpenAI model, and a local runtime has no per-token price at all — its cost is hardware and electricity, which this tool does not attempt to model. Override with --prices to use your negotiated rates.</p>
+<p>Rates are per million tokens, in USD, at published list prices. Bedrock is partner-priced by AWS and is NOT interchangeable with Anthropic first-party rates. Claude Sonnet 5&#x27;s introductory input rate of 2.00 ends 2026-08-31, reverting to the 3.00 listed here. Providers absent from this table are reported as not priced rather than as free: no list price was confirmed for the default OpenAI model, and a local runtime has no per-token price at all — its cost is hardware and electricity, which this tool does not attempt to model. Override with <code>--prices</code> to use your negotiated rates.</p>
+</div>
 </section>
 
 <section class=band id="appendix-band">
