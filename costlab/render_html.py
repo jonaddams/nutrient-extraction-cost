@@ -314,11 +314,8 @@ alongside it rather than as a like-for-like comparison.</p>
             "does not.</p>"
         )
         a = summary["agreementSummary"]
-        # `.get`, not `a["rate"]`: a hand-built summary (a test, or an older
-        # caller) may omit "rate" altogether, and that must render as "not
-        # comparable" rather than crash the whole appendix.
         rate_shown = (
-            "not comparable" if a.get("rate") is None else f"{a['rate']:.0%}"
+            "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
         )
         # Filtered on `state`, never on the legacy `agree` boolean: `agree` is
         # False for both disagreed AND ambiguous rows, and listing an ambiguous

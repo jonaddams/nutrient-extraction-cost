@@ -250,7 +250,10 @@ def test_the_appendix_carries_every_disagreement():
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
     summary["agreement"] = [_dis(f"doc{i}", {"x": "1", "y": f"{i}"}) for i in range(6)]
-    summary["agreementSummary"] = {"fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0}
+    summary["agreementSummary"] = {
+        "fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
 
     appendix = render_html.render(summary)
     appendix = appendix[appendix.index('id="disagreements"'):]
