@@ -102,7 +102,8 @@ th {
   color: var(--text-neutral-tertiary);
   font-weight: normal;
 }
-td.n { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+th.n, td.n { text-align: right; }
+td.n { font-family: var(--font-mono); white-space: nowrap; }
 td.d { font-weight: 440; }
 td.v { font-family: var(--font-mono); font-size: 13px; }
 

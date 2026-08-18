@@ -314,9 +314,7 @@ alongside it rather than as a like-for-like comparison.</p>
             "does not.</p>"
         )
         a = summary["agreementSummary"]
-        rate_shown = (
-            "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
-        )
+        rate_shown = "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
         # Filtered on `state`, never on the legacy `agree` boolean: `agree` is
         # False for both disagreed AND ambiguous rows, and listing an ambiguous
         # row here — a pair the comparator explicitly could not judge — would
