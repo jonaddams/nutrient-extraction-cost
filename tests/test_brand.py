@@ -15,12 +15,21 @@ def test_unknown_asset_raises():
 
 
 def test_no_external_requests_in_brand_files():
-    """A brand layer is exactly what smuggles a webfont URL into the report."""
+    """A brand layer is exactly what smuggles a webfont URL into the report.
+
+    An xmlns namespace URI is an identifier, never a fetch, so it is allowed
+    explicitly — the thing being banned is anything the renderer would go and
+    get: url(...), src=, href=, @import, pointing at http(s):// or a
+    protocol-relative //.
+    """
+    fetch = re.compile(
+        r"""(url\(\s*['"]?|(?:src|href)\s*=\s*['"]?|@import\s+['"]?)"""
+        r"""(https?:)?//""",
+        re.IGNORECASE,
+    )
     for name in ("theme.css", "print.css", "nutrient-logo.svg"):
         text = brand.asset(name)
-        assert "http://" not in text
-        assert "https://" not in text
-        assert not re.search(r"url\(", text), f"{name} fetches something"
+        assert not fetch.search(text), f"{name} fetches something external"
 
 
 def test_no_font_binary_is_vendored():
@@ -42,6 +51,12 @@ def test_the_typeface_is_declared_with_a_fallback():
 def test_the_logo_inherits_text_colour():
     """currentColor is what lets one SVG work on light and dark grounds."""
     assert 'fill="currentColor"' in brand.asset("nutrient-logo.svg")
+
+
+def test_the_logo_keeps_its_namespace():
+    """Byte-fidelity with the design system's file, which needs xmlns to stand
+    alone in an <img src> or when served directly."""
+    assert 'xmlns="http://www.w3.org/2000/svg"' in brand.asset("nutrient-logo.svg")
 
 
 def test_print_css_opens_the_appendix():
