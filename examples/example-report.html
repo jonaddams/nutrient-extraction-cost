@@ -289,19 +289,49 @@ section.band {
   border-radius: 999px;
   padding: 3px 10px;
 }
-.cmp-grid { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr 2fr; gap: 1px 16px; font-size: 13px; }
+.cmp-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr;
+  gap: 8px 12px;
+  align-items: stretch;
+  font-size: 13px;
+}
 .cmp-grid .h {
   font-family: var(--font-semi-mono);
   text-transform: uppercase;
   font-size: 11px;
   letter-spacing: 0.24px;
-  color: var(--text-neutral-tertiary);
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border-neutral-default-primary);
+  color: hsla(32, 10%, 49%, 1);
 }
-.cmp-grid .p { font-family: var(--font-mono); padding: 10px 0; }
-.cmp-grid .v { padding: 10px 0; }
-.cmp-grid .same { color: var(--text-neutral-tertiary); font-style: italic; }
+.cmp-grid .p { font-size: 13px; padding-top: 8px; color: var(--text-neutral-tertiary); }
+
+/* Each returned value sits in its own tinted box, so "these two differ" is
+   visible at a glance instead of requiring the reader to compare two
+   paragraphs word by word — which is the entire argument of this section. */
+.val {
+  background: var(--bg-neutral-default-secondary);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.45;
+}
+/* A differing pair carries the error edge. Not because either value is wrong —
+   we cannot know that without a citation — but because they cannot both be
+   right, which is the finding. */
+.val.diff { border-left: 2px solid var(--bg-state-error); border-radius: 4px 12px 12px 4px; }
+/* Halves that agree are one box across both columns, captioned, rather than
+   the same string printed twice. */
+.val.agree { grid-column: span 2; }
+.val .same-note {
+  display: block;
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+  margin-top: 6px;
+}
 
 /* Caveats: numbered, titled, body unchanged. */
 .caveat {
@@ -413,7 +443,7 @@ this run: Claude Sonnet 5 +1,226 to +1,226, Qwen3-VL 235B (Bedrock) +468 to +468
 </div>
 <div class=cmp-grid>
 <div class=h></div><div class=h>Direct call</div><div class=h>With Nutrient SDK</div>
-<div class=p>anthropic</div><div class=v>Recipe from the kitchen of:</div><div class=v>From. Lola to</div><div class=p>bedrock</div><div class=v>From. Lola to Grand m te ~ Hons Hea what Ven if vw gers Recipe from the kilehyn of: Orig bola na : &gt; - _ - Bak of F fre for Ahour ee Fg 4</div><div class=v>From. Lola to Grand m te</div><div class=p>openai</div><div class=v>From Lola to Grandmother ~ Heaven knows what</div><div class=v>From. Lola to ~ Hea Ven Hons vw what</div>
+<div class=p>anthropic</div><div class='val diff'>Recipe from the kitchen of:</div><div class='val diff'>From. Lola to</div><div class=p>bedrock</div><div class='val diff'>From. Lola to Grand m te ~ Hons Hea what Ven if vw gers Recipe from the kilehyn of: Orig bola na : &gt; - _ - Bak of F fre for Ahour ee Fg 4</div><div class='val diff'>From. Lola to Grand m te</div><div class=p>openai</div><div class='val diff'>From Lola to Grandmother ~ Heaven knows what</div><div class='val diff'>From. Lola to ~ Hea Ven Hons vw what</div>
 </div>
 </article>
 

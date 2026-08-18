@@ -256,17 +256,18 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         row = shown[0]
         cells = ""
         for provider, direct, sdk in _by_provider_half(row):
+            cells += f"<div class=p>{e(provider)}</div>"
             if direct is not None and sdk is not None and str(direct) == str(sdk):
+                # One box across both columns rather than the same string
+                # printed twice — the reader should see agreement, not repetition.
                 cells += (
-                    f"<div class=p>{e(provider)}</div>"
-                    f"<div class=v>{e(str(direct))}</div>"
-                    f"<div class='v same'>both halves identical</div>"
+                    f"<div class='val agree'>{e(str(direct))}"
+                    f"<span class=same-note>both halves identical</span></div>"
                 )
             else:
                 cells += (
-                    f"<div class=p>{e(provider)}</div>"
-                    f"<div class=v>{e('—' if direct is None else str(direct))}</div>"
-                    f"<div class=v>{e('—' if sdk is None else str(sdk))}</div>"
+                    f"<div class='val diff'>{e('—' if direct is None else str(direct))}</div>"
+                    f"<div class='val diff'>{e('—' if sdk is None else str(sdk))}</div>"
                 )
         in_full = f"""
 <p class=eyebrow>One disagreement in full</p>

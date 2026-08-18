@@ -296,3 +296,42 @@ def test_the_agreement_rate_card_carries_the_accent_fill():
     assert "<div class='card accent'>" in out
     assert out.count("class='card accent'") == 1, "only the rate card is filled"
     assert ".card.accent" in out and "--bg-state-warning" in out
+
+
+def test_agreeing_halves_are_one_captioned_box_not_the_same_string_twice():
+    summary = _two_doc_summary()
+    summary["agreement"] = [
+        _dis("alpha", {
+            "anthropic:direct": "Meridian Components Inc.",
+            "anthropic:sdk": "Meridian Components Inc.",
+            "bedrock:direct": "Statement of Financial Position",
+            "bedrock:sdk": "Meridian Components Inc. Statement",
+        }),
+    ]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
+    out = render_html.render(summary)
+    cmp_block = out[out.index("class=cmp-head") : out.index("by spread")]
+
+    # anthropic agreed: one box spanning both columns, captioned once
+    assert cmp_block.count("class='val agree'") == 1
+    assert cmp_block.count("Meridian Components Inc.</div>") == 0  # not printed bare twice
+    assert cmp_block.count("both halves identical") == 1
+
+    # bedrock differed: two boxes, each carrying the error edge
+    assert cmp_block.count("class='val diff'") == 2
+
+
+def test_a_missing_half_still_reads_as_a_difference():
+    """One side answering and the other not is a difference, not agreement."""
+    summary = _two_doc_summary()
+    summary["agreement"] = [_dis("alpha", {"a:direct": "something", "a:sdk": None})]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
+    out = render_html.render(summary)
+    assert "class='val diff'" in out
+    assert "—" in out
