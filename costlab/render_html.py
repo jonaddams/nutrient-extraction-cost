@@ -179,17 +179,8 @@ def _honesty_band(summary: dict[str, Any], e) -> str:
     ahead of the legacy "Reading this honestly" section further down the page:
     that duplication is deliberate and transitional, and Task 8 removes the
     legacy section when it folds the detail into an appendix.
-
-    Caveats are escaped with `quote=False`: a caveat rendered as a `<li>` text
-    node never needs its apostrophes turned into `&#x27;`, and the standing
-    disagreement-framing caveat contains one ("a single document's direct
-    call") — escaping it would mean the raw caveat string could never appear
-    verbatim in the page, which is exactly what the "outside a details
-    element" test checks for.
     """
-    caveats = "\n".join(
-        f"<li>{e(c, quote=False)}</li>" for c in summary["caveats"]
-    )
+    caveats = "\n".join(f"<li>{e(c)}</li>" for c in summary["caveats"])
     notices = []
     if summary["unmeasurable"]:
         retried = (

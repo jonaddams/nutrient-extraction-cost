@@ -194,12 +194,22 @@ def test_representative_is_stable_across_input_orders():
 
 
 def test_every_caveat_is_outside_a_details_element():
-    """A caveat a reader has to click for is a caveat we did not really make."""
+    """A caveat a reader has to click for is a caveat we did not really make.
+
+    Compares the ESCAPED text, which is what the document contains. Asserting
+    the raw string would also pass if escaping were removed altogether, so the
+    escaped form is the stronger assertion as well as the correct one.
+
+    No <details> exists until Task 8, so this passes trivially today and becomes
+    load-bearing when the appendix lands. Do not weaken it in the meantime.
+    """
+    import html
+
     summary = _summary()
     out = render_html.render(summary)
     head = out.split("<details")[0]
     for caveat in summary["caveats"]:
-        assert caveat in head, f"caveat is behind a disclosure: {caveat[:40]}"
+        assert html.escape(caveat) in head, f"caveat is behind a disclosure: {caveat[:40]}"
 
 
 def test_unmeasurable_and_retried_notices_are_in_the_summary():
