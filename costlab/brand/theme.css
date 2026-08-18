@@ -46,8 +46,8 @@ h1, h2 {
   line-height: 1;
   margin: 0 0 12px;
 }
-h1 { font-size: 34px; letter-spacing: -0.96px; }
-h2 { font-size: 22px; letter-spacing: -0.48px; margin-top: 40px; }
+h1 { font-size: 46px; letter-spacing: -0.96px; line-height: 1.02; max-width: 20ch; }
+h2 { font-size: 30px; letter-spacing: -0.64px; line-height: 1.05; margin: 0; }
 
 /* Supertitles: semi-mono uppercase 12px, +0.24px tracking. */
 .supertitle {
@@ -139,4 +139,173 @@ footer {
   border-top: 1px solid var(--border-neutral-default-secondary);
   color: var(--text-neutral-tertiary);
   font-size: 13px;
+}
+
+
+/* ---- Canvas redesign components ------------------------------------------
+   Translated from the Claude Design artboard (branded-report/). The artboard
+   uses inline styles; these are the same values as classes, so the renderer
+   stays readable and a brand change remains one file. */
+
+.eyebrow {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+  margin: 0;
+}
+
+.standfirst { max-width: 68ch; color: var(--text-neutral-tertiary); margin: 0; }
+
+/* Sections are rules across the page, numbered by their eyebrow. */
+section.band {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 48px 0 8px;
+  margin-top: 40px;
+  border-top: 1px solid var(--border-neutral-default-secondary);
+}
+
+/* Provenance: a hairline grid, one cell per fact. */
+.prov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--border-neutral-default-secondary);
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  margin-bottom: 56px;
+}
+.prov-cell {
+  background: var(--bg-neutral-default-primary);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prov-k {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+}
+.prov-v { font-size: 14px; }
+
+/* Cards: one per model in the cost band, one per statistic in accuracy. */
+.cards { display: flex; flex-wrap: wrap; gap: 16px; }
+.card {
+  flex: 1 1 200px;
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.card-model {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+}
+.card-figure { display: flex; flex-direction: column; gap: 2px; }
+.card-figure.split { padding-top: 14px; border-top: 1px solid var(--border-neutral-default-primary); }
+.figure-lg {
+  font-size: 34px;
+  font-weight: 440;
+  letter-spacing: -0.8px;
+  line-height: 1;
+  font-family: var(--font-mono);
+}
+.figure-xl {
+  font-size: 40px;
+  font-weight: 440;
+  letter-spacing: -0.96px;
+  line-height: 1;
+  font-family: var(--font-mono);
+}
+.figure-md {
+  font-size: 20px;
+  font-weight: 440;
+  letter-spacing: -0.48px;
+  font-family: var(--font-mono);
+}
+.figure-note { font-size: 13px; color: var(--text-neutral-tertiary); }
+
+/* One disagreement, shown in full: provider down the side, halves across. */
+.cmp {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cmp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.cmp-doc { font-family: var(--font-mono); font-size: 15px; }
+.pill {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.cmp-grid { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr 2fr; gap: 1px 16px; font-size: 13px; }
+.cmp-grid .h {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-neutral-default-primary);
+}
+.cmp-grid .p { font-family: var(--font-mono); padding: 10px 0; }
+.cmp-grid .v { padding: 10px 0; }
+.cmp-grid .same { color: var(--text-neutral-tertiary); font-style: italic; }
+
+/* Caveats: numbered, titled, body unchanged. */
+.caveat {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 260px;
+}
+.caveat-n {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-neutral-tertiary);
+}
+.caveat p { margin: 0; font-size: 14px; color: var(--text-neutral-tertiary); }
+
+/* Appendix panels. */
+details.panel {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  margin: 0;
+}
+details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.24px; }
+.group-head {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  margin: 18px 0 0;
 }

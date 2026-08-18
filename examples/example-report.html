@@ -51,8 +51,8 @@ h1, h2 {
   line-height: 1;
   margin: 0 0 12px;
 }
-h1 { font-size: 34px; letter-spacing: -0.96px; }
-h2 { font-size: 22px; letter-spacing: -0.48px; margin-top: 40px; }
+h1 { font-size: 46px; letter-spacing: -0.96px; line-height: 1.02; max-width: 20ch; }
+h2 { font-size: 30px; letter-spacing: -0.64px; line-height: 1.05; margin: 0; }
 
 /* Supertitles: semi-mono uppercase 12px, +0.24px tracking. */
 .supertitle {
@@ -146,6 +146,175 @@ footer {
   font-size: 13px;
 }
 
+
+/* ---- Canvas redesign components ------------------------------------------
+   Translated from the Claude Design artboard (branded-report/). The artboard
+   uses inline styles; these are the same values as classes, so the renderer
+   stays readable and a brand change remains one file. */
+
+.eyebrow {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+  margin: 0;
+}
+
+.standfirst { max-width: 68ch; color: var(--text-neutral-tertiary); margin: 0; }
+
+/* Sections are rules across the page, numbered by their eyebrow. */
+section.band {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 48px 0 8px;
+  margin-top: 40px;
+  border-top: 1px solid var(--border-neutral-default-secondary);
+}
+
+/* Provenance: a hairline grid, one cell per fact. */
+.prov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1px;
+  background: var(--border-neutral-default-secondary);
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  margin-bottom: 56px;
+}
+.prov-cell {
+  background: var(--bg-neutral-default-primary);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prov-k {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+}
+.prov-v { font-size: 14px; }
+
+/* Cards: one per model in the cost band, one per statistic in accuracy. */
+.cards { display: flex; flex-wrap: wrap; gap: 16px; }
+.card {
+  flex: 1 1 200px;
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.card-model {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+}
+.card-figure { display: flex; flex-direction: column; gap: 2px; }
+.card-figure.split { padding-top: 14px; border-top: 1px solid var(--border-neutral-default-primary); }
+.figure-lg {
+  font-size: 34px;
+  font-weight: 440;
+  letter-spacing: -0.8px;
+  line-height: 1;
+  font-family: var(--font-mono);
+}
+.figure-xl {
+  font-size: 40px;
+  font-weight: 440;
+  letter-spacing: -0.96px;
+  line-height: 1;
+  font-family: var(--font-mono);
+}
+.figure-md {
+  font-size: 20px;
+  font-weight: 440;
+  letter-spacing: -0.48px;
+  font-family: var(--font-mono);
+}
+.figure-note { font-size: 13px; color: var(--text-neutral-tertiary); }
+
+/* One disagreement, shown in full: provider down the side, halves across. */
+.cmp {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cmp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.cmp-doc { font-family: var(--font-mono); font-size: 15px; }
+.pill {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.cmp-grid { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr 2fr; gap: 1px 16px; font-size: 13px; }
+.cmp-grid .h {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-neutral-default-primary);
+}
+.cmp-grid .p { font-family: var(--font-mono); padding: 10px 0; }
+.cmp-grid .v { padding: 10px 0; }
+.cmp-grid .same { color: var(--text-neutral-tertiary); font-style: italic; }
+
+/* Caveats: numbered, titled, body unchanged. */
+.caveat {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 260px;
+}
+.caveat-n {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-neutral-tertiary);
+}
+.caveat p { margin: 0; font-size: 14px; color: var(--text-neutral-tertiary); }
+
+/* Appendix panels. */
+details.panel {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  margin: 0;
+}
+details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.24px; }
+.group-head {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  margin: 18px 0 0;
+}
+
 /* costlab/brand/print.css
    A printed copy must be complete: the appendix cannot stay collapsed. */
 @media print {
@@ -166,64 +335,105 @@ footer {
   <path d="M14.237 74.236C6.37 74.236 0 67.865 0 59.999s6.371-14.237 14.237-14.237S28.474 52.133 28.474 60s-6.371 14.237-14.237 14.237Zm142.368-28.474c-7.866 0-14.237 6.371-14.237 14.237s6.371 14.237 14.237 14.237c7.865 0 14.236-6.371 14.236-14.237s-6.371-14.237-14.236-14.237ZM21.74 94.85c-6.023 5.055-6.813 14.038-1.759 20.06 5.054 6.022 14.038 6.812 20.06 1.758 6.022-5.054 6.812-14.037 1.758-20.06-5.054-6.021-14.037-6.812-20.06-1.758Zm127.362-69.703c6.022-5.054 6.812-14.037 1.758-20.06-5.054-6.022-14.037-6.812-20.06-1.758-6.022 5.054-6.812 14.038-1.758 20.06 5.054 6.022 14.038 6.812 20.06 1.758ZM40.041 3.337c-6.022-5.055-15.006-4.272-20.06 1.758-5.054 6.029-4.27 15.005 1.759 20.06 6.029 5.053 15.005 4.27 20.06-1.759 5.053-6.03 4.27-15.006-1.759-20.06ZM149.102 94.85c-6.022-5.055-15.006-4.272-20.06 1.758-5.054 6.022-4.271 15.005 1.758 20.059 6.023 5.054 15.006 4.271 20.06-1.758 5.054-6.022 4.271-15.005-1.758-20.06Zm-36.354-30.51c-6.022-5.054-15.005-4.271-20.06 1.758-5.053 6.03-4.27 15.006 1.759 20.06 6.029 5.054 15.005 4.271 20.059-1.758 5.055-6.03 4.271-15.006-1.758-20.06Zm-36.353-30.5c-6.023-5.054-15.006-4.271-20.06 1.758-5.054 6.03-4.271 15.006 1.758 20.06 6.03 5.054 15.006 4.27 20.06-1.759 5.054-6.029 4.27-15.005-1.758-20.06Zm209.026-21.83h12.22v96.31h-14.04l-32.97-57.89c-1.79-3.22-5.51-10.43-11.15-21.63h-.13c.18 4.12.34 8.61.47 13.47.13 4.86.2 8.5.2 10.91v55.14h-12.22V12.01h13.7l33.04 57.22c1.66 2.87 4.66 8.48 9 16.86l2.42 4.63h.13c-.18-3.67-.34-7.9-.47-12.69-.13-4.79-.2-8.64-.2-11.55V12.01Zm72.02 66.16c0 14.33-5.91 21.49-17.73 21.49-2.64 0-4.95-.24-6.92-.71-1.97-.47-3.83-1.56-5.57-3.26-1.3-1.25-2.24-2.68-2.82-4.26-.58-1.59-.93-3.18-1.04-4.77-.11-1.59-.17-3.82-.17-6.68V39.55h-12.76v41.1c0 3.22.1 6.02.3 8.4.2 2.38.71 4.73 1.51 7.09.8 2.36 2.04 4.4 3.69 6.15 2.46 2.64 5.35 4.59 8.66 5.84 3.31 1.25 7.21 1.88 11.69 1.88 4.93 0 9.22-1.03 12.89-3.09 3.67-2.06 6.42-5.01 8.26-8.87v10.28h12.36V39.55h-12.36v38.62h.01Zm49.45-57.76h-12.22v19.14h-14.44v10.34h14.44V91.4c0 6.22 1.68 10.71 5.04 13.47 3.36 2.76 8.77 4.13 16.25 4.13 1.88 0 3.75-.1 5.61-.3 1.86-.2 3.39-.46 4.6-.77l-.27-11.28c-3.45.81-6.43 1.21-8.93 1.21s-4.6-.19-6.01-.57c-1.41-.38-2.44-1.06-3.09-2.05-.65-.99-.97-2.4-.97-4.23v-41.1h19.54V39.57h-19.54V20.41h-.01Zm55.04 22.36c-4.37 2.6-7.2 5.82-8.5 9.67V39.55h-12.36v68.77h12.36v-31.5c0-7.21 1.07-12.83 3.22-16.86 2.15-4.03 5.06-6.79 8.73-8.29 3.67-1.5 8.13-2.25 13.36-2.25 2.1 0 3.54.07 4.3.2l.27-11.75c-2.96 0-4.84.04-5.64.13-6.14.58-11.38 2.17-15.75 4.77h.01Zm121.91 19.28c1.03 4.07 1.54 8.31 1.54 12.69 0 1.3-.02 2.26-.07 2.89h-52.18c.13 7.57 1.81 13.2 5.04 16.89 3.22 3.69 8.06 5.54 14.51 5.54 5.82 0 10.34-1.26 13.57-3.79 3.23-2.53 5.26-6.39 6.11-11.59l11.95.94c-1.52 8.01-4.96 14.08-10.31 18.2-5.35 4.12-12.41 6.18-21.19 6.18-10.57 0-18.8-3.36-24.72-10.07-5.6-6.27-8.4-14.98-8.4-26.13 0-5.15.73-9.91 2.18-14.27 1.45-4.37 3.62-8.14 6.48-11.32 3-3.4 6.56-5.98 10.68-7.72 4.12-1.75 8.66-2.62 13.63-2.62 5.55 0 10.72 1.18 15.51 3.53 4.79 2.35 8.57 5.72 11.35 10.11 1.84 2.96 3.27 6.47 4.3 10.54h.02Zm-11.22 5.57c-.04-1.97-.4-4.11-1.07-6.41s-1.54-4.24-2.62-5.81c-1.75-2.6-3.93-4.49-6.55-5.68-2.62-1.19-5.81-1.78-9.57-1.78-3.76 0-7.05.66-9.87 1.98-2.82 1.32-4.93 3.15-6.31 5.47-1.17 1.88-2 3.9-2.52 6.04-.51 2.15-.8 4.21-.84 6.18h39.36l-.01.01Zm81.11-15.81c-.78-2.4-1.98-4.47-3.59-6.21-2.51-2.64-5.42-4.59-8.73-5.84-3.31-1.25-7.23-1.88-11.75-1.88-10.52 0-17.6 4.07-21.22 12.22V39.56h-12.36v68.77h12.36V70.38c0-8.64 1.86-14.5 5.57-17.56 3.72-3.07 7.83-4.6 12.36-4.6 2.55 0 4.79.24 6.72.71 1.92.47 3.76 1.56 5.51 3.26 1.3 1.25 2.25 2.69 2.85 4.3.6 1.61.96 3.23 1.07 4.87.11 1.63.17 3.91.17 6.82v40.16h12.83V67.51c0-3.27-.1-6.1-.3-8.5-.2-2.4-.7-4.79-1.48-7.19l-.01-.01Zm57.14-1.92V39.55h-19.54V20.41h-12.22v19.14h-14.44v10.34h14.44V91.4c0 6.22 1.68 10.71 5.04 13.47 3.36 2.76 8.77 4.13 16.25 4.13 1.88 0 3.75-.1 5.61-.3 1.86-.2 3.39-.46 4.6-.77l-.27-11.28c-3.45.81-6.43 1.21-8.93 1.21s-4.6-.19-6.01-.57c-1.41-.38-2.44-1.06-3.09-2.05-.65-.99-.97-2.4-.97-4.23v-41.1h19.54l-.01-.02Zm-215.25 58.53h12.36V39.65h-12.36v68.77Zm6.18-98.42c-4.99 0-9.03 4.04-9.03 9.03 0 4.99 4.04 9.03 9.03 9.03 4.99 0 9.03-4.04 9.03-9.03 0-4.99-4.04-9.03-9.03-9.03Z"></path>
 </svg>
 </div>
-<h1>What document extraction costs, with and without the Nutrient SDK</h1>
-<table class=prov><tr><td>Documents run</td><td>17 from Nutrient sample corpus</td></tr>
-<tr><td>Models compared</td><td>anthropic / claude-sonnet-5, bedrock / qwen.qwen3-vl-235b-a22b-instruct, openai / gpt-5.4</td></tr>
-<tr><td>Credentials used</td><td>ANTHROPIC_API_KEY (set), OPENAI_API_KEY (set), BEDROCK_API_KEY (set)</td></tr>
-<tr><td>Run</td><td>2026-08-17T13:07:00-04:00</td></tr>
-<tr><td>Price table checked</td><td>2026-08-14</td></tr>
-<tr><td>Tool version</td><td>0.1.0</td></tr></table>
 
-<section class=answer>
-<p class=supertitle>Nutrient SDK overhead</p>
-<div class=tiles>
-<div class=tile><div class=k>Claude Sonnet 5</div><div class=v>+1,226 tokens per document</div><div class=k>$367.8000 per 100k docs</div></div>
-<div class=tile><div class=k>Qwen3-VL 235B (Bedrock)</div><div class=v>+468 tokens per document</div><div class=k>$24.8040 per 100k docs</div></div>
-<div class=tile><div class=k>OpenAI</div><div class=v>+748 tokens per document</div><div class=k>not priced per 100k docs</div></div>
+<header>
+<p class=eyebrow>Extraction cost and accuracy · measured run</p>
+<h1>What document extraction costs, with and without the Nutrient SDK</h1>
+<p class=standfirst>Seventeen documents, three models, each run twice: once through the Nutrient SDK and once as a direct model call. The SDK&#x27;s token overhead is a constant per call, and the two halves do not return the same thing.</p>
+</header>
+<div class=prov-grid><div class=prov-cell><span class=prov-k>Documents run</span><span class=prov-v>17 from Nutrient sample corpus</span></div>
+<div class=prov-cell><span class=prov-k>Run</span><span class=prov-v>2026-08-17T13:07:00-04:00</span></div>
+<div class=prov-cell><span class=prov-k>Price table checked</span><span class=prov-v>2026-08-14</span></div>
+<div class=prov-cell><span class=prov-k>Tool version</span><span class=prov-v>nutrient-extraction-cost 0.1.0</span></div>
+<div class=prov-cell><span class=prov-k>Models compared</span><span class=prov-v>anthropic / claude-sonnet-5 · bedrock / qwen.qwen3-vl-235b-a22b-instruct · openai / gpt-5.4</span></div>
+<div class=prov-cell><span class=prov-k>Credentials used</span><span class=prov-v>ANTHROPIC_API_KEY (set) · OPENAI_API_KEY (set) · BEDROCK_API_KEY (set)</span></div></div>
+
+
+<section class=band id="cost">
+<p class=eyebrow>01 — Cost</p>
+<h2>The SDK adds a fixed number of input tokens per call</h2>
+<p class=standfirst>The overhead is the same on the smallest document and the
+largest. It is a constant per model, not a percentage of the document, so it
+matters most on short documents and fades on long ones. Per-call spread across
+this run: Claude Sonnet 5 +1,226 to +1,226, Qwen3-VL 235B (Bedrock) +468 to +468, OpenAI +748 to +748.</p>
+<div class=cards>
+<div class=card><span class=card-model>Claude Sonnet 5</span><div class=card-figure><span class=figure-lg>+1,226</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$367.8000</span><span class=figure-note>per 100k documents</span></div></div>
+<div class=card><span class=card-model>Qwen3-VL 235B (Bedrock)</span><div class=card-figure><span class=figure-lg>+468</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$24.8040</span><span class=figure-note>per 100k documents</span></div></div>
+<div class=card><span class=card-model>OpenAI</span><div class=card-figure><span class=figure-lg>+748</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>not priced</span><span class=figure-note>no list price confirmed</span></div></div>
 </div>
-<table>
-<thead><tr><th>model</th><th class=n>documents measured</th><th class=n>per-call spread</th>
-<th class=n>cost per 100k docs (input)</th></tr></thead>
-<tr><td>Claude Sonnet 5</td><td class=n>17</td><td class='n d'>+1,226 to +1,226</td><td class='n d'>$367.8000</td></tr>
-<tr><td>Qwen3-VL 235B (Bedrock)</td><td class=n>17</td><td class='n d'>+468 to +468</td><td class='n d'>$24.8040</td></tr>
-<tr><td>OpenAI</td><td class=n>17</td><td class='n d'>+748 to +748</td><td class='n d'>not priced</td></tr>
-</table>
-<p class=sub>The overhead is a constant per call, and the constant is per model — not per vendor, and not per tokenizer generation. A different model, including a sibling from the same family, is a new measurement: the figures above do not transfer to it.</p>
-<p class=sub>Full per-document detail is in the
-<a href="#appendix">appendix</a>.</p>
+<p class=standfirst>The overhead is a constant per call, and the constant is per model — not per vendor, and not per tokenizer generation. A different model, including a sibling from the same family, is a new measurement: the figures above do not transfer to it. Per-document detail is in
+<a href="#appendix-a">Appendix A</a>; provider totals in
+<a href="#appendix-b">Appendix B</a>.</p>
 </section>
 
 
-<h2>Where the models disagree</h2>
-<p class=sub>Each row is a field where two configurations returned different answers. Looking at two values, you cannot tell which is right without a citation back to the page — and a citation is exactly what the grounded half returns and the direct half does not. Agreement is agreement, not correctness: two models can agree and both be wrong.</p>
-<p class=sub><strong>10/17 judged fields agreed (59%)</strong>
-— 7 disagreement(s). Fields nobody answered are excluded from
-that rate.</p>
+<section class=band id="agreement">
+<p class=eyebrow>02 — Accuracy</p>
+<h2>Six configurations, seventeen fields, seven disagreements</h2>
+<p class=standfirst>Looking at two values, you cannot tell which is right without a citation back to the page — and a citation is exactly what the grounded half returns and the direct half does not. Agreement is agreement, not correctness: two models can agree and both be wrong.</p>
+<div class=cards>
+<div class=card><span class=figure-xl>59%</span>
+<span class=figure-note>of judged fields agreed — 10 of 17</span></div>
+<div class=card><span class=figure-xl>7</span>
+<span class=figure-note>fields where configurations differed</span></div>
+<div class=card><span class=figure-xl>0</span>
+<span class=figure-note>fields excluded as unjudgeable or unanswered</span></div>
+</div>
+
+<p class=eyebrow>One disagreement in full</p>
+<article class=cmp>
+<div class=cmp-head>
+<span class=cmp-doc>heavenly-hamburgers-recipe</span>
+<span class=pill>documentTitle</span>
+<span class=figure-note>6 distinct answers across 6 configurations</span>
+</div>
+<div class=cmp-grid>
+<div class=h></div><div class=h>Direct call</div><div class=h>With Nutrient SDK</div>
+<div class=p>anthropic</div><div class=v>Recipe from the kitchen of:</div><div class=v>From. Lola to</div><div class=p>bedrock</div><div class=v>From. Lola to Grand m te ~ Hons Hea what Ven if vw gers Recipe from the kilehyn of: Orig bola na : &gt; - _ - Bak of F fre for Ahour ee Fg 4</div><div class=v>From. Lola to Grand m te</div><div class=p>openai</div><div class=v>From Lola to Grandmother ~ Heaven knows what</div><div class=v>From. Lola to ~ Hea Ven Hons vw what</div>
+</div>
+</article>
+
+
+<p class=eyebrow>All 7, by spread</p>
+<div class=scroll>
 <table>
-<thead><tr><th>document</th><th>field</th><th>what each returned</th></tr></thead>
-<tr><td>heavenly-hamburgers-recipe</td><td>documentTitle</td><td class=v>anthropic:direct=&#x27;Recipe from the kitchen of:&#x27;, anthropic:sdk=&#x27;From. Lola to&#x27;, bedrock:direct=&#x27;From. Lola to Grand m te ~ Hons Hea what Ven if vw gers Recipe from the kilehyn of: Orig bola na : &gt; - _ - Bak of F fre for Ahour ee Fg 4&#x27;, bedrock:sdk=&#x27;From. Lola to Grand m te&#x27;, openai:direct=&#x27;From Lola to Grandmother ~ Heaven knows what&#x27;, openai:sdk=&#x27;From. Lola to ~ Hea Ven Hons vw what&#x27;</td></tr>
-<tr><td>invoice-ac-2025-1047</td><td>documentTitle</td><td class=v>anthropic:direct=&#x27;PROGRESS INVOICE&#x27;, anthropic:sdk=&#x27;PROGRESS INVOICE&#x27;, bedrock:direct=&#x27;PROGRESS INVOICE - Riverside Mixed-Use Development — Phase 2&#x27;, bedrock:sdk=&#x27;PROGRESS INVOICE: Riverside Mixed-Use Development — Phase 2 (Contract #RMD-2024-003, Permit #BLD-2024-78945, Invoice Date March 1, 2025, Due March 31, 2025, Period Feb 1 – Feb 28, 2025, Invoice No. 1047, Status: On Schedule, Retainage 10%)&#x27;, openai:direct=&#x27;PROGRESS INVOICE&#x27;, openai:sdk=&#x27;ATLAS CONSTRUCTION PROGRESS INVOICE&#x27;</td></tr>
-<tr><td>meridian-balance-sheet</td><td>documentTitle</td><td class=v>anthropic:direct=&#x27;Meridian Components Inc.&#x27;, anthropic:sdk=&#x27;Meridian Components Inc.&#x27;, bedrock:direct=&#x27;Statement of Financial Position · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, bedrock:sdk=&#x27;Meridian Components Inc. Statement of Financial Position · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, openai:direct=&#x27;Statement of Financial Position&#x27;, openai:sdk=&#x27;Meridian Components Inc.&#x27;</td></tr>
+<thead><tr><th>document</th><th>field</th><th class=n>distinct answers</th></tr></thead>
+<tr><td>heavenly-hamburgers-recipe</td><td>documentTitle</td><td class=n>6 distinct answers</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>documentTitle</td><td class=n>4 distinct answers</td></tr>
+<tr><td>meridian-balance-sheet</td><td>documentTitle</td><td class=n>4 distinct answers</td></tr>
+<tr><td>meridian-income-statement</td><td>documentTitle</td><td class=n>3 distinct answers</td></tr>
+<tr><td>lumen-invoice</td><td>documentTitle</td><td class=n>2 distinct answers</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>documentTitle</td><td class=n>2 distinct answers</td></tr>
+<tr><td>happy-tooth-invoice-excel</td><td>documentTitle</td><td class=n>2 distinct answers</td></tr>
 </table>
-<p class=sub>4 more disagreement(s) are listed in full in the <a href="#disagreements">appendix</a>.</p>
+</div>
+<p class=standfirst>Every value each configuration returned is in
+<a href="#appendix-c">Appendix C</a>.</p>
+
+</section>
 
 
+<section class=band id="caveats">
+<p class=eyebrow>03 — Caveats</p>
 <h2>Reading this honestly</h2>
+<p class=standfirst>Four things that would make
+the numbers say something they do not say.</p>
 
-<ul class=sub>
-<li>The “without Nutrient” calls return no reliable page coordinates. They are cheaper because they do less: no grounded source locations, no confidence components. Do not read the delta as waste.</li>
-<li>Output tokens are not comparable between the two halves. The SDK asks for grounded metadata the direct call does not, and a direct call is free to be verbose — in one measured run a single document&#x27;s direct call emitted about 7,500 more output tokens than its SDK counterpart, which alone was enough to flip the aggregate and make the SDK look cheaper overall. The headline figure is therefore priced from input tokens, which measure the same document on both sides. The total including output is shown separately and should not be read as a like-for-like saving.</li>
-<li>Token counts are not comparable across providers — each tokenises the same document differently, so a cross-provider token column compares tokenizers rather than efficiency. Compare tokens within a provider, and cost across them.</li>
-<li>Anthropic bills thinking tokens inside output tokens, itemised separately in its usage block. Output cost is not proportional to returned text.</li>
-</ul>
-<p class=sub>Rates are per million tokens, in USD, at published list prices. Bedrock is partner-priced by AWS and is NOT interchangeable with Anthropic first-party rates. Claude Sonnet 5&#x27;s introductory input rate of 2.00 ends 2026-08-31, reverting to the 3.00 listed here. Providers absent from this table are reported as not priced rather than as free: no list price was confirmed for the default OpenAI model, and a local runtime has no per-token price at all — its cost is hardware and electricity, which this tool does not attempt to model. Override with --prices to use your negotiated rates.</p>
+<div class=cards>
+<div class=caveat><span class=caveat-n>01</span><h3>The delta is not waste</h3><p>The “without Nutrient” calls return no reliable page coordinates. They are cheaper because they do less: no grounded source locations, no confidence components. Do not read the delta as waste.</p></div><div class=caveat><span class=caveat-n>02</span><h3>Output tokens are not comparable</h3><p>Output tokens are not comparable between the two halves. The SDK asks for grounded metadata the direct call does not, and a direct call is free to be verbose — in one measured run a single document&#x27;s direct call emitted about 7,500 more output tokens than its SDK counterpart, which alone was enough to flip the aggregate and make the SDK look cheaper overall. The headline figure is therefore priced from input tokens, which measure the same document on both sides. The total including output is shown separately and should not be read as a like-for-like saving.</p></div><div class=caveat><span class=caveat-n>03</span><h3>Tokens do not compare across providers</h3><p>Token counts are not comparable across providers — each tokenises the same document differently, so a cross-provider token column compares tokenizers rather than efficiency. Compare tokens within a provider, and cost across them.</p></div><div class=caveat><span class=caveat-n>04</span><h3>Thinking tokens are billed as output</h3><p>Anthropic bills thinking tokens inside output tokens, itemised separately in its usage block. Output cost is not proportional to returned text.</p></div>
+</div>
+<p class=eyebrow>On the prices used</p>
+<p class=standfirst>Rates are per million tokens, in USD, at published list prices. Bedrock is partner-priced by AWS and is NOT interchangeable with Anthropic first-party rates. Claude Sonnet 5&#x27;s introductory input rate of 2.00 ends 2026-08-31, reverting to the 3.00 listed here. Providers absent from this table are reported as not priced rather than as free: no list price was confirmed for the default OpenAI model, and a local runtime has no per-token price at all — its cost is hardware and electricity, which this tool does not attempt to model. Override with --prices to use your negotiated rates.</p>
+</section>
 
+<section class=band id="appendix-band">
 
 <h2 id="appendix">Appendix</h2>
 <p class=sub>Everything the summary above is derived from.</p>
 
-<details id="per-document">
-<summary>Per document (input tokens)</summary>
+<details class=panel id="appendix-a">
+<summary>A · Per document, input tokens</summary>
+<p class=group-head>Claude Sonnet 5 · 17 documents · +1,226 input tokens each</p>
 <div class=scroll>
 <table>
   <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
@@ -247,6 +457,14 @@ that rate.</p>
 <tr><td>northgate-claim-file</td><td>anthropic</td><td class=n>9,117</td><td class=n>7,891</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
 <tr><td>regional-health-record</td><td>anthropic</td><td class=n>31,188</td><td class=n>29,962</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
 <tr><td>scanned-invoice</td><td>anthropic</td><td class=n>3,163</td><td class=n>1,937</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+</table>
+</div><p class=group-head>Qwen3-VL 235B (Bedrock) · 17 documents · +468 input tokens each</p>
+<div class=scroll>
+<table>
+  <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
+      <th class=n>direct input</th><th class=n>delta</th>
+      <th class=n>delta $ (input)</th>
+      <th class=n>delta $ incl. output (not like-for-like)</th></tr>
 <tr><td>apricot-cake-recipe</td><td>bedrock</td><td class=n>640</td><td class=n>172</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>bill-of-lading</td><td>bedrock</td><td class=n>1,349</td><td class=n>881</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>construction-pay-application</td><td>bedrock</td><td class=n>1,796</td><td class=n>1,328</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
@@ -264,6 +482,14 @@ that rate.</p>
 <tr><td>northgate-claim-file</td><td>bedrock</td><td class=n>5,918</td><td class=n>5,450</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>regional-health-record</td><td>bedrock</td><td class=n>21,830</td><td class=n>21,362</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>scanned-invoice</td><td>bedrock</td><td class=n>1,891</td><td class=n>1,423</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+</table>
+</div><p class=group-head>OpenAI · 17 documents · +748 input tokens each</p>
+<div class=scroll>
+<table>
+  <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
+      <th class=n>direct input</th><th class=n>delta</th>
+      <th class=n>delta $ (input)</th>
+      <th class=n>delta $ incl. output (not like-for-like)</th></tr>
 <tr><td>apricot-cake-recipe</td><td>openai</td><td class=n>950</td><td class=n>202</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>bill-of-lading</td><td>openai</td><td class=n>1,594</td><td class=n>846</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>construction-pay-application</td><td>openai</td><td class=n>1,974</td><td class=n>1,226</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
@@ -289,8 +515,8 @@ the output-token difference and is not like-for-like — the two calls are asked
 for different things, and output is priced several times higher than input.</p>
 </details>
 
-<details id="per-provider">
-<summary>Per provider</summary>
+<details class=panel id="appendix-b">
+<summary>B · Per provider</summary>
 <div class=scroll>
 <table>
   <tr><th>provider</th><th class=n>docs</th><th class=n>delta input</th>
@@ -311,8 +537,8 @@ rows instead.</p>
 </details>
 
 
-<details id="disagreements">
-<summary>Every disagreement</summary>
+<details class=panel id="appendix-c">
+<summary>C · Every disagreement, in full</summary>
 <p class=sub>Each row is a field where two configurations returned different answers. This is the part worth dwelling on: looking at two different values, you cannot tell which is right without a citation back to the page to check — and a citation is exactly what the grounded half returns and the direct half does not.</p>
 <p class=sub>10/17 judged fields agreed
 (59%) — 7 disagreement(s) below. Excluded from that rate:
@@ -334,12 +560,13 @@ nothing to agree about. 17 field(s) were considered in total.</p>
 </details>
 
 
-<details id="prices">
+<details class=panel id="prices">
 <summary>Price table</summary>
 <p class=sub>List prices checked 2026-08-14. Replace them with
 your negotiated rates using <code>--prices</code>.</p>
 </details>
 
+</section>
 
 <footer>
 <p>This file includes values extracted from the documents that were run, so handle it the way you would handle those documents. Nothing was sent to Nutrient: the tool has no telemetry and no Nutrient endpoint.</p>
