@@ -3,3 +3,10 @@ out/
 __pycache__/
 *.egg-info/
 .DS_Store
+
+# The Claude Design source for the report's look. Kept out of the repo on
+# purpose: it ships the commercial ABC Monument Grotesk woff2 files, which we
+# deliberately do not redistribute, plus the canvas editor runtime. The design
+# itself lives in Claude Design; theme.css carries the values we use.
+branded-report/
+branded-report.zip
