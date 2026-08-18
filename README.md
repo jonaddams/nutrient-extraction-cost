@@ -6,6 +6,9 @@ and without the Nutrient SDK in the path.
 Every number this tool reports is one it observed. It does not estimate, and where it cannot
 measure something it says so instead of substituting a zero.
 
+Provided to Nutrient customers for evaluation under the [Nutrient Reference-Use
+License](LICENSE) — not open source. See [Licence and distribution](#licence-and-distribution).
+
 **See the output before you run anything:** [`examples/example-report.html`](examples/example-report.html)
 is a real 102-call run on the bundled sample corpus across three providers. Every
 figure in it is measured, and the provenance block at the top of the page says
@@ -286,3 +289,26 @@ python -m pytest tests/
 ```
 
 No network and no credentials required — every provider is stubbed.
+
+## Licence and distribution
+
+This tool is **not open source.** It is provided under the [Nutrient Reference-Use
+License](LICENSE) to a recipient named in an applicable Nutrient agreement, and the licence
+file governs — the summary here is orientation, not terms.
+
+What that means in practice:
+
+- **You may** run it, read it, and modify it for your own internal, non-production evaluation
+  of Nutrient products. Auditing it before you point it at your documents is exactly the
+  intended use.
+- **You may not** redistribute, publish, sell or sublicense it, or otherwise make it
+  available to anyone else.
+- **It is confidential.** Do not share the code with third parties without Nutrient's prior
+  written consent.
+- **The reports you generate are yours.** They are your measurements of your documents; the
+  licence covers this tool, not its output. Note that a report's appendix embeds values
+  extracted from the documents you ran, so handle the file the way you would handle those
+  documents.
+
+Questions about the licence, or about wider rights to use the tool: talk to your Nutrient
+contact.
