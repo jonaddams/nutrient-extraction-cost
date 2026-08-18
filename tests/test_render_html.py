@@ -178,3 +178,39 @@ def test_the_rate_falls_back_for_a_hand_built_summary():
     out = render_html._accuracy_band(summary, lambda s: s)
 
     assert "50%" in out
+
+
+def test_representative_is_stable_across_input_orders():
+    """Determinism by construction, not by luck: same rows, either order, same pick."""
+    a = _dis("doc", {"x": "1", "y": "2"})
+    a["field"] = "alpha"
+    b = _dis("doc", {"x": "1", "y": "2"})
+    b["field"] = "beta"
+
+    forward, _ = render_html.representative_disagreements([a, b], limit=1)
+    reverse, _ = render_html.representative_disagreements([b, a], limit=1)
+
+    assert forward[0]["field"] == reverse[0]["field"] == "alpha"
+
+
+def test_every_caveat_is_outside_a_details_element():
+    """A caveat a reader has to click for is a caveat we did not really make."""
+    summary = _summary()
+    out = render_html.render(summary)
+    head = out.split("<details")[0]
+    for caveat in summary["caveats"]:
+        assert caveat in head, f"caveat is behind a disclosure: {caveat[:40]}"
+
+
+def test_unmeasurable_and_retried_notices_are_in_the_summary():
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    sdk = _rec("a", "local", True, 10866)
+    sdk["calls"] = sdk["attempts"] = 3
+    direct = _rec("a", "local", False, 6766)
+    direct["calls"] = direct["attempts"] = 2
+    summary = report.summarise([sdk, direct], table, models={"local": "qwen3-vl"})
+
+    head = render_html.render(summary).split("<details")[0]
+
+    assert "not measurable" in head
+    assert "retried" in head

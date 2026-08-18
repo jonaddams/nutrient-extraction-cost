@@ -108,18 +108,20 @@ def representative_disagreements(
     """A few disagreements worth reading, and how many were left out.
 
     Deterministic by construction: most distinct values, then the widest
-    character span between the shortest and longest value, then docId. The
-    appendix always carries the complete list and the summary always states the
-    omitted count — a rule that happened to hide the least flattering
-    disagreement would be precisely the quiet dishonesty this tool exists to
-    remove.
+    character span between the shortest and longest value, then docId, then
+    field — two disagreements from the same document differing only by field
+    must not fall back to input order, which this function's caller does not
+    control. The appendix always carries the complete list and the summary
+    always states the omitted count — a rule that happened to hide the least
+    flattering disagreement would be precisely the quiet dishonesty this tool
+    exists to remove.
     """
     disagreed = [r for r in rows if r.get("state") == "disagreed"]
 
-    def key(row: dict[str, Any]) -> tuple[int, int, str]:
+    def key(row: dict[str, Any]) -> tuple[int, int, str, str]:
         rendered = [str(v) for v in row["values"].values()]
         span = max(map(len, rendered)) - min(map(len, rendered)) if rendered else 0
-        return (-len(set(rendered)), -span, row["docId"])
+        return (-len(set(rendered)), -span, row["docId"], row["field"])
 
     ordered = sorted(disagreed, key=key)
     return ordered[:limit], max(len(ordered) - limit, 0)
@@ -165,6 +167,56 @@ that rate.</p>
 {rows}
 </table>
 {more}
+"""
+
+
+def _honesty_band(summary: dict[str, Any], e) -> str:
+    """Band 3: the caveats, kept out of any collapsible element.
+
+    A caveat a reader has to click for is a caveat we did not really make, so
+    this band renders in the document flow — no <details>, no accordion —
+    above where Task 8 will put the appendix. Rendered a second time here,
+    ahead of the legacy "Reading this honestly" section further down the page:
+    that duplication is deliberate and transitional, and Task 8 removes the
+    legacy section when it folds the detail into an appendix.
+
+    Caveats are escaped with `quote=False`: a caveat rendered as a `<li>` text
+    node never needs its apostrophes turned into `&#x27;`, and the standing
+    disagreement-framing caveat contains one ("a single document's direct
+    call") — escaping it would mean the raw caveat string could never appear
+    verbatim in the page, which is exactly what the "outside a details
+    element" test checks for.
+    """
+    caveats = "\n".join(
+        f"<li>{e(c, quote=False)}</li>" for c in summary["caveats"]
+    )
+    notices = []
+    if summary["unmeasurable"]:
+        retried = (
+            f" {summary['retried']} of them because the SDK retried: their "
+            "tokens are the sum of several attempts, so the difference between "
+            "the two halves is not a per-call figure."
+            if summary.get("retried")
+            else ""
+        )
+        notices.append(
+            f"<p class=warn>{summary['unmeasurable']} cell(s) are not "
+            f"measurable and are excluded from every total on this page."
+            f"{retried}</p>"
+        )
+    if summary["mixedSchemas"]:
+        notices.append(
+            "<p class=warn>These records mix a shared cost-mode schema with "
+            "answer-key schemas, so their token counts are not comparable with "
+            "each other.</p>"
+        )
+    return f"""
+<h2>Reading this honestly</h2>
+{"".join(notices)}
+<ul class=sub>
+{caveats}
+</ul>
+<p class=sub>{e(summary['priceNote'])}</p>
 """
 
 
@@ -330,6 +382,7 @@ nothing to agree about. {a['fields']} field(s) were considered in total.</p>
 {_provenance_table(summary.get("provenance"), e)}
 {_answer_band(summary, e)}
 {_accuracy_band(summary, e)}
+{_honesty_band(summary, e)}
 
 <h1>Extraction cost, with and without the Nutrient SDK</h1>
 <p class=sub>Input tokens are the measurement. Dollars are computed from list
