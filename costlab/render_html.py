@@ -448,10 +448,19 @@ def _appendix(summary: dict[str, Any], e) -> str:
         if not rows:
             continue
         each = round(provider["deltaInputTokens"] / max(provider["documents"], 1))
+        meta = (
+            f"{provider['label']} · {_plural(provider['documents'], 'document')} · "
+            f"{each:+,} input tokens each"
+        )
+        if provider["deltaCostPer100k"] is None:
+            meta += " · not priced"
+        # Nested and collapsed: opening A should show which models were measured
+        # and what each one's constant was, not 51 rows at once.
         doc_groups += (
-            f"<p class=group-head>{e(provider['label'])} · "
-            f"{_plural(provider['documents'], 'document')} · "
-            f"{each:+,} input tokens each</p>\n{_doc_table(rows)}"
+            f"<details class=group><summary>"
+            f"<span class=group-id>{e(provider['providerId'])}</span>"
+            f"<span class=group-meta>{e(meta)}</span></summary>"
+            f"{_doc_table(rows)}</details>"
         )
     if not doc_groups:
         doc_groups = _doc_table(summary["byDocument"])
@@ -562,10 +571,10 @@ nothing to agree about. {a['fields']} field(s) were considered in total.</p>
 """
 
     return f"""
-<h2 id="appendix">Appendix</h2>
-<p class=sub>Everything the summary above is derived from.</p>
+<p class=eyebrow id="appendix">Appendix</p>
+<h2>Everything the summary is derived from</h2>
 
-<details class=panel id="appendix-a">
+<details class=panel id="appendix-a" open>
 <summary>A · Per document, input tokens</summary>
 {doc_groups}
 <p class=sub>The <strong>delta $ (input)</strong> column prices the input-token
@@ -595,8 +604,8 @@ rows instead.</p>
 {accuracy_section}
 {disagreements_section}
 
-<details class=panel id="prices">
-<summary>Price table</summary>
+<details class=panel id="appendix-d" open>
+<summary>D · Price table</summary>
 <p class=sub>List prices checked {e(summary['checkedOn'])}. Replace them with
 your negotiated rates using <code>--prices</code>.</p>
 </details>

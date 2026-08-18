@@ -411,3 +411,11 @@ details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.
   font-size: 13px;
   font-weight: 440;
 }
+
+/* Per-model groups inside Appendix A, nested and collapsed: opening A should
+   answer "which models, and what was each one's constant" before it offers
+   fifty-one rows. */
+details.group { border-top: 1px solid var(--border-neutral-default-secondary); padding-top: 14px; margin-top: 14px; }
+details.group > summary { display: list-item; list-style-position: outside; margin-left: 16px; }
+.group-id { font-family: var(--font-mono); font-size: 14px; margin-right: 10px; }
+.group-meta { font-size: 13px; color: var(--text-neutral-tertiary); }

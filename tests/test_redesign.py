@@ -371,3 +371,33 @@ def test_marking_flags_as_code_cannot_introduce_other_markup():
     assert "<code>--prices</code>" in hostile
     assert "<script>" not in hostile
     assert "&lt;script&gt;" in hostile
+
+
+def test_appendix_a_opens_onto_its_models_not_onto_every_row():
+    """Opening A should answer "which models, and what constant" first.
+
+    Each model's rows are a nested, collapsed panel, so the reader chooses to
+    see fifty-one rows rather than being handed them.
+    """
+    out = render_html.render(_two_doc_summary())
+    a = out[out.index('id="appendix-a"') : out.index('id="appendix-b"')]
+    assert 'id="appendix-a" open' in out
+    assert "<details class=group>" in a
+    assert "class=group-id" in a
+
+
+def test_an_unpriced_model_says_so_in_its_group_summary():
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = [
+        _rec("alpha", "openai", True, 1000),
+        _rec("alpha", "openai", False, 600),
+    ]
+    summary = report.summarise(records, table, models={"openai": "gpt-5.4"})
+    out = render_html.render(summary)
+    assert "not priced" in out[out.index('id="appendix-a"'):]
+
+
+def test_the_price_panel_is_lettered_like_its_siblings():
+    out = render_html.render(_two_doc_summary())
+    assert 'id="appendix-d"' in out
+    assert "D · Price table" in out

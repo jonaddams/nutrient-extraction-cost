@@ -417,6 +417,14 @@ details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.
   font-weight: 440;
 }
 
+/* Per-model groups inside Appendix A, nested and collapsed: opening A should
+   answer "which models, and what was each one's constant" before it offers
+   fifty-one rows. */
+details.group { border-top: 1px solid var(--border-neutral-default-secondary); padding-top: 14px; margin-top: 14px; }
+details.group > summary { display: list-item; list-style-position: outside; margin-left: 16px; }
+.group-id { font-family: var(--font-mono); font-size: 14px; margin-right: 10px; }
+.group-meta { font-size: 13px; color: var(--text-neutral-tertiary); }
+
 /* costlab/brand/print.css
    A printed copy must be complete: the appendix cannot stay collapsed. */
 @media print {
@@ -532,13 +540,12 @@ the numbers say something they do not say.</p>
 
 <section class=band id="appendix-band">
 
-<h2 id="appendix">Appendix</h2>
-<p class=sub>Everything the summary above is derived from.</p>
+<p class=eyebrow id="appendix">Appendix</p>
+<h2>Everything the summary is derived from</h2>
 
-<details class=panel id="appendix-a">
+<details class=panel id="appendix-a" open>
 <summary>A · Per document, input tokens</summary>
-<p class=group-head>Claude Sonnet 5 · 17 documents · +1,226 input tokens each</p>
-<div class=scroll>
+<details class=group><summary><span class=group-id>anthropic</span><span class=group-meta>Claude Sonnet 5 · 17 documents · +1,226 input tokens each</span></summary><div class=scroll>
 <table>
   <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
       <th class=n>direct input</th><th class=n>delta</th>
@@ -562,8 +569,7 @@ the numbers say something they do not say.</p>
 <tr><td>regional-health-record</td><td>anthropic</td><td class=n>31,188</td><td class=n>29,962</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
 <tr><td>scanned-invoice</td><td>anthropic</td><td class=n>3,163</td><td class=n>1,937</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
 </table>
-</div><p class=group-head>Qwen3-VL 235B (Bedrock) · 17 documents · +468 input tokens each</p>
-<div class=scroll>
+</div></details><details class=group><summary><span class=group-id>bedrock</span><span class=group-meta>Qwen3-VL 235B (Bedrock) · 17 documents · +468 input tokens each</span></summary><div class=scroll>
 <table>
   <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
       <th class=n>direct input</th><th class=n>delta</th>
@@ -587,8 +593,7 @@ the numbers say something they do not say.</p>
 <tr><td>regional-health-record</td><td>bedrock</td><td class=n>21,830</td><td class=n>21,362</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>scanned-invoice</td><td>bedrock</td><td class=n>1,891</td><td class=n>1,423</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 </table>
-</div><p class=group-head>OpenAI · 17 documents · +748 input tokens each</p>
-<div class=scroll>
+</div></details><details class=group><summary><span class=group-id>openai</span><span class=group-meta>OpenAI · 17 documents · +748 input tokens each · not priced</span></summary><div class=scroll>
 <table>
   <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
       <th class=n>direct input</th><th class=n>delta</th>
@@ -612,7 +617,7 @@ the numbers say something they do not say.</p>
 <tr><td>regional-health-record</td><td>openai</td><td class=n>20,290</td><td class=n>19,542</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>scanned-invoice</td><td>openai</td><td class=n>2,068</td><td class=n>1,320</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 </table>
-</div>
+</div></details>
 <p class=sub>The <strong>delta $ (input)</strong> column prices the input-token
 delta, which measures the same document on both sides. The column beside it adds
 the output-token difference and is not like-for-like — the two calls are asked
@@ -664,8 +669,8 @@ nothing to agree about. 17 field(s) were considered in total.</p>
 </details>
 
 
-<details class=panel id="prices">
-<summary>Price table</summary>
+<details class=panel id="appendix-d" open>
+<summary>D · Price table</summary>
 <p class=sub>List prices checked 2026-08-14. Replace them with
 your negotiated rates using <code>--prices</code>.</p>
 </details>
