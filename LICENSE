@@ -1,0 +1,139 @@
+NUTRIENT REFERENCE-USE LICENSE
+
+Copyright © 2026 PSPDFKit GmbH d/b/a Nutrient (“Nutrient”). All rights reserved.
+
+This reference implementation, together with any modifications or derivative works of it
+made by or for the Recipient (collectively, the “Sample Code”) is proprietary to Nutrient
+and is provided solely to the recipient named in the applicable agreement or communication
+granting access (the “Recipient”) to assist Recipient in evaluating and testing the
+Nutrient Products (as the term is defined in the Nutrient SDK UELA). The conveyance,
+license, and use of such Sample Code are governed by this Nutrient Reference-Use License
+Agreement (the “License” or “License Agreement”). Recipient’s access to and use of the
+Nutrient Products is and shall continue to be subject to the Nutrient Software Development
+Kits User Evaluation License Agreement available at
+https://www.nutrient.io/downloads/legal/Nutrient_SDK_User_Evaluation_Subscription_Agreement.pdf
+(the “Nutrient SDK UELA”), until such time as Nutrient and Recipient enter into a signed
+agreement conveying further rights to use and access the Nutrient Products. In the event of
+a conflict between the terms of this License Agreement and the Nutrient SDK UELA and in
+cases where this Nutrient Reference-Use License Agreement is silent on any matter, the
+terms of the Nutrient SDK UELA shall control.
+
+1. Acceptance
+
+By accessing, downloading, cloning, or otherwise using the Sample Code, Recipient accepts
+and agrees to be bound by this License. If Recipient does not agree, Recipient must not
+access or use the Sample Code and must promptly delete all copies in its possession or
+control. Recipient may permit access to the Sample Code only by those of its employees and
+contractors who require access for the Permitted Purpose and who are bound by written
+confidentiality obligations at least as protective as those in Section 4.
+
+2. License Grant
+
+Subject to the terms of this License, Nutrient grants Recipient a limited, non-exclusive,
+non-transferable, non-sublicensable, revocable license to access, use, and run the Sample
+Code, and to modify it, solely for Recipient's internal, non-production evaluation and
+testing of the Nutrient Products (the “Permitted Purpose”). No other use is authorized or
+permitted.
+
+3. Restrictions
+
+Except as expressly permitted above, Recipient may not:
+
+    (a) redistribute, publish, sell, sublicense, or otherwise make the Sample Code
+        available to any third party;
+
+    (b) use the Sample Code, or any portion of it, in any production, live, or
+        customer-facing environment, or in connection with any product or service offered
+        to others;
+
+    (c) copy, incorporate, or otherwise reuse the Sample Code, in whole or in part, in
+        Recipient's own applications, products, or codebases, except as necessary to run it
+        for the Permitted Purpose;
+
+    (d) use the Sample Code as, or as part of, a standalone product or service;
+
+    (e) remove or alter any copyright or proprietary notices contained in the Sample Code;
+        or
+
+    (f) use Nutrient's name, trademarks, or logos to endorse or promote any product without
+        Nutrient's prior written consent.
+
+4. Confidentiality
+
+The Sample Code contains proprietary and confidential information of Nutrient. Recipient
+shall not disclose the Sample Code to any third party without Nutrient's prior written
+consent.
+
+5. Production Use Requires a Paid License
+
+This License does not authorize any production use of the Sample Code or of any Nutrient
+Product. Before deploying any application in production, whether or not it incorporates or
+is derived from the Sample Code, Recipient must obtain a separate paid commercial license
+from Nutrient covering the applicable Nutrient Product(s).
+
+This sample uses the Nutrient Web SDK (in-browser viewing, annotation, and signature
+capture) and the Nutrient DWS API (server-side digital signatures), each of which requires
+its own paid credential for production use. A commercial license or credential held by
+Recipient for any other Nutrient Product does not satisfy this requirement.
+
+Please contact sales@nutrient.io for details. Nothing in this License grants any right to
+use Nutrient SDKs, APIs, cloud services, or other Nutrient intellectual property beyond
+running the Sample Code for the Permitted Purpose. Upon Recipient's purchase of the
+applicable commercial license(s), the restrictions in Sections 3(b) and 3(c) shall no
+longer apply to Sample Code incorporated into the application covered by that license.
+
+6. Ownership
+
+The Sample Code is licensed, not sold. Nutrient retains all right, title, and interest in
+and to the Sample Code, all related intellectual property rights, and all Nutrient
+intellectual property embodied in any modification or derivative work of the Sample Code.
+Recipient retains ownership of any original code it authors, excluding any Nutrient
+intellectual property embodied in that code, and its ownership does not relieve Recipient
+of the restrictions in Section 3 or the obligations in Sections 4 and 11.
+
+7. Third-Party Components
+
+The Sample Code includes or depends on third-party software components (including, for
+example, PostgreSQL and Next.js) that are not owned by Nutrient. Such third-party
+components are excluded from the definition of "Sample Code" and from Sections 4
+(Confidentiality) and 6 (Ownership), and are licensed to Recipient solely under their own
+applicable license terms, which this License does not modify, limit, or supplement.
+Nutrient makes no warranties, and provides no maintenance or support, with respect to any
+third-party components.
+
+8. No Support
+
+Nutrient is under no obligation to provide maintenance, support, updates, or enhancements
+for the Sample Code.
+
+9. Disclaimer
+
+THE SAMPLE CODE IS PROVIDED “AS IS,” WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS,
+IMPLIED, OR STATUTORY, INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, TITLE, OR NON-INFRINGEMENT.
+
+10. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, NUTRIENT SHALL NOT BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR ANY LOSS
+OF PROFITS, REVENUE, DATA, OR BUSINESS INTERRUPTION ARISING OUT OF OR RELATED TO THE SAMPLE
+CODE OR ITS USE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+IN NO EVENT WILL NUTRIENT’S TOTAL AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THE
+SAMPLE CODE OR THIS LICENSE EXCEED ONE HUNDRED U.S. DOLLARS ($100). THE EXCLUSIONS AND
+LIMITATIONS IN THIS SECTION APPLY NOTWITHSTANDING THE FAILURE OF THE ESSENTIAL PURPOSE OF
+ANY LIMITED REMEDY AND ARE AN ESSENTIAL BASIS OF THE BARGAIN BETWEEN THE PARTIES. NOTHING
+IN THIS LICENSE EXCLUDES OR LIMITS LIABILITY THAT CANNOT BE EXCLUDED OR LIMITED UNDER
+APPLICABLE LAW.
+
+NUTRIENT RESERVES ALL RIGHTS AND REMEDIES AVAILABLE TO IT, IN BOTH LAW AND EQUITY, FOR ANY
+BREACH OF THESE TERMS BY RECIPIENT.
+
+11. Term and Termination
+
+This License remains in effect until terminated. Nutrient may terminate this License at any
+time, with or without cause, upon notice to Recipient (email sufficient), and this License
+terminates automatically upon any breach by Recipient. Upon termination, Recipient must
+cease all use of the Sample Code, destroy all copies in its possession or control, and
+certify in writing that it has done so. Upon Nutrient’s request, Recipient must also
+provide reasonable proof of its adherence to the obligations in this Section.

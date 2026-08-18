@@ -25,13 +25,22 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from . import prices, report
+import costlab
+from . import prices, provenance, report
 from .answers import AnswerKey, load_answers, load_answers_csv, schema_for
 from .providers import PROVIDERS, Provider, available, direct_request
 from .proxy import RecordingProxy
+
+# The packaged corpus's own resolved location, computed once as a fact rather
+# than guessed from the path's shape. Comparing resolved paths means a
+# relative --corpus argument, a symlink, or a trailing slash cannot defeat it,
+# unlike the earlier string-match on ".../costlab/corpus" that a prospect's own
+# identically-named directory could trip.
+_PACKAGED_CORPUS = (Path(costlab.__file__).parent / "corpus").resolve()
 
 # One shared schema, so a payload difference between documents is attributable
 # to the document rather than to a varying field count. Field count is its own
@@ -287,7 +296,8 @@ def sdk_extraction(
     tell them apart — it only sees the SDK's envelope — so both arrive as `{}`,
     which by this module's rules means "answered, found nothing, must be
     scored". Two 17-document runs against LM Studio recorded `{}` for every
-    document because the content came back structurally gutted by an upstream SDK defect, and
+    document because the content came back structurally gutted by the runtime,
+    and
     the report then printed `Agreement: 0/14 fields judged (0%)` — a
     confidently wrong number where an absent one was correct.
 
@@ -462,9 +472,10 @@ def run(
                             # too: an SDK-side failure and an unmeasurable
                             # direct cell are different findings, and reporting
                             # "no captured document text" for a request that WAS
-                            # captured is simply wrong. the upstream SDK defect's empty-content
-                            # surface raises here on every document, which cost
-                            # one 17-document run every row it could have had.
+                            # captured is simply wrong. A local runtime that
+                            # returns empty content makes the SDK raise on every
+                            # document, which cost one 17-document run every row
+                            # it could have had.
                             document_text = _document_text(
                                 proxy.last_request_body or {}
                             )
@@ -512,6 +523,10 @@ def run(
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Stamped before the run, not after: a report that claims it started when
+    # it finished is a false statement about a long run.
+    run_started = datetime.now().astimezone().isoformat(timespec="seconds")
+
     parser = argparse.ArgumentParser(
         prog="costlab",
         description=(
@@ -673,7 +688,23 @@ def main(argv: list[str] | None = None) -> int:
 
     table = prices.load(args.prices)
     summary = report.summarise(
-        records, table, models={p.id: p.default_model for p in chosen}, key=key
+        records,
+        table,
+        models={p.id: p.default_model for p in chosen},
+        key=key,
+        provenance=provenance.build(
+            corpus_dir=str(args.corpus),
+            records=records,
+            models={p.id: p.default_model for p in chosen},
+            credential_envs=[
+                p.credential_env
+                for p in chosen
+                if p.credential_env and os.environ.get(p.credential_env)
+            ],
+            run_started=run_started,
+            checked_on=table.checked_on,
+            is_bundled=Path(args.corpus).resolve() == _PACKAGED_CORPUS,
+        ),
     )
     (out_dir / "report.json").write_text(report.render_json(summary))
     (out_dir / "report.html").write_text(report.render_html(summary))

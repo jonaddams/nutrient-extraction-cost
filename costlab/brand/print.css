@@ -1,0 +1,13 @@
+/* costlab/brand/print.css
+   A printed copy must be complete: the appendix cannot stay collapsed. */
+@media print {
+  details { display: block; }
+  details > summary { list-style: none; font-weight: 440; }
+  details[open] > summary, details > summary { margin-bottom: 8px; }
+  details > *:not(summary) { display: revert !important; }
+  details:not([open]) > *:not(summary) { display: revert !important; }
+  body { padding: 0; font-size: 11pt; }
+  .tile, .answer, table { break-inside: avoid; }
+  h2 { break-after: avoid; }
+  a[href^="#"] { text-decoration: none; color: inherit; }
+}
