@@ -458,3 +458,57 @@ def test_the_accuracy_section_discloses_the_halves_may_cover_different_documents
     html = render_html(out).lower()
     assert "different document counts" in html
     assert "not scoreable" in html
+
+
+def _retried(rec, calls):
+    """A cell the SDK retried: `calls` successful requests, tokens summed."""
+    rec["attempts"] = calls
+    rec["calls"] = calls
+    return rec
+
+
+def test_a_retried_cell_is_not_measurable():
+    """Summed tokens across retries are not a per-call delta.
+
+    summarise_attempts sums usage across successful calls, so a cell the SDK
+    retried carries a multiple of one call's tokens. Subtracting one sum from
+    another and labelling it "per call" produced +4,100 on a live run — three
+    SDK attempts against two direct ones — printed in the same column as the
+    real +468. The records carry `calls` precisely so this is detectable; the
+    report has to actually read it.
+    """
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    sdk = _retried(_rec("a", "local", True, 10866), 3)
+    direct = _retried(_rec("a", "local", False, 6766), 2)
+
+    out = summarise([sdk, direct], table)
+
+    assert out["byDocument"] == []
+    assert out["unmeasurable"] == 2
+    assert out["retried"] == 2
+    # And the reader must be told why, not just that a count went up.
+    assert "retr" in render_terminal(out).lower()
+
+
+def test_a_single_call_pair_is_still_measurable():
+    """The guard must not reject ordinary cells, which report calls == 1."""
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    sdk = _retried(_rec("a", "bedrock", True, 1000), 1)
+    direct = _retried(_rec("a", "bedrock", False, 600), 1)
+
+    out = summarise([sdk, direct], table)
+
+    assert out["byDocument"][0]["deltaInputTokens"] == 400
+    assert out["retried"] == 0
+
+
+def test_one_retried_half_is_enough_to_disqualify_the_row():
+    """A clean direct half cannot rescue a retried SDK half: the delta needs both."""
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    sdk = _retried(_rec("a", "local", True, 7244), 2)
+    direct = _retried(_rec("a", "local", False, 3383), 1)
+
+    out = summarise([sdk, direct], table)
+
+    assert out["byDocument"] == []
+    assert out["retried"] == 1

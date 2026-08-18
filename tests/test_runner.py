@@ -434,3 +434,68 @@ def test_a_raising_sdk_half_still_leaves_the_direct_half_measurable(
     assert document_text in seen["document_text"]
     # And it must not claim the text was never captured, because it was.
     assert "no captured document text" not in (direct.get("note") or "")
+
+
+# The exact string LM Studio returned for a schema-constrained request with
+# logprobs enabled, per an upstream SDK defect: the model's own words with every grammar-forced
+# span deleted. It is not parseable, and the SDK reported zero fields for it.
+MANGLED_CONTENT = (
+    ' "Progress Invoice - Riverside Mixed-Use Development — Phase 2"},'
+    'b2", "b3", "b4"]'
+)
+
+
+def _chat_body(content):
+    return {"choices": [{"message": {"content": content}}]}
+
+
+def test_an_unreadable_provider_answer_is_none_not_an_empty_extraction():
+    """`{}` claims the provider answered and found nothing. Here it could not be read.
+
+    Two full 17-document runs recorded `extracted == {}` for every SDK cell
+    because the provider's content was mangled. By the tool's own rules that
+    means "answered, found nothing, must be scored", so the report printed
+    `Agreement: 0/14 fields judged (0%) — 14 disagreement(s)`. The truth was
+    that no answer could be read, which must be absent, not zero. The evidence
+    was on disk the whole time: the captured response body.
+    """
+    from costlab.runner import sdk_extraction
+
+    assert sdk_extraction({"extraction": {}}, _chat_body(MANGLED_CONTENT)) is None
+
+
+def test_an_empty_provider_answer_is_also_unreadable():
+    from costlab.runner import sdk_extraction
+
+    assert sdk_extraction({"extraction": {}}, _chat_body("")) is None
+
+
+def test_an_empty_extraction_survives_when_the_provider_answer_parsed():
+    """The distinction this whole module defends: a readable "found nothing".
+
+    If the provider's own content parses, `{}` is the SDK's structured finding
+    and must still score as a mismatch on every keyed field. Downgrading it to
+    None would let a provider escape scoring by declining to answer.
+    """
+    from costlab.runner import sdk_extraction
+
+    readable = json.dumps({"extracted": {}, "field_sources": {}})
+    assert sdk_extraction({"extraction": {}}, _chat_body(readable)) == {}
+
+
+def test_values_the_sdk_read_are_never_second_guessed():
+    """Only an EMPTY extraction is reconsidered. Real values stand."""
+    from costlab.runner import sdk_extraction
+
+    got = sdk_extraction(
+        {"extraction": {"documentTitle": "Progress Invoice"}},
+        _chat_body(MANGLED_CONTENT),
+    )
+    assert got == {"documentTitle": "Progress Invoice"}
+
+
+def test_no_captured_response_leaves_an_empty_extraction_alone():
+    """Without evidence of an unreadable answer, do not invent one."""
+    from costlab.runner import sdk_extraction
+
+    assert sdk_extraction({"extraction": {}}, None) == {}

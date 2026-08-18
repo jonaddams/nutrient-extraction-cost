@@ -78,11 +78,30 @@ def summarise(
         provider = PROVIDERS.get(provider_id)
         return provider.default_model if provider else ""
 
-    unmeasurable = sum(1 for r in records if not r.get("usage"))
+    def measurable(record: dict[str, Any]) -> bool:
+        """One cell, one call, or its tokens are not a per-call figure.
+
+        `summarise_attempts` sums usage across successful calls, so a cell the
+        SDK retried carries a multiple of one call's tokens. Subtracting one
+        such sum from another and printing it as a per-call delta produced
+        +4,100 on a live run — three SDK attempts against two direct ones — in
+        the same column as a real +468. The records have carried `calls` for
+        exactly this reason since the beginning; nothing read it until now.
+
+        A record with no `calls` field at all is a hand-built one from a test
+        or an older run; treat it as a single call rather than silently
+        discarding data whose shape predates this guard.
+        """
+        return bool(record.get("usage")) and record.get("calls", 1) == 1
+
+    unmeasurable = sum(1 for r in records if not measurable(r))
+    retried = sum(
+        1 for r in records if r.get("usage") and r.get("calls", 1) != 1
+    )
 
     pairs: dict[tuple[str, str], dict[bool, dict[str, Any]]] = {}
     for r in records:
-        if not r.get("usage"):
+        if not measurable(r):
             continue
         pairs.setdefault((r["docId"], r["providerId"]), {})[
             bool(r["withNutrient"])
@@ -212,6 +231,7 @@ def summarise(
         "byDocument": by_document,
         "byProvider": by_provider,
         "unmeasurable": unmeasurable,
+        "retried": retried,
         "accuracy": accuracy,
         "agreement": agreement_rows,
         "agreementSummary": agreement_summary(agreement_rows),
@@ -285,9 +305,15 @@ def render_terminal(summary: dict[str, Any]) -> str:
     if summary["unmeasurable"]:
         lines.append("")
         lines.append(
-            f"{summary['unmeasurable']} cell(s) reported no usage and are "
+            f"{summary['unmeasurable']} cell(s) are not measurable and are "
             "excluded from every total above."
         )
+        if summary.get("retried"):
+            lines.append(
+                f"  {summary['retried']} of them because the SDK retried: "
+                "their tokens are the sum of several attempts, so the "
+                "difference between the two halves is not a per-call figure."
+            )
 
     if summary["accuracy"]:
         lines.append("")
@@ -417,9 +443,16 @@ def render_html(summary: dict[str, Any]) -> str:
     )
 
     caveats = "\n".join(f"<li>{e(c)}</li>" for c in summary["caveats"])
+    retried_note = (
+        f" {summary['retried']} of them because the SDK retried: their tokens "
+        "are the sum of several attempts, so the difference between the two "
+        "halves is not a per-call figure."
+        if summary.get("retried")
+        else ""
+    )
     unmeasurable = (
-        f"<p class=warn>{summary['unmeasurable']} cell(s) reported no usage and "
-        "are excluded from every total on this page.</p>"
+        f"<p class=warn>{summary['unmeasurable']} cell(s) are not measurable "
+        f"and are excluded from every total on this page.{retried_note}</p>"
         if summary["unmeasurable"]
         else ""
     )

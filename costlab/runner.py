@@ -256,21 +256,56 @@ def extracted_values(payload: Any, *, with_nutrient: bool) -> dict[str, Any] | N
     if not isinstance(parsed, dict):
         return None
 
-    content: Any = None
-    choices = parsed.get("choices")
-    if isinstance(choices, list) and choices:
-        content = ((choices[0] or {}).get("message") or {}).get("content")
-    elif isinstance(parsed.get("content"), list):
-        # Anthropic's /v1/messages dialect: content blocks, not choices.
-        for block in parsed["content"]:
-            if isinstance(block, dict) and block.get("type") == "text":
-                content = block.get("text")
-                break
-
+    content = _message_content(parsed)
     if not isinstance(content, str):
         return None
     values = _loads_or_none(content)
     return values if isinstance(values, dict) else None
+
+
+def _message_content(parsed: dict[str, Any]) -> Any:
+    """The model's own text out of a provider reply, in either dialect."""
+    choices = parsed.get("choices")
+    if isinstance(choices, list) and choices:
+        return ((choices[0] or {}).get("message") or {}).get("content")
+    if isinstance(parsed.get("content"), list):
+        # Anthropic's /v1/messages dialect: content blocks, not choices.
+        for block in parsed["content"]:
+            if isinstance(block, dict) and block.get("type") == "text":
+                return block.get("text")
+    return None
+
+
+def sdk_extraction(
+    raw: Any, response_body: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    """What the SDK read, with an unreadable provider answer recorded as absent.
+
+    The SDK reports zero fields two ways that look identical from its return
+    value: the provider answered and the SDK found nothing in it, and the
+    provider's answer could not be parsed at all. `extracted_values` cannot
+    tell them apart — it only sees the SDK's envelope — so both arrive as `{}`,
+    which by this module's rules means "answered, found nothing, must be
+    scored". Two 17-document runs against LM Studio recorded `{}` for every
+    document because the content came back structurally gutted by an upstream SDK defect, and
+    the report then printed `Agreement: 0/14 fields judged (0%)` — a
+    confidently wrong number where an absent one was correct.
+
+    The evidence to tell them apart is already captured: the provider's own
+    reply. Only an EMPTY extraction is reconsidered, and only when the captured
+    content is present and unreadable. Values the SDK did read always stand,
+    and with no captured response nothing is inferred — an unreadable answer
+    has to be shown, not assumed.
+    """
+    values = extracted_values(raw, with_nutrient=True)
+    if values != {} or not isinstance(response_body, dict):
+        return values
+    content = _message_content(response_body)
+    if not isinstance(content, str):
+        return values
+    if content.strip() and _loads_or_none(content) is not None:
+        return values
+    return None
 
 
 def _loads_or_none(text: str) -> Any:
@@ -321,7 +356,7 @@ def _run_sdk_cell(
 
     return (
         _document_text(proxy.last_request_body or {}),
-        extracted_values(raw, with_nutrient=True),
+        sdk_extraction(raw, proxy.last_response_body),
     )
 
 
