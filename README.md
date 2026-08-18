@@ -6,6 +6,11 @@ and without the Nutrient SDK in the path.
 Every number this tool reports is one it observed. It does not estimate, and where it cannot
 measure something it says so instead of substituting a zero.
 
+**See the output before you run anything:** [`examples/example-report.html`](examples/example-report.html)
+is a real 102-call run on the bundled sample corpus across three providers. Every
+figure in it is measured, and the provenance block at the top of the page says
+exactly which documents, models and price table produced it.
+
 ## What it measures
 
 Four cells. Two model tiers, each run twice:

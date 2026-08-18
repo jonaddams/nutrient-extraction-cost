@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang=en>
+<meta charset=utf-8>
+<title>Extraction cost and accuracy — Nutrient SDK</title>
+<style>
+/* costlab/brand/theme.css
+   Semantic tokens copied from the Nutrient design system, [data-theme="company"].
+   Never reference palette values directly — a brand refresh should be a copy of
+   this block and nothing else. */
+:root {
+  --font-sans: "ABC Monument Grotesk", system-ui, sans-serif;
+  --font-mono: "ABC Monument Grotesk Mono", ui-monospace, monospace;
+  --font-semi-mono: "ABC Monument Grotesk Semi-Mono", ui-monospace, monospace;
+
+  --text-neutral-primary: hsla(0, 13%, 9%, 1);
+  --text-neutral-tertiary: hsla(30, 16%, 35%, 1);
+  --text-neutral-alternate: hsla(0, 0%, 100%, 1);
+  --text-state-error: hsla(9, 49%, 27%, 1);
+  --text-state-success: hsla(131, 20%, 21%, 1);
+
+  --bg-neutral-default-primary: hsla(0, 0%, 100%, 1);
+  --bg-neutral-default-secondary: hsla(30, 20%, 92%, 1);
+  --bg-neutral-default-tertiary: hsla(13, 13%, 87%, 1);
+  --bg-neutral-alternate-primary: hsla(0, 13%, 9%, 1);
+  --bg-state-warning: hsla(43, 82%, 67%, 1);
+
+  --border-neutral-default-primary: hsla(30, 14%, 72%, 0.5);
+  --border-neutral-default-secondary: hsla(30, 14%, 72%, 1);
+
+  /* Cards are radius xl (24px) per the design system README's rules of thumb;
+     tokens.css carries no radius token, so the value is inlined here. */
+  --radius-card: 24px;
+}
+
+body {
+  margin: 0;
+  padding: 40px 32px 64px;
+  background: var(--bg-neutral-default-primary);
+  color: var(--text-neutral-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.wrap { max-width: 1100px; margin: 0 auto; }
+
+/* Headings: variable weight 440 with negative tracking and line-height 1, per
+   the design system's rules of thumb. */
+h1, h2, h3 {
+  font-weight: 440;
+  line-height: 1;
+  margin: 0 0 12px;
+}
+h1 { font-size: 34px; letter-spacing: -0.96px; }
+h2 { font-size: 22px; letter-spacing: -0.48px; margin-top: 40px; }
+h3 { font-size: 17px; letter-spacing: -0.48px; margin-top: 28px; }
+
+/* Supertitles: semi-mono uppercase 12px, +0.24px tracking. */
+.supertitle {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  margin: 0 0 8px;
+}
+
+.logo { height: 28px; display: block; margin-bottom: 28px; }
+
+.sub { color: var(--text-neutral-tertiary); max-width: 680px; }
+
+.answer {
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 24px 28px;
+  background: var(--bg-neutral-default-primary);
+}
+
+.tiles { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0 8px; }
+.tile {
+  flex: 1 1 200px;
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
+}
+.tile .v { font-size: 26px; font-weight: 440; letter-spacing: -0.64px; }
+.tile .k {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+}
+
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+th, td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-neutral-default-primary);
+  vertical-align: top;
+}
+th {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  font-weight: normal;
+}
+th.n, td.n { text-align: right; }
+td.n { font-family: var(--font-mono); white-space: nowrap; }
+td.d { font-weight: 440; }
+td.v { font-family: var(--font-mono); font-size: 13px; }
+
+.warn {
+  background: var(--bg-state-warning);
+  color: var(--text-neutral-primary);
+  border-radius: 12px;
+  padding: 12px 14px;
+  max-width: 680px;
+}
+
+.prov { font-size: 14px; }
+.prov td:first-child {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  width: 200px;
+}
+
+details { margin: 16px 0; }
+summary { cursor: pointer; font-weight: 440; }
+
+/* The appendix's legacy tables can run wider than the viewport; scope the
+   scrollbar to the table rather than letting the whole page scroll sideways.
+   Ported from render_html's old inline style block, which this replaces. */
+.scroll { overflow-x: auto; }
+
+footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-neutral-default-secondary);
+  color: var(--text-neutral-tertiary);
+  font-size: 13px;
+}
+
+/* costlab/brand/print.css
+   A printed copy must be complete: the appendix cannot stay collapsed. */
+@media print {
+  details { display: block; }
+  details > summary { list-style: none; font-weight: 440; }
+  details[open] > summary, details > summary { margin-bottom: 8px; }
+  details > *:not(summary) { display: revert !important; }
+  details:not([open]) > *:not(summary) { display: revert !important; }
+  body { padding: 0; font-size: 11pt; }
+  .tile, .answer, table { break-inside: avoid; }
+  h2 { break-after: avoid; }
+  a[href^="#"] { text-decoration: none; color: inherit; }
+}
+
+</style>
+<div class=wrap>
+<svg xmlns="http://www.w3.org/2000/svg" width="711" height="120" fill="currentColor" viewBox="0 0 711 120">
+  <path d="M14.237 74.236C6.37 74.236 0 67.865 0 59.999s6.371-14.237 14.237-14.237S28.474 52.133 28.474 60s-6.371 14.237-14.237 14.237Zm142.368-28.474c-7.866 0-14.237 6.371-14.237 14.237s6.371 14.237 14.237 14.237c7.865 0 14.236-6.371 14.236-14.237s-6.371-14.237-14.236-14.237ZM21.74 94.85c-6.023 5.055-6.813 14.038-1.759 20.06 5.054 6.022 14.038 6.812 20.06 1.758 6.022-5.054 6.812-14.037 1.758-20.06-5.054-6.021-14.037-6.812-20.06-1.758Zm127.362-69.703c6.022-5.054 6.812-14.037 1.758-20.06-5.054-6.022-14.037-6.812-20.06-1.758-6.022 5.054-6.812 14.038-1.758 20.06 5.054 6.022 14.038 6.812 20.06 1.758ZM40.041 3.337c-6.022-5.055-15.006-4.272-20.06 1.758-5.054 6.029-4.27 15.005 1.759 20.06 6.029 5.053 15.005 4.27 20.06-1.759 5.053-6.03 4.27-15.006-1.759-20.06ZM149.102 94.85c-6.022-5.055-15.006-4.272-20.06 1.758-5.054 6.022-4.271 15.005 1.758 20.059 6.023 5.054 15.006 4.271 20.06-1.758 5.054-6.022 4.271-15.005-1.758-20.06Zm-36.354-30.51c-6.022-5.054-15.005-4.271-20.06 1.758-5.053 6.03-4.27 15.006 1.759 20.06 6.029 5.054 15.005 4.271 20.059-1.758 5.055-6.03 4.271-15.006-1.758-20.06Zm-36.353-30.5c-6.023-5.054-15.006-4.271-20.06 1.758-5.054 6.03-4.271 15.006 1.758 20.06 6.03 5.054 15.006 4.27 20.06-1.759 5.054-6.029 4.27-15.005-1.758-20.06Zm209.026-21.83h12.22v96.31h-14.04l-32.97-57.89c-1.79-3.22-5.51-10.43-11.15-21.63h-.13c.18 4.12.34 8.61.47 13.47.13 4.86.2 8.5.2 10.91v55.14h-12.22V12.01h13.7l33.04 57.22c1.66 2.87 4.66 8.48 9 16.86l2.42 4.63h.13c-.18-3.67-.34-7.9-.47-12.69-.13-4.79-.2-8.64-.2-11.55V12.01Zm72.02 66.16c0 14.33-5.91 21.49-17.73 21.49-2.64 0-4.95-.24-6.92-.71-1.97-.47-3.83-1.56-5.57-3.26-1.3-1.25-2.24-2.68-2.82-4.26-.58-1.59-.93-3.18-1.04-4.77-.11-1.59-.17-3.82-.17-6.68V39.55h-12.76v41.1c0 3.22.1 6.02.3 8.4.2 2.38.71 4.73 1.51 7.09.8 2.36 2.04 4.4 3.69 6.15 2.46 2.64 5.35 4.59 8.66 5.84 3.31 1.25 7.21 1.88 11.69 1.88 4.93 0 9.22-1.03 12.89-3.09 3.67-2.06 6.42-5.01 8.26-8.87v10.28h12.36V39.55h-12.36v38.62h.01Zm49.45-57.76h-12.22v19.14h-14.44v10.34h14.44V91.4c0 6.22 1.68 10.71 5.04 13.47 3.36 2.76 8.77 4.13 16.25 4.13 1.88 0 3.75-.1 5.61-.3 1.86-.2 3.39-.46 4.6-.77l-.27-11.28c-3.45.81-6.43 1.21-8.93 1.21s-4.6-.19-6.01-.57c-1.41-.38-2.44-1.06-3.09-2.05-.65-.99-.97-2.4-.97-4.23v-41.1h19.54V39.57h-19.54V20.41h-.01Zm55.04 22.36c-4.37 2.6-7.2 5.82-8.5 9.67V39.55h-12.36v68.77h12.36v-31.5c0-7.21 1.07-12.83 3.22-16.86 2.15-4.03 5.06-6.79 8.73-8.29 3.67-1.5 8.13-2.25 13.36-2.25 2.1 0 3.54.07 4.3.2l.27-11.75c-2.96 0-4.84.04-5.64.13-6.14.58-11.38 2.17-15.75 4.77h.01Zm121.91 19.28c1.03 4.07 1.54 8.31 1.54 12.69 0 1.3-.02 2.26-.07 2.89h-52.18c.13 7.57 1.81 13.2 5.04 16.89 3.22 3.69 8.06 5.54 14.51 5.54 5.82 0 10.34-1.26 13.57-3.79 3.23-2.53 5.26-6.39 6.11-11.59l11.95.94c-1.52 8.01-4.96 14.08-10.31 18.2-5.35 4.12-12.41 6.18-21.19 6.18-10.57 0-18.8-3.36-24.72-10.07-5.6-6.27-8.4-14.98-8.4-26.13 0-5.15.73-9.91 2.18-14.27 1.45-4.37 3.62-8.14 6.48-11.32 3-3.4 6.56-5.98 10.68-7.72 4.12-1.75 8.66-2.62 13.63-2.62 5.55 0 10.72 1.18 15.51 3.53 4.79 2.35 8.57 5.72 11.35 10.11 1.84 2.96 3.27 6.47 4.3 10.54h.02Zm-11.22 5.57c-.04-1.97-.4-4.11-1.07-6.41s-1.54-4.24-2.62-5.81c-1.75-2.6-3.93-4.49-6.55-5.68-2.62-1.19-5.81-1.78-9.57-1.78-3.76 0-7.05.66-9.87 1.98-2.82 1.32-4.93 3.15-6.31 5.47-1.17 1.88-2 3.9-2.52 6.04-.51 2.15-.8 4.21-.84 6.18h39.36l-.01.01Zm81.11-15.81c-.78-2.4-1.98-4.47-3.59-6.21-2.51-2.64-5.42-4.59-8.73-5.84-3.31-1.25-7.23-1.88-11.75-1.88-10.52 0-17.6 4.07-21.22 12.22V39.56h-12.36v68.77h12.36V70.38c0-8.64 1.86-14.5 5.57-17.56 3.72-3.07 7.83-4.6 12.36-4.6 2.55 0 4.79.24 6.72.71 1.92.47 3.76 1.56 5.51 3.26 1.3 1.25 2.25 2.69 2.85 4.3.6 1.61.96 3.23 1.07 4.87.11 1.63.17 3.91.17 6.82v40.16h12.83V67.51c0-3.27-.1-6.1-.3-8.5-.2-2.4-.7-4.79-1.48-7.19l-.01-.01Zm57.14-1.92V39.55h-19.54V20.41h-12.22v19.14h-14.44v10.34h14.44V91.4c0 6.22 1.68 10.71 5.04 13.47 3.36 2.76 8.77 4.13 16.25 4.13 1.88 0 3.75-.1 5.61-.3 1.86-.2 3.39-.46 4.6-.77l-.27-11.28c-3.45.81-6.43 1.21-8.93 1.21s-4.6-.19-6.01-.57c-1.41-.38-2.44-1.06-3.09-2.05-.65-.99-.97-2.4-.97-4.23v-41.1h19.54l-.01-.02Zm-215.25 58.53h12.36V39.65h-12.36v68.77Zm6.18-98.42c-4.99 0-9.03 4.04-9.03 9.03 0 4.99 4.04 9.03 9.03 9.03 4.99 0 9.03-4.04 9.03-9.03 0-4.99-4.04-9.03-9.03-9.03Z"></path>
+</svg>
+
+<h1>What document extraction costs, with and without the Nutrient SDK</h1>
+<table class=prov><tr><td>Documents run</td><td>17 from Nutrient sample corpus</td></tr>
+<tr><td>Models compared</td><td>anthropic / claude-sonnet-5, bedrock / qwen.qwen3-vl-235b-a22b-instruct, openai / gpt-5.4</td></tr>
+<tr><td>Credentials used</td><td>ANTHROPIC_API_KEY (set), OPENAI_API_KEY (set), BEDROCK_API_KEY (set)</td></tr>
+<tr><td>Run</td><td>2026-08-17T13:07:00-04:00</td></tr>
+<tr><td>Price table checked</td><td>2026-08-14</td></tr>
+<tr><td>Tool version</td><td>0.1.0</td></tr></table>
+
+<section class=answer>
+<p class=supertitle>Nutrient SDK overhead</p>
+<div class=tiles>
+<div class=tile><div class=k>Claude Sonnet 5</div><div class=v>+1,226 tokens</div><div class=k>$367.8000 per 100k docs</div></div>
+<div class=tile><div class=k>Qwen3-VL 235B (Bedrock)</div><div class=v>+468 tokens</div><div class=k>$24.8040 per 100k docs</div></div>
+<div class=tile><div class=k>OpenAI</div><div class=v>+748 tokens</div><div class=k>not priced per 100k docs</div></div>
+</div>
+<table>
+<thead><tr><th>model</th><th>documents measured</th><th>per-call spread</th>
+<th>cost per 100k docs (input)</th></tr></thead>
+<tr><td>Claude Sonnet 5</td><td class=n>17</td><td class='n d'>+1,226 to +1,226</td><td class='n d'>$367.8000</td></tr>
+<tr><td>Qwen3-VL 235B (Bedrock)</td><td class=n>17</td><td class='n d'>+468 to +468</td><td class='n d'>$24.8040</td></tr>
+<tr><td>OpenAI</td><td class=n>17</td><td class='n d'>+748 to +748</td><td class='n d'>not priced</td></tr>
+</table>
+<p class=sub>The overhead is a constant per call, and the constant is per model — not per vendor and not per tokenizer generation. Measured on this corpus it was 468 input tokens on Qwen3-VL, 479 on Qwen3.5 9B and 1,226 on Claude Sonnet 5. A different model, including a sibling from the same family, is a new measurement.</p>
+<p class=sub>Full per-document detail is in the
+<a href="#appendix">appendix</a>.</p>
+</section>
+
+
+<h2>Where the models disagree</h2>
+<p class=sub>Each row is a field where two configurations returned different answers. Looking at two values, you cannot tell which is right without a citation back to the page — and a citation is exactly what the grounded half returns and the direct half does not. Agreement is agreement, not correctness: two models can agree and both be wrong.</p>
+<p class=sub><strong>10/17 judged fields agreed (59%)</strong>
+— 7 disagreement(s). Fields nobody answered are excluded from
+that rate.</p>
+<table>
+<thead><tr><th>document</th><th>field</th><th>what each returned</th></tr></thead>
+<tr><td>heavenly-hamburgers-recipe</td><td>documentTitle</td><td class=v>anthropic:direct=&#x27;Recipe from the kitchen of:&#x27;, anthropic:sdk=&#x27;From. Lola to&#x27;, bedrock:direct=&#x27;From. Lola to Grand m te ~ Hons Hea what Ven if vw gers Recipe from the kilehyn of: Orig bola na : &gt; - _ - Bak of F fre for Ahour ee Fg 4&#x27;, bedrock:sdk=&#x27;From. Lola to Grand m te&#x27;, openai:direct=&#x27;From Lola to Grandmother ~ Heaven knows what&#x27;, openai:sdk=&#x27;From. Lola to ~ Hea Ven Hons vw what&#x27;</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>documentTitle</td><td class=v>anthropic:direct=&#x27;PROGRESS INVOICE&#x27;, anthropic:sdk=&#x27;PROGRESS INVOICE&#x27;, bedrock:direct=&#x27;PROGRESS INVOICE - Riverside Mixed-Use Development — Phase 2&#x27;, bedrock:sdk=&#x27;PROGRESS INVOICE: Riverside Mixed-Use Development — Phase 2 (Contract #RMD-2024-003, Permit #BLD-2024-78945, Invoice Date March 1, 2025, Due March 31, 2025, Period Feb 1 – Feb 28, 2025, Invoice No. 1047, Status: On Schedule, Retainage 10%)&#x27;, openai:direct=&#x27;PROGRESS INVOICE&#x27;, openai:sdk=&#x27;ATLAS CONSTRUCTION PROGRESS INVOICE&#x27;</td></tr>
+<tr><td>meridian-balance-sheet</td><td>documentTitle</td><td class=v>anthropic:direct=&#x27;Meridian Components Inc.&#x27;, anthropic:sdk=&#x27;Meridian Components Inc.&#x27;, bedrock:direct=&#x27;Statement of Financial Position · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, bedrock:sdk=&#x27;Meridian Components Inc. Statement of Financial Position · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, openai:direct=&#x27;Statement of Financial Position&#x27;, openai:sdk=&#x27;Meridian Components Inc.&#x27;</td></tr>
+</table>
+<p class=sub>4 more disagreement(s) are listed in full in the <a href="#disagreements">appendix</a>.</p>
+
+
+<h2>Reading this honestly</h2>
+
+<ul class=sub>
+<li>The “without Nutrient” calls return no reliable page coordinates. They are cheaper because they do less: no grounded source locations, no confidence components. Do not read the delta as waste.</li>
+<li>Output tokens are not comparable between the two halves. The SDK asks for grounded metadata the direct call does not, and a direct call is free to be verbose — in one measured run a single document&#x27;s direct call emitted about 7,500 more output tokens than its SDK counterpart, which alone was enough to flip the aggregate and make the SDK look cheaper overall. The headline figure is therefore priced from input tokens, which measure the same document on both sides. The total including output is shown separately and should not be read as a like-for-like saving.</li>
+<li>Token counts are not comparable across providers — each tokenises the same document differently, so a cross-provider token column compares tokenizers rather than efficiency. Compare tokens within a provider, and cost across them.</li>
+<li>Anthropic bills thinking tokens inside output tokens, itemised separately in its usage block. Output cost is not proportional to returned text.</li>
+</ul>
+<p class=sub>Rates are per million tokens, in USD, at published list prices. Bedrock is partner-priced by AWS and is NOT interchangeable with Anthropic first-party rates. Claude Sonnet 5&#x27;s introductory input rate of 2.00 ends 2026-08-31, reverting to the 3.00 listed here. Providers absent from this table are reported as not priced rather than as free: no list price was confirmed for the default OpenAI model, and a local runtime has no per-token price at all — its cost is hardware and electricity, which this tool does not attempt to model. Override with --prices to use your negotiated rates.</p>
+
+
+<h2 id="appendix">Appendix</h2>
+<p class=sub>Everything the summary above is derived from.</p>
+
+<details id="per-document">
+<summary>Per document (input tokens)</summary>
+<div class=scroll>
+<table>
+  <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
+      <th class=n>direct input</th><th class=n>delta</th>
+      <th class=n>delta $ (input)</th>
+      <th class=n>delta $ incl. output (not like-for-like)</th></tr>
+<tr><td>apricot-cake-recipe</td><td>anthropic</td><td class=n>1,563</td><td class=n>337</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
+<tr><td>bill-of-lading</td><td>anthropic</td><td class=n>2,603</td><td class=n>1,377</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
+<tr><td>construction-pay-application</td><td>anthropic</td><td class=n>3,133</td><td class=n>1,907</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>dear-magnus-thank-you-note</td><td>anthropic</td><td class=n>1,811</td><td class=n>585</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0054</td></tr>
+<tr><td>emergency-dept-billing-worksheet</td><td>anthropic</td><td class=n>2,624</td><td class=n>1,398</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>employment-application</td><td>anthropic</td><td class=n>2,116</td><td class=n>890</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>happy-tooth-invoice-excel</td><td>anthropic</td><td class=n>2,718</td><td class=n>1,492</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0042</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>anthropic</td><td class=n>1,844</td><td class=n>618</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0072</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>anthropic</td><td class=n>5,167</td><td class=n>3,941</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
+<tr><td>lumen-invoice</td><td>anthropic</td><td class=n>2,992</td><td class=n>1,766</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>meridian-annual-report</td><td>anthropic</td><td class=n>18,723</td><td class=n>17,497</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>meridian-balance-sheet</td><td>anthropic</td><td class=n>2,607</td><td class=n>1,381</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0019</td></tr>
+<tr><td>meridian-income-statement</td><td>anthropic</td><td class=n>2,214</td><td class=n>988</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>anthropic</td><td class=n>2,650</td><td class=n>1,424</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>northgate-claim-file</td><td>anthropic</td><td class=n>9,117</td><td class=n>7,891</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>regional-health-record</td><td>anthropic</td><td class=n>31,188</td><td class=n>29,962</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>scanned-invoice</td><td>anthropic</td><td class=n>3,163</td><td class=n>1,937</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>apricot-cake-recipe</td><td>bedrock</td><td class=n>640</td><td class=n>172</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>bill-of-lading</td><td>bedrock</td><td class=n>1,349</td><td class=n>881</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>construction-pay-application</td><td>bedrock</td><td class=n>1,796</td><td class=n>1,328</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>dear-magnus-thank-you-note</td><td>bedrock</td><td class=n>790</td><td class=n>322</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>emergency-dept-billing-worksheet</td><td>bedrock</td><td class=n>1,316</td><td class=n>848</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>employment-application</td><td>bedrock</td><td class=n>1,058</td><td class=n>590</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>happy-tooth-invoice-excel</td><td>bedrock</td><td class=n>1,519</td><td class=n>1,051</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>bedrock</td><td class=n>855</td><td class=n>387</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0002</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>bedrock</td><td class=n>3,612</td><td class=n>3,144</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0007</td></tr>
+<tr><td>lumen-invoice</td><td>bedrock</td><td class=n>1,743</td><td class=n>1,275</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>meridian-annual-report</td><td>bedrock</td><td class=n>12,933</td><td class=n>12,465</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>meridian-balance-sheet</td><td>bedrock</td><td class=n>1,466</td><td class=n>998</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0004</td></tr>
+<tr><td>meridian-income-statement</td><td>bedrock</td><td class=n>1,155</td><td class=n>687</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0004</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>bedrock</td><td class=n>1,442</td><td class=n>974</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>northgate-claim-file</td><td>bedrock</td><td class=n>5,918</td><td class=n>5,450</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>regional-health-record</td><td>bedrock</td><td class=n>21,830</td><td class=n>21,362</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>scanned-invoice</td><td>bedrock</td><td class=n>1,891</td><td class=n>1,423</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>apricot-cake-recipe</td><td>openai</td><td class=n>950</td><td class=n>202</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>bill-of-lading</td><td>openai</td><td class=n>1,594</td><td class=n>846</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>construction-pay-application</td><td>openai</td><td class=n>1,974</td><td class=n>1,226</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>dear-magnus-thank-you-note</td><td>openai</td><td class=n>1,088</td><td class=n>340</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>emergency-dept-billing-worksheet</td><td>openai</td><td class=n>1,578</td><td class=n>830</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>employment-application</td><td>openai</td><td class=n>1,338</td><td class=n>590</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>happy-tooth-invoice-excel</td><td>openai</td><td class=n>1,745</td><td class=n>997</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>openai</td><td class=n>1,154</td><td class=n>406</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>openai</td><td class=n>3,496</td><td class=n>2,748</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>lumen-invoice</td><td>openai</td><td class=n>1,938</td><td class=n>1,190</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>meridian-annual-report</td><td>openai</td><td class=n>12,141</td><td class=n>11,393</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>meridian-balance-sheet</td><td>openai</td><td class=n>1,674</td><td class=n>926</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>meridian-income-statement</td><td>openai</td><td class=n>1,408</td><td class=n>660</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>openai</td><td class=n>1,679</td><td class=n>931</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>northgate-claim-file</td><td>openai</td><td class=n>5,839</td><td class=n>5,091</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>regional-health-record</td><td>openai</td><td class=n>20,290</td><td class=n>19,542</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>scanned-invoice</td><td>openai</td><td class=n>2,068</td><td class=n>1,320</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+</table>
+</div>
+<p class=sub>The <strong>delta $ (input)</strong> column prices the input-token
+delta, which measures the same document on both sides. The column beside it adds
+the output-token difference and is not like-for-like — the two calls are asked
+for different things, and output is priced several times higher than input.</p>
+</details>
+
+<details id="per-provider">
+<summary>Per provider</summary>
+<div class=scroll>
+<table>
+  <tr><th>provider</th><th class=n>docs</th><th class=n>delta input</th>
+      <th class=n>delta output</th><th class=n>per-call spread</th>
+      <th class=n>$ / 100k docs (input)</th>
+      <th class=n>$ / 100k incl. output</th></tr>
+<tr><td>Claude Sonnet 5</td><td class=n>17</td><td class='n d'>+20,842</td><td class=n>+596</td><td class=n>+1,226 to +1,226</td><td class='n d'>$367.8000</td><td class=n>$420.3882</td></tr>
+<tr><td>Qwen3-VL 235B (Bedrock)</td><td class=n>17</td><td class='n d'>+7,956</td><td class=n>+594</td><td class=n>+468 to +468</td><td class='n d'>$24.8040</td><td class=n>$34.0984</td></tr>
+<tr><td>OpenAI</td><td class=n>17</td><td class='n d'>+12,716</td><td class=n>+378</td><td class=n>+748 to +748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+</table>
+</div>
+<p class=sub>A narrow per-call spread is the point: the SDK's overhead behaves as
+a constant number of tokens per call rather than a percentage of the document,
+so it matters most on the smallest documents and fades on the largest. The
+100k-document column is a linear projection of the measured mean, and it is only
+meaningful while that spread stays narrow — if it widens, read the per-document
+rows instead.</p>
+</details>
+
+
+<details id="disagreements">
+<summary>Every disagreement</summary>
+<p class=sub>Each row is a field where two configurations returned different answers. This is the part worth dwelling on: looking at two different values, you cannot tell which is right without a citation back to the page to check — and a citation is exactly what the grounded half returns and the direct half does not.</p>
+<p class=sub>10/17 judged fields agreed
+(59%) — 7 disagreement(s) below. Excluded from that rate:
+0 field(s) the comparator could not confidently judge, and
+0 that no provider answered at all — nobody answered, so there is
+nothing to agree about. 17 field(s) were considered in total.</p>
+<div class=scroll>
+<table>
+  <tr><th>document</th><th>field</th><th>values</th></tr>
+<tr><td>happy-tooth-invoice-excel</td><td>documentTitle</td><td>anthropic:direct=&#x27;Invoice #5465&#x27;, anthropic:sdk=&#x27;THE HAPPY TOOTH&#x27;, bedrock:direct=&#x27;THE HAPPY TOOTH&#x27;, bedrock:sdk=&#x27;THE HAPPY TOOTH&#x27;, openai:direct=&#x27;THE HAPPY TOOTH&#x27;, openai:sdk=&#x27;THE HAPPY TOOTH&#x27;</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>documentTitle</td><td>anthropic:direct=&#x27;Recipe from the kitchen of:&#x27;, anthropic:sdk=&#x27;From. Lola to&#x27;, bedrock:direct=&#x27;From. Lola to Grand m te ~ Hons Hea what Ven if vw gers Recipe from the kilehyn of: Orig bola na : &gt; - _ - Bak of F fre for Ahour ee Fg 4&#x27;, bedrock:sdk=&#x27;From. Lola to Grand m te&#x27;, openai:direct=&#x27;From Lola to Grandmother ~ Heaven knows what&#x27;, openai:sdk=&#x27;From. Lola to ~ Hea Ven Hons vw what&#x27;</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>documentTitle</td><td>anthropic:direct=&#x27;PROGRESS INVOICE&#x27;, anthropic:sdk=&#x27;PROGRESS INVOICE&#x27;, bedrock:direct=&#x27;PROGRESS INVOICE - Riverside Mixed-Use Development — Phase 2&#x27;, bedrock:sdk=&#x27;PROGRESS INVOICE: Riverside Mixed-Use Development — Phase 2 (Contract #RMD-2024-003, Permit #BLD-2024-78945, Invoice Date March 1, 2025, Due March 31, 2025, Period Feb 1 – Feb 28, 2025, Invoice No. 1047, Status: On Schedule, Retainage 10%)&#x27;, openai:direct=&#x27;PROGRESS INVOICE&#x27;, openai:sdk=&#x27;ATLAS CONSTRUCTION PROGRESS INVOICE&#x27;</td></tr>
+<tr><td>lumen-invoice</td><td>documentTitle</td><td>anthropic:direct=&#x27;Invoice&#x27;, anthropic:sdk=&#x27;Invoice&#x27;, bedrock:direct=&#x27;Invoice of CenturyLink Communications, LLC.&#x27;, bedrock:sdk=&#x27;Invoice of CenturyLink Communications, LLC.&#x27;, openai:direct=&#x27;Invoice&#x27;, openai:sdk=&#x27;Invoice&#x27;</td></tr>
+<tr><td>meridian-balance-sheet</td><td>documentTitle</td><td>anthropic:direct=&#x27;Meridian Components Inc.&#x27;, anthropic:sdk=&#x27;Meridian Components Inc.&#x27;, bedrock:direct=&#x27;Statement of Financial Position · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, bedrock:sdk=&#x27;Meridian Components Inc. Statement of Financial Position · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, openai:direct=&#x27;Statement of Financial Position&#x27;, openai:sdk=&#x27;Meridian Components Inc.&#x27;</td></tr>
+<tr><td>meridian-income-statement</td><td>documentTitle</td><td>anthropic:direct=&#x27;Meridian Components Inc.&#x27;, anthropic:sdk=&#x27;Meridian Components Inc.&#x27;, bedrock:direct=&#x27;Meridian Components Inc. Statement of Operations · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, bedrock:sdk=&#x27;Meridian Components Inc. Statement of Operations · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, openai:direct=&#x27;INCOME STATEMENT&#x27;, openai:sdk=&#x27;INCOME STATEMENT&#x27;</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>documentTitle</td><td>anthropic:direct=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, anthropic:sdk=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, bedrock:direct=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, bedrock:sdk=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, openai:direct=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, openai:sdk=&#x27;Northgate Mutual Insurance Company&#x27;</td></tr>
+</table>
+</div>
+</details>
+
+
+<details id="prices">
+<summary>Price table</summary>
+<p class=sub>List prices checked 2026-08-14. Replace them with
+your negotiated rates using <code>--prices</code>.</p>
+</details>
+
+
+<footer>
+<p>This file includes values extracted from the documents that were run, so handle it the way you would handle those documents. Nothing was sent to Nutrient: the tool has no telemetry and no Nutrient endpoint.</p>
+<p>Measured by nutrient-extraction-cost 0.1.0 · list prices checked
+2026-08-14 · Nutrient, nutrient.io</p>
+</footer>
+
+</div>
+</html>
