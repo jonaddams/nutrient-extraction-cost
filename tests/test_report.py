@@ -512,3 +512,22 @@ def test_one_retried_half_is_enough_to_disqualify_the_row():
 
     assert out["byDocument"] == []
     assert out["retried"] == 1
+
+
+def test_summarise_carries_a_provenance_block_when_given_one():
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    block = {"corpusName": "acme-invoices", "documentCount": 2}
+    out = summarise(
+        [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)],
+        table,
+        provenance=block,
+    )
+    assert out["provenance"] == block
+
+
+def test_summarise_without_provenance_still_works():
+    """Existing callers must not break, and report.json stays a superset."""
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    out = summarise([_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)], table)
+    assert out["provenance"] is None
+    assert out["byDocument"][0]["deltaInputTokens"] == 400

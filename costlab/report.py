@@ -63,6 +63,7 @@ def summarise(
     table: PriceTable,
     models: dict[str, str] | None = None,
     key: AnswerKey | None = None,
+    provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Per-document and per-provider totals, with the unmeasurable set aside.
 
@@ -227,6 +228,7 @@ def summarise(
 
     return {
         "checkedOn": table.checked_on,
+        "provenance": provenance,
         "priceNote": table.note,
         "byDocument": by_document,
         "byProvider": by_provider,
