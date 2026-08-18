@@ -282,3 +282,17 @@ def test_machine_shaped_values_are_set_in_mono():
     grid = out[out.index("class=prov-grid") : out.index("id=\"cost\"")]
     assert "<span class='prov-v mono'>2026-08-18T09:30:00-04:00</span>" in grid
     assert "<span class='prov-v'>2 from acme-invoices</span>" in grid
+
+
+def test_the_agreement_rate_card_carries_the_accent_fill():
+    """One card in colour, the rest plain — the eye should land on the rate."""
+    summary = _two_doc_summary()
+    summary["agreement"] = [_dis("alpha", {"a:direct": "x", "a:sdk": "y"})]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
+    out = render_html.render(summary)
+    assert "<div class='card accent'>" in out
+    assert out.count("class='card accent'") == 1, "only the rate card is filled"
+    assert ".card.accent" in out and "--bg-state-warning" in out

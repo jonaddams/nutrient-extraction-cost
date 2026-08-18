@@ -221,6 +221,16 @@ section.band {
   flex-direction: column;
   gap: 14px;
 }
+/* The headline statistic carries the accent fill and drops its border, the
+   way the artboard has it — one card in colour, the rest plain, so the eye
+   lands on the agreement rate first. The token is the same warm yellow the
+   warning notices use. */
+.card.accent {
+  background: var(--bg-state-warning);
+  border-color: transparent;
+}
+.card.accent .figure-note { color: var(--text-neutral-primary); }
+
 .card-model {
   font-family: var(--font-semi-mono);
   text-transform: uppercase;

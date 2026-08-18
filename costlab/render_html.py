@@ -309,7 +309,7 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
 <h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {_plural(a['fields'], 'field', spell=spell_h2)}, {_plural(a['disagreed'], 'disagreement', spell=spell_h2)}</h2>
 <p class=standfirst>{e(AGREEMENT_FRAMING)}</p>
 <div class=cards>
-<div class=card><span class=figure-xl>{e(rate)}</span>
+<div class='card accent'><span class=figure-xl>{e(rate)}</span>
 <span class=figure-note>of judged fields agreed — {a['agreed']} of {judged}</span></div>
 <div class=card><span class=figure-xl>{a['disagreed']}</span>
 <span class=figure-note>fields where configurations differed</span></div>

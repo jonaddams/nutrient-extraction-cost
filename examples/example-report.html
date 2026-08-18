@@ -226,6 +226,16 @@ section.band {
   flex-direction: column;
   gap: 14px;
 }
+/* The headline statistic carries the accent fill and drops its border, the
+   way the artboard has it — one card in colour, the rest plain, so the eye
+   lands on the agreement rate first. The token is the same warm yellow the
+   warning notices use. */
+.card.accent {
+  background: var(--bg-state-warning);
+  border-color: transparent;
+}
+.card.accent .figure-note { color: var(--text-neutral-primary); }
+
 .card-model {
   font-family: var(--font-semi-mono);
   text-transform: uppercase;
@@ -386,7 +396,7 @@ this run: Claude Sonnet 5 +1,226 to +1,226, Qwen3-VL 235B (Bedrock) +468 to +468
 <h2>Six configurations, seventeen fields, seven disagreements</h2>
 <p class=standfirst>Looking at two values, you cannot tell which is right without a citation back to the page — and a citation is exactly what the grounded half returns and the direct half does not. Agreement is agreement, not correctness: two models can agree and both be wrong.</p>
 <div class=cards>
-<div class=card><span class=figure-xl>59%</span>
+<div class='card accent'><span class=figure-xl>59%</span>
 <span class=figure-note>of judged fields agreed — 10 of 17</span></div>
 <div class=card><span class=figure-xl>7</span>
 <span class=figure-note>fields where configurations differed</span></div>
