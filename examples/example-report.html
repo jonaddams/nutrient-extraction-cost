@@ -369,6 +369,33 @@ details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.
   margin: 18px 0 0;
 }
 
+/* The ranked-disagreement table. The artboard builds this from nested grids;
+   a real <table> is kept instead — screen readers announce the header
+   relationships, and it prints as a table rather than as loose divs — styled
+   to land in the same place. */
+.spread {
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.spread table { width: 100%; border-collapse: collapse; margin: 0; font-size: 13px; }
+.spread thead th {
+  background: var(--bg-neutral-default-tertiary);
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  font-weight: normal;
+  text-align: left;
+  padding: 12px 20px;
+  border: 0;
+}
+.spread td { padding: 12px 20px; border: 0; border-top: 1px solid var(--border-neutral-default-secondary); }
+.spread td.doc { font-family: var(--font-mono); }
+.spread td.field { color: var(--text-neutral-tertiary); }
+.spread td.count strong { font-weight: 440; }
+
 /* costlab/brand/print.css
    A printed copy must be complete: the appendix cannot stay collapsed. */
 @media print {
@@ -448,17 +475,17 @@ this run: Claude Sonnet 5 +1,226 to +1,226, Qwen3-VL 235B (Bedrock) +468 to +468
 </article>
 
 
-<p class=eyebrow>All 7, by spread</p>
-<div class=scroll>
+<p class=eyebrow>All seven, by spread</p>
+<div class=spread>
 <table>
-<thead><tr><th>document</th><th>field</th><th class=n>distinct answers</th></tr></thead>
-<tr><td>heavenly-hamburgers-recipe</td><td>documentTitle</td><td class=n>6 distinct answers</td></tr>
-<tr><td>invoice-ac-2025-1047</td><td>documentTitle</td><td class=n>4 distinct answers</td></tr>
-<tr><td>meridian-balance-sheet</td><td>documentTitle</td><td class=n>4 distinct answers</td></tr>
-<tr><td>meridian-income-statement</td><td>documentTitle</td><td class=n>3 distinct answers</td></tr>
-<tr><td>lumen-invoice</td><td>documentTitle</td><td class=n>2 distinct answers</td></tr>
-<tr><td>northgate-auto-claim-fnol</td><td>documentTitle</td><td class=n>2 distinct answers</td></tr>
-<tr><td>happy-tooth-invoice-excel</td><td>documentTitle</td><td class=n>2 distinct answers</td></tr>
+<thead><tr><th>document</th><th>field</th><th>distinct answers</th></tr></thead>
+<tr><td class=doc>heavenly-hamburgers-recipe</td><td class=field>documentTitle</td><td class=count><strong>6 of 6</strong> configurations differed</td></tr>
+<tr><td class=doc>invoice-ac-2025-1047</td><td class=field>documentTitle</td><td class=count><strong>4</strong> distinct answers</td></tr>
+<tr><td class=doc>meridian-balance-sheet</td><td class=field>documentTitle</td><td class=count><strong>4</strong> distinct answers</td></tr>
+<tr><td class=doc>meridian-income-statement</td><td class=field>documentTitle</td><td class=count><strong>3</strong> distinct answers</td></tr>
+<tr><td class=doc>lumen-invoice</td><td class=field>documentTitle</td><td class=count><strong>2</strong> distinct answers</td></tr>
+<tr><td class=doc>northgate-auto-claim-fnol</td><td class=field>documentTitle</td><td class=count><strong>2</strong> distinct answers</td></tr>
+<tr><td class=doc>happy-tooth-invoice-excel</td><td class=field>documentTitle</td><td class=count><strong>2</strong> distinct answers</td></tr>
 </table>
 </div>
 <p class=standfirst>Every value each configuration returned is in

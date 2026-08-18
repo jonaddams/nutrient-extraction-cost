@@ -47,6 +47,11 @@ _WORDS = (
 ).split()
 
 
+def _count(n: int) -> str:
+    """A bare count, spelled when small — "All seven", "All 240"."""
+    return _WORDS[n] if _spellable(n) else f"{n:,}"
+
+
 def _spellable(*counts: int) -> bool:
     """True only when EVERY count in one sentence can be a word."""
     return all(0 <= n < len(_WORDS) for n in counts)
@@ -285,18 +290,33 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
 """
 
     ranked, _ = representative_disagreements(summary["agreement"], limit=10_000)
+
+    def _count_cell(row: dict[str, Any]) -> str:
+        """"N of M configurations differed" when nothing agreed, else the count.
+
+        Every configuration returning something different is a stronger
+        statement than "N distinct answers", and it is the row a reader should
+        look at first — so it says so rather than leaving them to notice that
+        the two numbers happen to match.
+        """
+        distinct, total = _distinct(row), len(row["values"])
+        if distinct == total and total:
+            return f"<strong>{distinct} of {total}</strong> configurations differed"
+        return f"<strong>{distinct}</strong> distinct answers"
+
     ranked_rows = "\n".join(
-        f"<tr><td>{e(r['docId'])}</td><td>{e(r['field'])}</td>"
-        f"<td class=n>{_distinct(r)} distinct answers</td></tr>"
+        f"<tr><td class=doc>{e(r['docId'])}</td>"
+        f"<td class=field>{e(r['field'])}</td>"
+        f"<td class=count>{_count_cell(r)}</td></tr>"
         for r in ranked
     )
     all_ranked = ""
     if ranked:
         all_ranked = f"""
-<p class=eyebrow>All {len(ranked)}, by spread</p>
-<div class=scroll>
+<p class=eyebrow>All {_count(len(ranked))}, by spread</p>
+<div class=spread>
 <table>
-<thead><tr><th>document</th><th>field</th><th class=n>distinct answers</th></tr></thead>
+<thead><tr><th>document</th><th>field</th><th>distinct answers</th></tr></thead>
 {ranked_rows}
 </table>
 </div>

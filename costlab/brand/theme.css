@@ -363,3 +363,30 @@ details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.
   color: var(--text-neutral-tertiary);
   margin: 18px 0 0;
 }
+
+/* The ranked-disagreement table. The artboard builds this from nested grids;
+   a real <table> is kept instead — screen readers announce the header
+   relationships, and it prints as a table rather than as loose divs — styled
+   to land in the same place. */
+.spread {
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.spread table { width: 100%; border-collapse: collapse; margin: 0; font-size: 13px; }
+.spread thead th {
+  background: var(--bg-neutral-default-tertiary);
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  font-weight: normal;
+  text-align: left;
+  padding: 12px 20px;
+  border: 0;
+}
+.spread td { padding: 12px 20px; border: 0; border-top: 1px solid var(--border-neutral-default-secondary); }
+.spread td.doc { font-family: var(--font-mono); }
+.spread td.field { color: var(--text-neutral-tertiary); }
+.spread td.count strong { font-weight: 440; }

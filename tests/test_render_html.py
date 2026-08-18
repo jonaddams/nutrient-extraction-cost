@@ -204,7 +204,7 @@ def test_every_disagreement_is_listed_not_just_a_sample():
 
     for i in range(6):
         assert f"doc{i}" in ranked, f"doc{i} is missing from the ranked list"
-    assert "All 6, by spread" in out
+    assert "All six, by spread" in out  # spelled, like every small count in prose
 
 
 def test_the_framing_sentence_travels_with_the_disagreements():

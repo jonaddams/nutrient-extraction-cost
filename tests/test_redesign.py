@@ -214,7 +214,26 @@ def test_all_disagreements_are_ranked_by_spread_with_their_counts():
     out = render_html.render(summary)
     ranked = out[out.index("by spread"):]
     assert ranked.index("wide") < ranked.index("narrow")
-    assert "4 distinct answers" in out and "2 distinct answers" in out
+    # Where every configuration differed, the row says so — a stronger
+    # statement than the bare count, and the one to read first.
+    assert "<strong>4 of 4</strong> configurations differed" in out
+    assert "<strong>2 of 2</strong> configurations differed" in out
+
+
+def test_a_partial_disagreement_reports_its_distinct_count():
+    """Not every row is unanimous: 2 distinct answers across 4 configurations
+    is a different finding from 4 of 4, and must not be flattened into it."""
+    summary = _two_doc_summary()
+    summary["agreement"] = [
+        _dis("part", {"a:direct": "x", "a:sdk": "x", "b:direct": "y", "b:sdk": "y"}),
+    ]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
+    out = render_html.render(summary)
+    assert "<strong>2</strong> distinct answers" in out
+    assert "configurations differed" not in out[out.index("by spread"):]
 
 
 def test_the_excluded_count_is_stated_not_implied():
