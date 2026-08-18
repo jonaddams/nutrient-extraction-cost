@@ -129,7 +129,10 @@ def test_the_summary_says_how_many_disagreements_it_is_not_showing():
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
     summary["agreement"] = [_dis(f"doc{i}", {"x": "1", "y": f"{i}"}) for i in range(6)]
-    summary["agreementSummary"] = {"fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0}
+    summary["agreementSummary"] = {
+        "fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
 
     out = render_html.render(summary)
 
@@ -141,9 +144,37 @@ def test_the_framing_sentence_travels_with_the_disagreements():
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
     summary["agreement"] = [_dis("a", {"x": "1", "y": "2"})]
-    summary["agreementSummary"] = {"fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0}
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
 
     out = render_html.render(summary)
 
     assert "citation" in out
     assert "not correctness" in out
+
+
+def test_the_rate_falls_back_for_a_hand_built_summary():
+    """A summary assembled by an external consumer may lack `rate`.
+
+    Real summarise() output always carries it, so this branch is defensive only
+    — but it is reachable by anyone building a summary dict themselves, and an
+    untested fallback is a fallback nobody knows is broken.
+
+    Exercised against `_accuracy_band` directly, not the full `render()` page:
+    the legacy `agreement_section` further down the same page indexes
+    `a["rate"]` unconditionally (restored, deliberately, to its pre-Task-6
+    behaviour), so a summary that omits `rate` to reach this fallback would
+    make the *rest* of the page crash. The fallback is real and reachable by a
+    hand-built summary passed to `_accuracy_band`; it is not something a full
+    `summarise()`-derived page can ever exhibit.
+    """
+    summary = {
+        "agreementSummary": {"fields": 1, "agreed": 1, "disagreed": 1, "ambiguous": 0},
+        "agreement": [_dis("a", {"x": "1", "y": "2"})],
+    }
+
+    out = render_html._accuracy_band(summary, lambda s: s)
+
+    assert "50%" in out
