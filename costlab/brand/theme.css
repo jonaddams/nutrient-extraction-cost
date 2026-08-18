@@ -20,10 +20,10 @@
   --bg-state-warning: hsla(43, 82%, 67%, 1);
 
   --border-neutral-default-primary: hsla(30, 14%, 72%, 0.5);
-  --border-neutral-default-secondary: hsla(30, 16%, 35%, 1);
+  --border-neutral-default-secondary: hsla(30, 14%, 72%, 1);
 
-  /* Cards are radius xl per the design system's rules of thumb; the token lives
-     in the site's tailwind config rather than tokens.css, so it is inlined. */
+  /* Cards are radius xl (24px) per the design system README's rules of thumb;
+     tokens.css carries no radius token, so the value is inlined here. */
   --radius-card: 24px;
 }
 
