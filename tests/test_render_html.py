@@ -89,3 +89,61 @@ def test_the_document_is_now_whole():
     assert out.startswith("<!doctype html>")
     assert "<html lang=en>" in out
     assert out.rstrip().endswith("</html>")
+
+
+def _dis(doc, values):
+    return {"docId": doc, "field": "documentTitle", "state": "disagreed", "values": values}
+
+
+def test_representative_picks_the_widest_divergence_first():
+    rows = [
+        _dis("small", {"a": "Invoice", "b": "Invoice."}),
+        _dis("wide", {"a": "Invoice", "b": "Invoice No 12 " * 20}),
+        _dis("mid", {"a": "Invoice", "b": "Invoice of CenturyLink Communications"}),
+    ]
+    chosen, omitted = render_html.representative_disagreements(rows, limit=2)
+    assert [r["docId"] for r in chosen] == ["wide", "mid"]
+    assert omitted == 1
+
+
+def test_representative_is_deterministic_on_ties():
+    rows = [_dis("b", {"x": "1", "y": "2"}), _dis("a", {"x": "1", "y": "2"})]
+    chosen, _ = render_html.representative_disagreements(rows, limit=1)
+    assert chosen[0]["docId"] == "a"
+
+
+def test_agreed_rows_are_never_offered_as_disagreements():
+    rows = [
+        {"docId": "a", "field": "f", "state": "agreed", "values": {"x": "1", "y": "1"}},
+        _dis("b", {"x": "1", "y": "2"}),
+    ]
+    chosen, omitted = render_html.representative_disagreements(rows, limit=3)
+    assert [r["docId"] for r in chosen] == ["b"]
+    assert omitted == 0
+
+
+def test_the_summary_says_how_many_disagreements_it_is_not_showing():
+    """A selection rule that quietly hid the least flattering disagreement would
+    be exactly the dishonesty this project keeps finding."""
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
+    summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
+    summary["agreement"] = [_dis(f"doc{i}", {"x": "1", "y": f"{i}"}) for i in range(6)]
+    summary["agreementSummary"] = {"fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0}
+
+    out = render_html.render(summary)
+
+    assert "3 more" in out
+
+
+def test_the_framing_sentence_travels_with_the_disagreements():
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
+    summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
+    summary["agreement"] = [_dis("a", {"x": "1", "y": "2"})]
+    summary["agreementSummary"] = {"fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0}
+
+    out = render_html.render(summary)
+
+    assert "citation" in out
+    assert "not correctness" in out

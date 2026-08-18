@@ -93,6 +93,81 @@ def _answer_band(summary: dict[str, Any], e) -> str:
 """
 
 
+AGREEMENT_FRAMING = (
+    "Each row is a field where two configurations returned different answers. "
+    "Looking at two values, you cannot tell which is right without a citation "
+    "back to the page — and a citation is exactly what the grounded half "
+    "returns and the direct half does not. Agreement is agreement, not "
+    "correctness: two models can agree and both be wrong."
+)
+
+
+def representative_disagreements(
+    rows: list[dict[str, Any]], limit: int = 3
+) -> tuple[list[dict[str, Any]], int]:
+    """A few disagreements worth reading, and how many were left out.
+
+    Deterministic by construction: most distinct values, then the widest
+    character span between the shortest and longest value, then docId. The
+    appendix always carries the complete list and the summary always states the
+    omitted count — a rule that happened to hide the least flattering
+    disagreement would be precisely the quiet dishonesty this tool exists to
+    remove.
+    """
+    disagreed = [r for r in rows if r.get("state") == "disagreed"]
+
+    def key(row: dict[str, Any]) -> tuple[int, int, str]:
+        rendered = [str(v) for v in row["values"].values()]
+        span = max(map(len, rendered)) - min(map(len, rendered)) if rendered else 0
+        return (-len(set(rendered)), -span, row["docId"])
+
+    ordered = sorted(disagreed, key=key)
+    return ordered[:limit], max(len(ordered) - limit, 0)
+
+
+def _accuracy_band(summary: dict[str, Any], e) -> str:
+    """Band 2: the agreement rate and a representative sample of disagreements.
+
+    Reuses `agreementSummary["rate"]` when present rather than recomputing
+    agreed/judged — this project has already fixed six defects that were
+    exactly two definitions of the same number disagreeing with each other.
+    Guarded on `"rate" in a`, never on truthiness, because a measured rate of
+    0.0 is real and must not be treated as absent.
+    """
+    a = summary["agreementSummary"]
+    if not a["fields"]:
+        return ""
+    judged = a["agreed"] + a["disagreed"]
+    if "rate" in a:
+        rate = "n/a" if a["rate"] is None else f"{a['rate']:.0%}"
+    else:
+        rate = f"{a['agreed'] / judged:.0%}" if judged else "n/a"
+    chosen, omitted = representative_disagreements(summary["agreement"])
+    rows = "\n".join(
+        f"<tr><td>{e(r['docId'])}</td><td>{e(r['field'])}</td>"
+        f"<td class=v>{e(', '.join(f'{k}={v!r}' for k, v in sorted(r['values'].items())))}</td></tr>"
+        for r in chosen
+    )
+    more = (
+        f"<p class=sub>{omitted} more disagreement(s) are listed in full in the "
+        "appendix below.</p>"
+        if omitted
+        else ""
+    )
+    return f"""
+<h2>Where the models disagree</h2>
+<p class=sub>{e(AGREEMENT_FRAMING)}</p>
+<p class=sub><strong>{a['agreed']}/{judged} judged fields agreed ({rate})</strong>
+— {a['disagreed']} disagreement(s). Fields nobody answered are excluded from
+that rate.</p>
+<table>
+<thead><tr><th>document</th><th>field</th><th>what each returned</th></tr></thead>
+{rows}
+</table>
+{more}
+"""
+
+
 def render(summary: dict[str, Any]) -> str:
     """A self-contained page. No external requests, so it can be mailed on."""
     e = html_mod.escape
@@ -189,7 +264,7 @@ alongside it rather than as a like-for-like comparison.</p>
             "does not.</p>"
         )
         a = summary["agreementSummary"]
-        rate_shown = "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
+        rate_shown = "not comparable" if a.get("rate") is None else f"{a['rate']:.0%}"
         # Filtered on `state`, never on the legacy `agree` boolean: `agree` is
         # False for both disagreed AND ambiguous rows, and listing an ambiguous
         # row here — a pair the comparator explicitly could not judge — would
@@ -254,6 +329,7 @@ nothing to agree about. {a['fields']} field(s) were considered in total.</p>
 <h1>What document extraction costs, with and without the Nutrient SDK</h1>
 {_provenance_table(summary.get("provenance"), e)}
 {_answer_band(summary, e)}
+{_accuracy_band(summary, e)}
 
 <h1>Extraction cost, with and without the Nutrient SDK</h1>
 <p class=sub>Input tokens are the measurement. Dollars are computed from list
