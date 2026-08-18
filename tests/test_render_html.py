@@ -1,4 +1,6 @@
-from costlab import render_html, report
+import re
+
+from costlab import brand, render_html, report
 from costlab.prices import PriceTable
 
 
@@ -61,12 +63,64 @@ def test_the_answer_band_leads_with_the_per_model_constant():
     assert out.index("Nutrient SDK overhead") < out.index('id="appendix"')
 
 
+def test_the_answer_band_says_so_when_there_is_no_delta_to_report():
+    """SDK-only records: every cell lacks its direct-half partner, so
+    summarise() leaves `byProvider` empty. The band must say plainly that
+    there is nothing to report, not render tiles and a table with nothing in
+    them."""
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = [_rec("a", "bedrock", True, 1000), _rec("b", "bedrock", True, 900)]
+    summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
+
+    assert summary["byProvider"] == []
+
+    out = render_html.render(summary)
+
+    assert "no delta to report" in out
+    answer_section = out[out.index("<section class=answer>") : out.index("</section>")]
+    assert "<table>" not in answer_section
+    assert "<div class=tiles>" not in answer_section
+
+
+def test_the_headline_figure_is_rounded_and_labelled_per_document():
+    """Two documents with deltas of 469 and 470 average to 469.5. Floor
+    division prints +469 — the wrong document's delta, silently preferred —
+    and the old label had no unit, so it read as a run total rather than the
+    per-document figure it actually is."""
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = [
+        _rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 531),
+        _rec("b", "bedrock", True, 900), _rec("b", "bedrock", False, 430),
+    ]
+    summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
+    prov = summary["byProvider"][0]
+    assert prov["deltaInputTokens"] == 939
+    assert prov["documents"] == 2
+
+    out = render_html.render(summary)
+
+    assert "+470 tokens per document" in out
+    assert "+469 tokens per document" not in out
+
+
 def test_the_provenance_block_names_the_corpus_and_the_model():
     out = render_html.render(_summary())
     assert "acme-invoices" in out
     assert "qwen3-vl" in out
     assert "BEDROCK_API_KEY (set)" in out
     assert "0.1.0" in out
+
+
+def test_the_logo_is_wrapped_and_sized_by_the_stylesheet():
+    """The inlined SVG carries its own width/height (711x120); nothing in the
+    markup shrinks it on its own. `render()` must wrap it in `class=logo` and
+    the stylesheet must size the child SVG — if either half drifts without the
+    other, the wordmark ships full-bleed again."""
+    out = render_html.render(_summary())
+    assert "<div class=logo>" in out
+    styles = brand.asset("theme.css")
+    assert ".logo svg" in styles
+    assert "height: 28px" in styles
 
 
 def test_the_brand_layer_is_inlined():
@@ -77,10 +131,14 @@ def test_the_brand_layer_is_inlined():
 
 
 def test_the_constant_is_labelled_as_per_model():
-    """468 on Qwen3-VL, 479 on Qwen3.5-9b, 1,226 on Sonnet. The number does not
-    transfer to a sibling model, and the page has to say so."""
+    """The number does not transfer to a sibling model, and the page has to
+    say so — without asserting a figure from some other run."""
     out = render_html.render(_summary())
     assert "per model" in out
+    assert not re.search(r"\d", render_html.PER_MODEL_NOTE), (
+        "the note must not cite figures from other runs — only the tables above "
+        "may state measured numbers"
+    )
 
 
 def test_the_document_is_now_whole():

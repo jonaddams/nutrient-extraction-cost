@@ -14,17 +14,16 @@ from typing import Any
 from costlab import brand
 from costlab.report import _money
 
-# Measured on this corpus: 468 input tokens on Qwen3-VL, 479 on Qwen3.5 9B,
-# 1,226 on Claude Sonnet 5. The overhead is a constant per call, and the
-# constant is per model — not per vendor and not per tokenizer generation. A
-# different model, including a sibling from the same family, is a new
-# measurement, so the figure never transfers across the "per model" line.
+# No figures here: this sentence is read on every run, including a prospect's
+# own, and the tables above are the only place on the page allowed to state a
+# measured number. See tests/test_render_html.py's
+# test_the_constant_is_labelled_as_per_model for the guard that keeps a future
+# edit from reintroducing one.
 PER_MODEL_NOTE = (
     "The overhead is a constant per call, and the constant is per model — not "
-    "per vendor and not per tokenizer generation. Measured on this corpus it "
-    "was 468 input tokens on Qwen3-VL, 479 on Qwen3.5 9B and 1,226 on Claude "
-    "Sonnet 5. A different model, including a sibling from the same family, is "
-    "a new measurement."
+    "per vendor, and not per tokenizer generation. A different model, "
+    "including a sibling from the same family, is a new measurement: the "
+    "figures above do not transfer to it."
 )
 
 
@@ -45,12 +44,18 @@ def _provenance_table(block: dict[str, Any] | None, e) -> str:
         ("Credentials used", ", ".join(block["keySources"])),
         ("Run", block["runDate"]),
         ("Price table checked", block["priceTableDate"]),
-        ("Tool version", block["toolVersion"]),
+        ("Tool version", block["toolVersion"] or "not recorded"),
     ]
     body = "\n".join(
         f"<tr><td>{e(k)}</td><td>{e(str(v))}</td></tr>" for k, v in rows
     )
     return f"<table class=prov>{body}</table>"
+
+
+NO_DELTA_NOTE = (
+    "No document produced both halves of the comparison, so there is no delta "
+    "to report. The appendix lists what each cell returned."
+)
 
 
 def _answer_band(summary: dict[str, Any], e) -> str:
@@ -61,10 +66,23 @@ def _answer_band(summary: dict[str, Any], e) -> str:
     generalising the constant to a sibling model, then a pointer down to the
     full per-document detail — safe to add only now that Task 8 gives
     `#appendix` a target to land on.
+
+    When `byProvider` is empty — no document produced both an SDK and a direct
+    cell — the tiles and table would render as an empty shell that still reads
+    as though it answered something. Render a plain statement instead: this
+    page has already fixed multiple defects where an absent measurement was
+    printed as though it were a zero or a real figure.
     """
+    if not summary["byProvider"]:
+        return f"""
+<section class=answer>
+<p class=supertitle>Nutrient SDK overhead</p>
+<p class=sub>{e(NO_DELTA_NOTE)}</p>
+</section>
+"""
     tiles = "\n".join(
         f"<div class=tile><div class=k>{e(r['label'])}</div>"
-        f"<div class=v>{r['deltaInputTokens'] // max(r['documents'], 1):+,} tokens</div>"
+        f"<div class=v>{round(r['deltaInputTokens'] / max(r['documents'], 1)):+,} tokens per document</div>"
         f"<div class=k>{e(_money(r['deltaCostPer100k']))} per 100k docs</div></div>"
         for r in summary["byProvider"]
     )
@@ -86,8 +104,8 @@ def _answer_band(summary: dict[str, Any], e) -> str:
 {tiles}
 </div>
 <table>
-<thead><tr><th>model</th><th>documents measured</th><th>per-call spread</th>
-<th>cost per 100k docs (input)</th></tr></thead>
+<thead><tr><th>model</th><th class=n>documents measured</th><th class=n>per-call spread</th>
+<th class=n>cost per 100k docs (input)</th></tr></thead>
 {prov_rows}
 </table>
 <p class=sub>{e(PER_MODEL_NOTE)}</p>
@@ -145,7 +163,7 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         return ""
     judged = a["agreed"] + a["disagreed"]
     if "rate" in a:
-        rate = "n/a" if a["rate"] is None else f"{a['rate']:.0%}"
+        rate = "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
     else:
         rate = f"{a['agreed'] / judged:.0%}" if judged else "n/a"
     chosen, omitted = representative_disagreements(summary["agreement"])
@@ -409,7 +427,7 @@ def _footer(summary: dict[str, Any], e) -> str:
     document content instead of hiding it.
     """
     block = summary.get("provenance") or {}
-    version = block.get("toolVersion", "not recorded")
+    version = block.get("toolVersion") or "not recorded"
     return f"""
 <footer>
 <p>{e(CONTENT_NOTICE)}</p>
@@ -434,7 +452,7 @@ def render(summary: dict[str, Any]) -> str:
 {styles}
 </style>
 <div class=wrap>
-{logo}
+<div class=logo>{logo}</div>
 <h1>What document extraction costs, with and without the Nutrient SDK</h1>
 {_provenance_table(summary.get("provenance"), e)}
 {_answer_band(summary, e)}

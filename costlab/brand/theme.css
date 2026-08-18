@@ -41,14 +41,13 @@ body {
 
 /* Headings: variable weight 440 with negative tracking and line-height 1, per
    the design system's rules of thumb. */
-h1, h2, h3 {
+h1, h2 {
   font-weight: 440;
   line-height: 1;
   margin: 0 0 12px;
 }
 h1 { font-size: 34px; letter-spacing: -0.96px; }
 h2 { font-size: 22px; letter-spacing: -0.48px; margin-top: 40px; }
-h3 { font-size: 17px; letter-spacing: -0.48px; margin-top: 28px; }
 
 /* Supertitles: semi-mono uppercase 12px, +0.24px tracking. */
 .supertitle {
@@ -60,7 +59,8 @@ h3 { font-size: 17px; letter-spacing: -0.48px; margin-top: 28px; }
   margin: 0 0 8px;
 }
 
-.logo { height: 28px; display: block; margin-bottom: 28px; }
+.logo { display: block; margin-bottom: 28px; }
+.logo svg { height: 28px; width: auto; display: block; }
 
 .sub { color: var(--text-neutral-tertiary); max-width: 680px; }
 

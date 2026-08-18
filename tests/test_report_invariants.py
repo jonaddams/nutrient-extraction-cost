@@ -55,6 +55,8 @@ def _assert_invariants(html: str, label: str) -> None:
     assert "@font-face" not in html, f"{label} embeds a font"
     assert "base64" not in html, f"{label} embeds a binary"
     assert "/Users/" not in html, f"{label} leaks a local path"
+    assert "/home/" not in html, f"{label} leaks a local path"
+    assert "C:\\" not in html, f"{label} leaks a local path"
     assert not re.search(r"SDK-0\d\d", html), f"{label} names an internal defect id"
     assert not re.search(r"(sk-[A-Za-z0-9]{8}|Bearer\s+\S+)", html), (
         f"{label} looks like it carries a credential"
