@@ -14,7 +14,6 @@ and that delta is the measurement this tool exists to produce.
 
 from __future__ import annotations
 
-import html as html_mod
 import json
 from typing import Any
 

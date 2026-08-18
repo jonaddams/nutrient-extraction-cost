@@ -42,14 +42,15 @@ def test_the_delegate_and_the_module_agree():
 
 
 def test_it_is_a_complete_document():
-    # NOTE: the brief for this test asserted "</html>" in out. The current
-    # (pre-restructure) render_html output is a bare HTML5 fragment — doctype,
-    # meta, title, style, then body markup — with no <html>/<head>/<body>
-    # wrapper anywhere, so that assertion cannot pass without changing
-    # behaviour. This task is a verbatim move, so the assertion below checks
-    # the document is well-formed against what the renderer actually emits
-    # today rather than against a structure it does not have. See
-    # task-4-report.md for detail.
+    """Structural facts a restructure could genuinely break.
+
+    Not `</html>`: this renderer emits a doctype followed by a fragment, with no
+    <html> or <body> element at all. Task 5 introduces the full document; until
+    then, asserting a closing tag would mean bending the code inside the one
+    task whose purpose is to change no behaviour.
+    """
     out = render_html.render(_summary())
     assert out.startswith("<!doctype html>")
-    assert "<title>Extraction cost comparison</title>" in out
+    assert "<style>" in out
+    assert "<h1>" in out
+    assert "<h2>Reading this honestly</h2>" in out
