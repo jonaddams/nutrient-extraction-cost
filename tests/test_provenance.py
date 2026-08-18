@@ -41,8 +41,24 @@ def test_the_bundled_corpus_is_labelled_as_ours():
         credential_envs=[],
         run_started="2026-08-18T09:30:00-04:00",
         checked_on="2026-08-14",
+        is_bundled=True,
     )
     assert out["corpusName"] == "Nutrient sample corpus"
+
+
+def test_a_prospects_own_costlab_corpus_path_is_not_relabelled_as_ours():
+    """The old heuristic matched any .../costlab/corpus path, which would have
+    told a prospect their own run was our demo."""
+    out = provenance.build(
+        corpus_dir="/home/them/costlab/corpus",
+        records=[_rec("a", "bedrock")],
+        models={"bedrock": "qwen3-vl"},
+        credential_envs=[],
+        run_started="2026-08-18T09:30:00-04:00",
+        checked_on="2026-08-14",
+        is_bundled=False,
+    )
+    assert out["corpusName"] == "corpus"
 
 
 def test_models_are_listed_per_provider_in_the_run():
