@@ -58,7 +58,7 @@ def test_it_is_a_complete_document():
 
 def test_the_answer_band_leads_with_the_per_model_constant():
     out = render_html.render(_summary())
-    assert out.index("Nutrient SDK overhead") < out.index("<h2>Per document")
+    assert out.index("Nutrient SDK overhead") < out.index('id="appendix"')
 
 
 def test_the_provenance_block_names_the_corpus_and_the_model():
@@ -224,3 +224,58 @@ def test_unmeasurable_and_retried_notices_are_in_the_summary():
 
     assert "not measurable" in head
     assert "retried" in head
+
+
+# --- Task 8: the appendix, and the cleanup of the four legacy leftovers.
+
+
+def test_the_appendix_holds_the_per_document_table():
+    out = render_html.render(_summary())
+    appendix = out[out.index('id="appendix"'):]
+    assert 'id="per-document"' in appendix
+    assert "sdkInputTokens" not in appendix  # keys are not rendered, values are
+    assert "1,000" in appendix and "600" in appendix
+
+
+def test_every_anchor_the_summary_links_to_exists():
+    out = render_html.render(_summary())
+    import re
+
+    for target in set(re.findall(r'href="#([a-z-]+)"', out)):
+        assert f'id="{target}"' in out, f"dangling anchor: #{target}"
+
+
+def test_the_appendix_carries_every_disagreement():
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
+    summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
+    summary["agreement"] = [_dis(f"doc{i}", {"x": "1", "y": f"{i}"}) for i in range(6)]
+    summary["agreementSummary"] = {"fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0}
+
+    appendix = render_html.render(summary)
+    appendix = appendix[appendix.index('id="disagreements"'):]
+
+    for i in range(6):
+        assert f"doc{i}" in appendix
+
+
+def test_the_bulk_tables_are_collapsible():
+    out = render_html.render(_summary())
+    assert "<details" in out
+    assert "<summary>" in out
+
+
+def test_there_is_exactly_one_h1_and_one_style_block():
+    """Task 5 introduced the real <h1>; the legacy one, and the legacy inline
+    <style> block that predates the brand theme, must not survive alongside
+    it."""
+    out = render_html.render(_summary())
+    assert out.count("<h1>") == 1
+    assert out.count("<style>") == 1
+
+
+def test_the_legacy_reading_this_honestly_section_is_not_duplicated():
+    """`_honesty_band` renders the caveats once; the old bottom-of-page section
+    that repeated them verbatim is gone."""
+    out = render_html.render(_summary())
+    assert out.count("<h2>Reading this honestly</h2>") == 1

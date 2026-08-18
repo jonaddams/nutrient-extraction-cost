@@ -127,6 +127,11 @@ td.v { font-family: var(--font-mono); font-size: 13px; }
 details { margin: 16px 0; }
 summary { cursor: pointer; font-weight: 440; }
 
+/* The appendix's legacy tables can run wider than the viewport; scope the
+   scrollbar to the table rather than letting the whole page scroll sideways.
+   Ported from render_html's old inline style block, which this replaces. */
+.scroll { overflow-x: auto; }
+
 footer {
   margin-top: 56px;
   padding-top: 20px;
