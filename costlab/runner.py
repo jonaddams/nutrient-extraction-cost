@@ -296,7 +296,8 @@ def sdk_extraction(
     tell them apart — it only sees the SDK's envelope — so both arrive as `{}`,
     which by this module's rules means "answered, found nothing, must be
     scored". Two 17-document runs against LM Studio recorded `{}` for every
-    document because the content came back structurally gutted by an upstream SDK defect, and
+    document because the content came back structurally gutted by the runtime,
+    and
     the report then printed `Agreement: 0/14 fields judged (0%)` — a
     confidently wrong number where an absent one was correct.
 
@@ -471,9 +472,10 @@ def run(
                             # too: an SDK-side failure and an unmeasurable
                             # direct cell are different findings, and reporting
                             # "no captured document text" for a request that WAS
-                            # captured is simply wrong. the upstream SDK defect's empty-content
-                            # surface raises here on every document, which cost
-                            # one 17-document run every row it could have had.
+                            # captured is simply wrong. A local runtime that
+                            # returns empty content makes the SDK raise on every
+                            # document, which cost one 17-document run every row
+                            # it could have had.
                             document_text = _document_text(
                                 proxy.last_request_body or {}
                             )

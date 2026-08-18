@@ -370,7 +370,7 @@ def test_a_raising_sdk_half_still_leaves_the_direct_half_measurable(
 ):
     """A raised SDK exception must not take the direct half down with it.
 
-    That upstream SDK defect surfaces two ways against a local runtime. When the provider returns
+    The underlying runtime defect surfaces two ways. When the provider returns
     mangled content the SDK returns zero fields and the direct half runs
     normally; when it returns EMPTY content the SDK raises
     `VisionAiExtraction: local returned no text content`. The request has
@@ -437,7 +437,7 @@ def test_a_raising_sdk_half_still_leaves_the_direct_half_measurable(
 
 
 # The exact string LM Studio returned for a schema-constrained request with
-# logprobs enabled, per an upstream SDK defect: the model's own words with every grammar-forced
+# logprobs enabled: the model's own words with every grammar-forced
 # span deleted. It is not parseable, and the SDK reported zero fields for it.
 MANGLED_CONTENT = (
     ' "Progress Invoice - Riverside Mixed-Use Development — Phase 2"},'
