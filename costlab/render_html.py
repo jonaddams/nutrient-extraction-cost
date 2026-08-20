@@ -250,9 +250,11 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
     excluded = a.get("ambiguous", 0) + a.get("unanswered", 0)
 
     shown, _ = representative_disagreements(summary["agreement"], limit=1)
+    # Counted across EVERY row, not only the disagreeing ones. Counting
+    # disagreements alone made a run where everything agreed — the best possible
+    # outcome — announce "Zero configurations", which is both false and absurd.
     configurations = max(
-        (len(r["values"]) for r in summary["agreement"] if r.get("state") == "disagreed"),
-        default=0,
+        (len(r["values"]) for r in summary["agreement"]), default=0
     )
 
     spell_h2 = _spellable(configurations, a["fields"], a["disagreed"])
@@ -328,7 +330,7 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
     return f"""
 <section class=band id="agreement">
 <p class=eyebrow>02 — Accuracy</p>
-<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {_plural(a['fields'], 'field', spell=spell_h2)}, {_plural(a['disagreed'], 'disagreement', spell=spell_h2)}</h2>
+<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {_plural(a['fields'], 'field', spell=spell_h2)}, {'no disagreements' if not a['disagreed'] else _plural(a['disagreed'], 'disagreement', spell=spell_h2)}</h2>
 <p class=standfirst>{e(AGREEMENT_FRAMING)}</p>
 <div class=cards>
 <div class='card accent'><span class=figure-xl>{e(rate)}</span>

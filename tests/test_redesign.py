@@ -419,3 +419,28 @@ def test_the_page_has_a_ground_for_its_white_cards_to_sit_on():
 def test_printing_does_not_tint_every_page():
     print_css = brand.asset("print.css")
     assert "background: #fff" in print_css
+
+
+def test_a_run_where_everything_agreed_still_counts_its_configurations():
+    """The best possible outcome must not announce "Zero configurations".
+
+    Counting configurations from disagreeing rows only meant a clean run — every
+    configuration returning the same answer — reported zero of them, which is
+    false and reads as absurd. Configurations are counted across every row.
+    """
+    summary = _two_doc_summary()
+    summary["agreement"] = [{
+        "docId": "alpha", "field": "documentTitle", "state": "agreed",
+        "values": {"bedrock:direct": "same", "bedrock:sdk": "same"},
+    }]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 1, "disagreed": 0, "ambiguous": 0,
+        "unanswered": 0, "rate": 1.0,
+    }
+
+    out = render_html.render(summary)
+    headline = re.findall(r"<h2>(.*?)</h2>", out, re.S)[1]
+
+    assert "Zero configurations" not in headline
+    assert "Two configurations" in headline
+    assert "no disagreements" in headline
