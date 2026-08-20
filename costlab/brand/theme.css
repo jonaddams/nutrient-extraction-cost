@@ -67,29 +67,6 @@ h2 { font-size: 30px; letter-spacing: -0.64px; line-height: 1.05; margin: 0; }
 
 .sub { color: var(--text-neutral-tertiary); max-width: 680px; }
 
-.answer {
-  border: 1px solid var(--border-neutral-default-primary);
-  border-radius: var(--radius-card);
-  padding: 24px 28px;
-  background: var(--bg-neutral-default-primary);
-}
-
-.tiles { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0 8px; }
-.tile {
-  flex: 1 1 200px;
-  border: 1px solid var(--border-neutral-default-primary);
-  border-radius: var(--radius-card);
-  padding: 16px 18px;
-}
-.tile .v { font-size: 26px; font-weight: 440; letter-spacing: -0.64px; }
-.tile .k {
-  font-family: var(--font-semi-mono);
-  text-transform: uppercase;
-  font-size: 12px;
-  letter-spacing: 0.24px;
-  color: var(--text-neutral-tertiary);
-}
-
 table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
 th, td {
   text-align: left;
