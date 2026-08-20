@@ -1,6 +1,6 @@
 import re
 
-from costlab import brand, render_html, report
+from costlab import agreement, brand, render_html, report
 from costlab.prices import PriceTable
 
 
@@ -151,7 +151,14 @@ def test_the_document_is_now_whole():
 
 
 def _dis(doc, values):
-    return {"docId": doc, "field": "documentTitle", "state": "disagreed", "values": values}
+    """Distinct is the comparator's own count, computed here rather than
+    omitted -- `render_html._distinct` now indexes it strictly rather than
+    recomputing it from raw values (see agreement.py's `normalise_values`)."""
+    distinct = len(set(agreement.normalise_values(values).values()))
+    return {
+        "docId": doc, "field": "documentTitle", "state": "disagreed",
+        "values": values, "distinct": distinct,
+    }
 
 
 def test_representative_picks_the_widest_divergence_first():
@@ -193,7 +200,9 @@ def test_every_disagreement_is_listed_not_just_a_sample():
     table = PriceTable(checked_on="2026-08-14", rates={})
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
-    summary["agreement"] = [_dis(f"doc{i}", {"x": "1", "y": f"{i}"}) for i in range(6)]
+    summary["agreement"] = [
+        _dis(f"doc{i}", {"a:direct": "1", "a:sdk": f"{i}"}) for i in range(6)
+    ]
     summary["agreementSummary"] = {
         "fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0,
         "unanswered": 0, "rate": 0.0,
@@ -211,7 +220,7 @@ def test_the_framing_sentence_travels_with_the_disagreements():
     table = PriceTable(checked_on="2026-08-14", rates={})
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
-    summary["agreement"] = [_dis("a", {"x": "1", "y": "2"})]
+    summary["agreement"] = [_dis("a", {"a:direct": "1", "a:sdk": "2"})]
     summary["agreementSummary"] = {
         "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
         "unanswered": 0, "rate": 0.0,
@@ -240,7 +249,7 @@ def test_the_rate_falls_back_for_a_hand_built_summary():
     """
     summary = {
         "agreementSummary": {"fields": 1, "agreed": 1, "disagreed": 1, "ambiguous": 0},
-        "agreement": [_dis("a", {"x": "1", "y": "2"})],
+        "agreement": [_dis("a", {"a:direct": "1", "a:sdk": "2"})],
     }
 
     out = render_html._accuracy_band(summary, lambda s: s)
@@ -317,7 +326,9 @@ def test_the_appendix_carries_every_disagreement():
     table = PriceTable(checked_on="2026-08-14", rates={})
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
-    summary["agreement"] = [_dis(f"doc{i}", {"x": "1", "y": f"{i}"}) for i in range(6)]
+    summary["agreement"] = [
+        _dis(f"doc{i}", {"a:direct": "1", "a:sdk": f"{i}"}) for i in range(6)
+    ]
     summary["agreementSummary"] = {
         "fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0,
         "unanswered": 0, "rate": 0.0,

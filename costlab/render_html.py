@@ -12,7 +12,7 @@ import html as html_mod
 import re
 from typing import Any
 
-from costlab import brand
+from costlab import agreement, brand
 from costlab.report import (
     COORDINATES_CAVEAT,
     OUTPUT_CAVEAT,
@@ -74,21 +74,67 @@ def _plural(n: int, one: str, many: str | None = None, *, spell: bool = False) -
     return f"{count} {one}" if n == 1 else f"{count} {many or one + 's'}"
 
 
+def _money_at_scale(value: float | None) -> str:
+    """Like `_money`, but 2dp at $1 or more.
+
+    `_money`'s fixed 4dp is right for the per-document cent figures it also
+    formats ($0.0037) and false precision for a per-100k-document projection
+    ($367.8000) — a dollar-scale figure does not need ten-thousandths of a
+    cent to be legible. `_money` itself is untouched: the appendix's
+    per-document columns and tests/test_report.py's pins on them depend on
+    its 4dp. This wraps it rather than duplicating its None/formatting rules.
+    """
+    if value is None or abs(value) < 1:
+        return _money(value)
+    return f"${value:,.2f}"
+
+
+def _spread(dmin: int | None, dmax: int | None) -> str:
+    """A per-call range, or the honest single figure when it isn't one.
+
+    "+1,226 to +1,226" is a degenerate range that reads as an error rather
+    than as the strongest fact on the page — a constant that never moved.
+    """
+    if dmin is None:
+        return "n/a"
+    if dmin == dmax:
+        return f"exactly {dmin:+,} on every call"
+    return f"{dmin:+,} to {dmax:+,}"
+
+
 def _distinct(row: dict[str, Any]) -> int:
-    """How many different answers one field actually drew."""
-    return len({str(v) for v in row["values"].values()})
+    """How many different answers one field actually drew.
+
+    The comparator's own count (see agreement.py's module docstring), never a
+    recomputation from the raw values here: `{None, "", "."}` is one shared
+    "no answer", not three distinct strings, and re-deriving that rule a
+    second time in the page is exactly how it would drift from the
+    comparator's. Indexed strictly — a row from `agreement()` always carries
+    this key, and a fixture that omits it describes a state the comparator
+    cannot actually produce.
+    """
+    return row["distinct"]
 
 
 def _by_provider_half(row: dict[str, Any]) -> list[tuple[str, str | None, str | None]]:
     """One entry per provider: (providerId, direct value, sdk value).
 
     Agreement keys are `providerId:half`, so a comparison table is a regroup of
-    what is already there — no new measurement, and nothing inferred.
+    what is already there — no new measurement, and nothing inferred. A key
+    that is not `<provider>:direct` or `<provider>:sdk` is raised on rather
+    than silently dropped: this page exists to not lose measurements, and a
+    half this function cannot place must not quietly vanish into two dashes
+    while the row's own caption still counts it.
     """
     grouped: dict[str, dict[str, Any]] = {}
     for key, value in row["values"].items():
-        provider, _, half = key.rpartition(":")
-        grouped.setdefault(provider or key, {})[half] = value
+        provider, sep, half = key.rpartition(":")
+        if not sep or half not in ("direct", "sdk"):
+            raise ValueError(
+                f"agreement key {key!r} is not '<provider>:direct' or "
+                "'<provider>:sdk' — cannot place it in the comparison table"
+            )
+        grouped.setdefault(provider, {})[half] = value
     return [
         (provider, halves.get("direct"), halves.get("sdk"))
         for provider, halves in sorted(grouped.items())
@@ -97,7 +143,10 @@ def _by_provider_half(row: dict[str, Any]) -> list[tuple[str, str | None, str | 
 
 def _header(summary: dict[str, Any], e) -> str:
     block = summary.get("provenance") or {}
-    documents = block.get("documentCount")
+    # Strict once `block` is known to exist: `provenance.build` always emits
+    # all seven keys, so a present block answering for a missing one would be
+    # a real bug worth a KeyError, not something to paper over with `.get`.
+    documents = block["documentCount"] if block else None
     models = summary["byProvider"]
 
     # Every figure in the standfirst is this run's. The design's own copy said
@@ -177,7 +226,7 @@ def _cost_band(summary: dict[str, Any], e) -> str:
         f"{round(r['deltaInputTokens'] / max(r['documents'], 1)):+,}</span>"
         f"<span class=figure-note>input tokens per document</span></div>"
         f"<div class='card-figure split'><span class=figure-md>"
-        f"{e(_money(r['deltaCostPer100k']))}</span>"
+        f"{e(_money_at_scale(r['deltaCostPer100k']))}</span>"
         f"<span class=figure-note>"
         + ("per 100k documents" if r["deltaCostPer100k"] is not None
            else "no list price confirmed")
@@ -185,7 +234,7 @@ def _cost_band(summary: dict[str, Any], e) -> str:
         for r in rows
     )
     spread = ", ".join(
-        f"{r['label']} {r['deltaMin']:+,} to {r['deltaMax']:+,}"
+        f"{r['label']} {_spread(r['deltaMin'], r['deltaMax'])}"
         for r in rows
         if r["deltaMin"] is not None
     )
@@ -258,24 +307,49 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
     )
 
     spell_h2 = _spellable(configurations, a["fields"], a["disagreed"])
+    # "No disagreements" reads as a clean bill of health -- true when
+    # everything was judged and agreed, false and misleading when nothing
+    # could be judged at all (every row ambiguous or unanswered). The two
+    # cases must not share a headline.
+    if judged == 0:
+        headline_tail = "nothing could be judged"
+        accent_note = "nothing could be judged"
+    else:
+        headline_tail = (
+            "no disagreements" if not a["disagreed"]
+            else _plural(a["disagreed"], "disagreement", spell=spell_h2)
+        )
+        accent_note = f"of judged fields agreed — {a['agreed']} of {judged}"
 
     in_full = ""
     if shown:
         row = shown[0]
+        # The comparator's own normalisation, not `str(a) == str(b)` — the
+        # latter calls "Acme Corp." and "acme corp" a disagreement the
+        # comparator scored as agreement, accusing the SDK of a difference
+        # that was only ever a typography difference. Both an absent value
+        # (None, "", ".") and its raw form are handled through the same
+        # lookup, so a blank answer reads as the em dash it is rather than an
+        # unexplained empty box.
+        normalised = agreement.normalise_values(row["values"])
         cells = ""
         for provider, direct, sdk in _by_provider_half(row):
             cells += f"<div class=p>{e(provider)}</div>"
-            if direct is not None and sdk is not None and str(direct) == str(sdk):
+            direct_norm = normalised.get(f"{provider}:direct", agreement._ABSENT)
+            sdk_norm = normalised.get(f"{provider}:sdk", agreement._ABSENT)
+            direct_shown = "—" if direct_norm is agreement._ABSENT else str(direct)
+            sdk_shown = "—" if sdk_norm is agreement._ABSENT else str(sdk)
+            if direct_norm == sdk_norm:
                 # One box across both columns rather than the same string
                 # printed twice — the reader should see agreement, not repetition.
                 cells += (
-                    f"<div class='val agree'>{e(str(direct))}"
+                    f"<div class='val agree'>{e(direct_shown)}"
                     f"<span class=same-note>both halves identical</span></div>"
                 )
             else:
                 cells += (
-                    f"<div class='val diff'>{e('—' if direct is None else str(direct))}</div>"
-                    f"<div class='val diff'>{e('—' if sdk is None else str(sdk))}</div>"
+                    f"<div class='val diff'>{e(direct_shown)}</div>"
+                    f"<div class='val diff'>{e(sdk_shown)}</div>"
                 )
         in_full = f"""
 <p class=eyebrow>One disagreement in full</p>
@@ -303,7 +377,12 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         the two numbers happen to match.
         """
         distinct, total = _distinct(row), len(row["values"])
-        if distinct == total and total:
+        if total <= 1:
+            # One configuration cannot differ from itself — "1 of 1
+            # configurations differed" is false, not just ungrammatical.
+            noun = "distinct answer" if distinct == 1 else "distinct answers"
+            return f"<strong>{distinct}</strong> {noun}"
+        if distinct == total:
             return f"<strong>{distinct} of {total}</strong> configurations differed"
         return f"<strong>{distinct}</strong> distinct answers"
 
@@ -315,8 +394,11 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
     )
     all_ranked = ""
     if ranked:
+        # "All one, by spread" is ungrammatical -- a single item is not "all"
+        # of anything worth saying so.
+        count_phrase = "The one" if len(ranked) == 1 else f"All {_count(len(ranked))}"
         all_ranked = f"""
-<p class=eyebrow>All {_count(len(ranked))}, by spread</p>
+<p class=eyebrow>{count_phrase}, by spread</p>
 <div class=spread>
 <table>
 <thead><tr><th>document</th><th>field</th><th>distinct answers</th></tr></thead>
@@ -330,11 +412,11 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
     return f"""
 <section class=band id="agreement">
 <p class=eyebrow>02 — Accuracy</p>
-<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {_plural(a['fields'], 'field', spell=spell_h2)}, {'no disagreements' if not a['disagreed'] else _plural(a['disagreed'], 'disagreement', spell=spell_h2)}</h2>
+<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {_plural(a['fields'], 'field', spell=spell_h2)}, {headline_tail}</h2>
 <p class=standfirst>{e(AGREEMENT_FRAMING)}</p>
 <div class=cards>
 <div class='card accent'><span class=figure-xl>{e(rate)}</span>
-<span class=figure-note>of judged fields agreed — {a['agreed']} of {judged}</span></div>
+<span class=figure-note>{accent_note}</span></div>
 <div class=card><span class=figure-xl>{a['disagreed']}</span>
 <span class=figure-note>fields where configurations differed</span></div>
 <div class=card><span class=figure-xl>{excluded}</span>
@@ -471,14 +553,9 @@ def _appendix(summary: dict[str, Any], e) -> str:
         f"<tr><td>{e(r['label'])}</td><td class=n>{r['documents']}</td>"
         f"<td class='n d'>{r['deltaInputTokens']:+,}</td>"
         f"<td class=n>{r['deltaOutputTokens']:+,}</td>"
-        f"<td class=n>"
-        + (
-            f"{r['deltaMin']:+,} to {r['deltaMax']:+,}"
-            if r["deltaMin"] is not None
-            else "n/a"
-        )
-        + f"</td><td class='n d'>{e(_money(r['deltaCostPer100k']))}</td>"
-        f"<td class=n>{e(_money(r['deltaCostPer100kIncludingOutput']))}</td></tr>"
+        f"<td class=n>{e(_spread(r['deltaMin'], r['deltaMax']))}</td>"
+        f"<td class='n d'>{e(_money_at_scale(r['deltaCostPer100k']))}</td>"
+        f"<td class=n>{e(_money_at_scale(r['deltaCostPer100kIncludingOutput']))}</td></tr>"
         for r in summary["byProvider"]
     )
 

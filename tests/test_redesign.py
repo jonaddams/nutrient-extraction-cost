@@ -9,7 +9,9 @@ it did not take.
 
 import re
 
-from costlab import brand, render_html, report
+import pytest
+
+from costlab import agreement, brand, render_html, report
 from costlab.prices import PriceTable
 
 
@@ -95,7 +97,7 @@ def test_the_accuracy_headline_counts_this_run():
     summary = _two_doc_summary()
     summary["agreement"] = [
         {"docId": "alpha", "field": "documentTitle", "state": "disagreed",
-         "values": {"bedrock:direct": "A", "bedrock:sdk": "B"}},
+         "values": {"bedrock:direct": "A", "bedrock:sdk": "B"}, "distinct": 2},
     ]
     summary["agreementSummary"] = {
         "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
@@ -178,7 +180,17 @@ def test_every_internal_link_resolves():
 
 
 def _dis(doc, values, field="documentTitle"):
-    return {"docId": doc, "field": field, "state": "disagreed", "values": values}
+    """A disagreed row shaped the way `agreement()` actually produces one --
+    including `distinct`, computed with the comparator's own
+    `normalise_values` rather than omitted. A fixture missing this key
+    describes a row shape the real comparator can never emit, which is
+    exactly how 29 tests never noticed render_html recomputing `distinct`
+    itself instead of reading the comparator's own count."""
+    distinct = len(set(agreement.normalise_values(values).values()))
+    return {
+        "docId": doc, "field": field, "state": "disagreed", "values": values,
+        "distinct": distinct,
+    }
 
 
 def test_one_disagreement_is_shown_in_full_by_provider_and_half():
@@ -244,8 +256,14 @@ def test_the_excluded_count_is_stated_not_implied():
         "unanswered": 1, "rate": 0.5,
     }
     out = render_html.render(summary)
-    assert "2" in out  # ambiguous + unanswered
-    assert "unjudgeable or unanswered" in out
+    # The rendered phrase itself, not a bare "2" that could match anything on
+    # the page -- the excluded count (ambiguous + unanswered) must be the
+    # number actually printed beside its own label.
+    assert re.search(
+        r"figure-xl>2</span>\s*<span class=figure-note>"
+        r"fields excluded as unjudgeable or unanswered",
+        out,
+    )
 
 
 def test_a_sentence_spells_all_its_numbers_or_none_of_them():
@@ -314,7 +332,10 @@ def test_the_agreement_rate_card_carries_the_accent_fill():
     out = render_html.render(summary)
     assert "<div class='card accent'>" in out
     assert out.count("class='card accent'") == 1, "only the rate card is filled"
-    assert ".card.accent" in out and "--bg-state-warning" in out
+    # The rule itself, not just both strings appearing anywhere on the page
+    # (which would pass even if `--bg-state-warning` were only ever declared
+    # on `:root` and never applied to `.card.accent`).
+    assert re.search(r"\.card\.accent\s*\{[^}]*--bg-state-warning", out)
 
 
 def test_agreeing_halves_are_one_captioned_box_not_the_same_string_twice():
@@ -359,7 +380,9 @@ def test_a_missing_half_still_reads_as_a_difference():
 def test_the_price_note_is_an_accent_panel_with_its_flag_in_code():
     out = render_html.render(_two_doc_summary())
     assert "<div class=price-note>" in out
-    assert ".price-note {" in out and "--bg-state-warning" in out
+    # The rule itself applies the token as a background, not merely both
+    # strings coexisting somewhere on the page.
+    assert re.search(r"\.price-note\s*\{[^}]*--bg-state-warning", out)
 
 
 def test_marking_flags_as_code_cannot_introduce_other_markup():
@@ -444,3 +467,185 @@ def test_a_run_where_everything_agreed_still_counts_its_configurations():
     assert "Zero configurations" not in headline
     assert "Two configurations" in headline
     assert "no disagreements" in headline
+
+
+# --- the page's "distinct" must be the comparator's, not a recomputation ---
+
+
+def test_distinct_is_read_from_the_comparator_never_recomputed():
+    """A row where three configurations answered nothing and one answered
+    "Globex" has TWO distinct answers by the comparator's own rule (every
+    absence is one shared answer) -- not four, which is what counting raw
+    string reprs of None / "" / "." / "Globex" would give."""
+    summary = _two_doc_summary()
+    summary["agreement"] = [
+        _dis("alpha", {
+            "anthropic:direct": None, "anthropic:sdk": "",
+            "openai:direct": ".", "openai:sdk": "Globex",
+        }),
+    ]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
+    out = render_html.render(summary)
+    assert "2 distinct answers across 4 configurations" in out
+    assert "4 distinct answers" not in out
+
+
+def test_render_html_distinct_indexes_the_row_strictly():
+    row = {"values": {"a:direct": "x", "a:sdk": "y"}, "distinct": 2}
+    assert render_html._distinct(row) == 2
+
+    with pytest.raises(KeyError):
+        render_html._distinct({"values": {"a:direct": "x", "a:sdk": "y"}})
+
+
+def test_the_sameness_test_uses_the_comparators_normalisation():
+    """"Acme Corp." and "acme corp" are the same answer by the comparator's
+    own text normalisation -- punctuation and case are typography, not
+    content. Comparing raw strings would render this as the SDK
+    disagreeing with the direct call over nothing."""
+    summary = _two_doc_summary()
+    summary["agreement"] = [
+        _dis("alpha", {
+            "a:direct": "Acme Corp.", "a:sdk": "acme corp",
+            "b:direct": "Globex", "b:sdk": "Globex Inc",
+        }),
+    ]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
+    out = render_html.render(summary)
+    cmp_block = out[out.index("class=cmp-head"):]
+    assert "both halves identical" in cmp_block
+    assert cmp_block.count("class='val agree'") == 1
+    assert cmp_block.count("class='val diff'") == 2
+
+
+# --- nothing judged must not read as a clean bill of health ---------------
+
+
+def test_nothing_judged_says_so_plainly():
+    summary = _two_doc_summary()
+    summary["agreement"] = [
+        {"docId": "alpha", "field": "documentTitle", "state": "ambiguous",
+         "values": {"a:direct": "4/1/2026", "a:sdk": "2026-01-04"}, "distinct": 2},
+    ]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 0, "ambiguous": 1,
+        "unanswered": 0, "rate": None,
+    }
+    out = render_html.render(summary)
+    headline = re.findall(r"<h2>(.*?)</h2>", out, re.S)[1]
+
+    assert "no disagreements" not in headline
+    assert "nothing could be judged" in headline
+    accuracy = out[out.index('id="agreement"'):]
+    card = accuracy[: accuracy.index("card accent") + 400]
+    assert "0 of 0" not in card
+    assert "nothing could be judged" in card
+
+
+# --- an empty string is an absence too, not a blank box --------------------
+
+
+def test_an_empty_string_reads_as_no_answer_not_a_blank_box():
+    summary = _two_doc_summary()
+    summary["agreement"] = [
+        _dis("alpha", {"a:direct": "", "a:sdk": "Meridian"}),
+    ]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
+    out = render_html.render(summary)
+    cmp_block = out[out.index("class=cmp-head"):]
+    assert "<div class='val diff'>—</div>" in cmp_block
+
+
+# --- an unrecognised configuration key must not vanish ---------------------
+
+
+def test_an_unrecognised_half_raises_instead_of_vanishing():
+    with pytest.raises(ValueError):
+        render_html._by_provider_half(
+            {"values": {"a:sdk-retry": "Y"}, "distinct": 1}
+        )
+
+
+# --- singular counts must be grammatical and true ---------------------------
+
+
+def test_a_single_configuration_row_cannot_have_differed():
+    """A row with exactly one configuration cannot report "1 of 1
+    configurations differed" -- there is nothing else it could differ from."""
+    summary = _two_doc_summary()
+    summary["agreement"] = [_dis("solo", {"a:direct": "x"})]
+    summary["agreementSummary"] = {
+        "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
+        "unanswered": 0, "rate": 0.0,
+    }
+    out = render_html.render(summary)
+    assert "1 of 1" not in out
+    assert "<strong>1</strong> distinct answer" in out
+    # a single ranked row reads "The one, by spread", not "All one, by spread"
+    assert "The one, by spread" in out
+    assert "All one" not in out
+
+
+# --- a per-100k figure is dollar-scale, not per-document cents -------------
+
+
+def test_money_at_scale_drops_to_two_decimals_at_a_dollar():
+    assert render_html._money_at_scale(367.8) == "$367.80"
+    assert render_html._money_at_scale(0.0037) == "$0.0037"
+    assert render_html._money_at_scale(None) == "not priced"
+
+
+def test_the_flagship_card_does_not_print_four_decimals_over_a_dollar():
+    table = PriceTable(
+        checked_on="2026-08-14",
+        rates={"bedrock": {"qwen3-vl": {"inputPerMTok": 100.0, "outputPerMTok": 100.0}}},
+    )
+    records = [
+        _rec("alpha", "bedrock", True, 1_000_000),
+        _rec("alpha", "bedrock", False, 600_000),
+    ]
+    summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
+    out = render_html.render(summary)
+    cost = out[out.index('id="cost"'): out.index('id="agreement"')]
+    assert "$4000.0000" not in cost
+    assert re.search(r"\$[\d,]+\.\d{2}<", cost)
+
+
+# --- a degenerate range is a single figure, stated as one -------------------
+
+
+def test_a_zero_spread_states_one_figure_not_a_degenerate_range():
+    assert render_html._spread(1226, 1226) == "exactly +1,226 on every call"
+    assert render_html._spread(1200, 1226) == "+1,200 to +1,226"
+    assert render_html._spread(None, None) == "n/a"
+
+
+# --- the printed appendix must actually be revealed -------------------------
+
+
+def test_print_css_reveals_closed_details_content():
+    print_css = brand.asset("print.css")
+    assert "details::details-content" in print_css
+    assert "content-visibility: visible" in print_css
+
+
+def test_theme_css_has_no_orphaned_tile_or_answer_rules():
+    theme_css = brand.asset("theme.css")
+    assert ".tile {" not in theme_css
+    assert ".answer {" not in theme_css
+
+
+def test_print_css_break_rules_name_live_classes():
+    print_css = brand.asset("print.css")
+    assert ".tile" not in print_css
+    for live_class in (".card", ".caveat", ".cmp", "details.group", ".prov-cell"):
+        assert live_class in print_css
