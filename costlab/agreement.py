@@ -241,6 +241,39 @@ def _field_sets(
     }
 
 
+def normalise_values(values: dict[str, Any]) -> dict[str, Any]:
+    """Map each cell in a row's `values` to the canonical answer it stands
+    for -- the same collapsing `distinct` counts by. Two cells map to the
+    same result exactly when the comparator calls them the same answer:
+    every absent value (None, "", a punctuation placeholder like ".")
+    collapses to the shared _ABSENT marker, and every present value
+    normalises the row's chosen way -- the parsed number when every present
+    value in the row looks numeric, otherwise the same text normalisation
+    compare_field itself applies.
+
+    Exported so a caller outside this module (render_html, when it decides
+    whether two cells "read as the same answer") uses the identical rule
+    `distinct` was counted with, rather than writing a second, driftable
+    definition of sameness -- see the module docstring's `distinct`
+    paragraph for why a second definition of "the same answer" is exactly
+    how this class of defect keeps recurring.
+    """
+    present_values = [v for v in values.values() if not _is_absent(v)]
+    type_ = (
+        "number"
+        if present_values and all(_looks_numeric(v) for v in present_values)
+        else "string"
+    )
+    return {
+        key: (
+            _ABSENT
+            if _is_absent(v)
+            else (_to_number(v) if type_ == "number" else _normalise_text(_js_string(v)))
+        )
+        for key, v in values.items()
+    }
+
+
 def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_doc: dict[str, list[tuple[str, dict[str, Any]]]] = {}
     for record in records:
@@ -360,13 +393,7 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             # always a float; a normalised present string is never empty,
             # since emptiness after normalisation is exactly the absence
             # test above), so the count is unambiguous.
-            normalised = {
-                _ABSENT
-                if _is_absent(v)
-                else (_to_number(v) if type_ == "number" else _normalise_text(_js_string(v)))
-                for v in values.values()
-            }
-            distinct = len(normalised)
+            distinct = len(set(normalise_values(values).values()))
 
             rows.append(
                 {

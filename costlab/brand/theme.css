@@ -29,15 +29,18 @@
 
 body {
   margin: 0;
-  padding: 40px 32px 64px;
-  background: var(--bg-neutral-default-primary);
+  padding: 56px 32px 96px;
+  /* Warm paper, not white: the cards, panels and provenance cells are white and
+     need a ground to sit on. On a white page they read as floating outlines. */
+  background: var(--bg-neutral-default-secondary);
   color: var(--text-neutral-primary);
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.55;
+  text-wrap: pretty;
 }
 
-.wrap { max-width: 1100px; margin: 0 auto; }
+.wrap { max-width: 1040px; margin: 0 auto; }
 
 /* Headings: variable weight 440 with negative tracking and line-height 1, per
    the design system's rules of thumb. */
@@ -46,8 +49,8 @@ h1, h2 {
   line-height: 1;
   margin: 0 0 12px;
 }
-h1 { font-size: 34px; letter-spacing: -0.96px; }
-h2 { font-size: 22px; letter-spacing: -0.48px; margin-top: 40px; }
+h1 { font-size: 46px; letter-spacing: -0.96px; line-height: 1.02; max-width: 20ch; }
+h2 { font-size: 30px; letter-spacing: -0.64px; line-height: 1.05; margin: 0; }
 
 /* Supertitles: semi-mono uppercase 12px, +0.24px tracking. */
 .supertitle {
@@ -63,29 +66,6 @@ h2 { font-size: 22px; letter-spacing: -0.48px; margin-top: 40px; }
 .logo svg { height: 28px; width: auto; display: block; }
 
 .sub { color: var(--text-neutral-tertiary); max-width: 680px; }
-
-.answer {
-  border: 1px solid var(--border-neutral-default-primary);
-  border-radius: var(--radius-card);
-  padding: 24px 28px;
-  background: var(--bg-neutral-default-primary);
-}
-
-.tiles { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0 8px; }
-.tile {
-  flex: 1 1 200px;
-  border: 1px solid var(--border-neutral-default-primary);
-  border-radius: var(--radius-card);
-  padding: 16px 18px;
-}
-.tile .v { font-size: 26px; font-weight: 440; letter-spacing: -0.64px; }
-.tile .k {
-  font-family: var(--font-semi-mono);
-  text-transform: uppercase;
-  font-size: 12px;
-  letter-spacing: 0.24px;
-  color: var(--text-neutral-tertiary);
-}
 
 table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
 th, td {
@@ -140,3 +120,282 @@ footer {
   color: var(--text-neutral-tertiary);
   font-size: 13px;
 }
+
+
+/* ---- Canvas redesign components ------------------------------------------
+   Translated from the Claude Design artboard (branded-report/). The artboard
+   uses inline styles; these are the same values as classes, so the renderer
+   stays readable and a brand change remains one file. */
+
+.eyebrow {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+  margin: 0;
+}
+
+.standfirst { max-width: 68ch; color: var(--text-neutral-tertiary); margin: 0; }
+
+/* Sections are rules across the page, numbered by their eyebrow. */
+section.band {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 48px 0 8px;
+  margin-top: 40px;
+  border-top: 1px solid var(--border-neutral-default-secondary);
+}
+
+/* Provenance: a hairline grid, one cell per fact. */
+.prov-grid {
+  display: grid;
+  /* Fixed four columns rather than auto-fit: the two long facts span two
+     columns each, so the six cells tile a 4-wide grid exactly. With auto-fit
+     an awkward container width leaves a column unfilled, and because the grid's
+     own background is the hairline colour, that gap renders as a grey block. */
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border-neutral-default-secondary);
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  margin: 40px 0 56px;
+}
+.prov-cell.wide { grid-column: span 2; }
+
+@media (max-width: 900px) {
+  .prov-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .prov-grid { grid-template-columns: 1fr; }
+  .prov-cell.wide { grid-column: span 1; }
+}
+.prov-cell {
+  background: var(--bg-neutral-default-primary);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prov-k {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+}
+.prov-v { font-size: 14px; }
+.prov-v.mono { font-family: var(--font-mono); font-size: 13px; }
+
+/* Cards: one per model in the cost band, one per statistic in accuracy. */
+.cards { display: flex; flex-wrap: wrap; gap: 16px; }
+.card {
+  flex: 1 1 200px;
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* The headline statistic carries the accent fill and drops its border, the
+   way the artboard has it — one card in colour, the rest plain, so the eye
+   lands on the agreement rate first. The token is the same warm yellow the
+   warning notices use. */
+.card.accent {
+  background: var(--bg-state-warning);
+  border-color: transparent;
+}
+.card.accent .figure-note { color: var(--text-neutral-primary); }
+
+.card-model {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+}
+.card-figure { display: flex; flex-direction: column; gap: 2px; }
+.card-figure.split { padding-top: 14px; border-top: 1px solid var(--border-neutral-default-primary); }
+.figure-lg {
+  font-size: 34px;
+  font-weight: 440;
+  letter-spacing: -0.8px;
+  line-height: 1;
+  font-family: var(--font-mono);
+}
+.figure-xl {
+  font-size: 40px;
+  font-weight: 440;
+  letter-spacing: -0.96px;
+  line-height: 1;
+  font-family: var(--font-mono);
+}
+.figure-md {
+  font-size: 20px;
+  font-weight: 440;
+  letter-spacing: -0.48px;
+  font-family: var(--font-mono);
+}
+.figure-note { font-size: 13px; color: var(--text-neutral-tertiary); }
+
+/* One disagreement, shown in full: provider down the side, halves across. */
+.cmp {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cmp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.cmp-doc { font-family: var(--font-mono); font-size: 15px; }
+.pill {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.cmp-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr;
+  gap: 8px 12px;
+  align-items: stretch;
+  font-size: 13px;
+}
+.cmp-grid .h {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+}
+.cmp-grid .p { font-size: 13px; padding-top: 8px; color: var(--text-neutral-tertiary); }
+
+/* Each returned value sits in its own tinted box, so "these two differ" is
+   visible at a glance instead of requiring the reader to compare two
+   paragraphs word by word — which is the entire argument of this section. */
+.val {
+  background: var(--bg-neutral-default-secondary);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.45;
+}
+/* A differing pair carries the error edge. Not because either value is wrong —
+   we cannot know that without a citation — but because they cannot both be
+   right, which is the finding. */
+.val.diff { border-left: 2px solid var(--bg-state-error); border-radius: 4px 12px 12px 4px; }
+/* Halves that agree are one box across both columns, captioned, rather than
+   the same string printed twice. */
+.val.agree { grid-column: span 2; }
+.val .same-note {
+  display: block;
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.24px;
+  color: hsla(32, 10%, 49%, 1);
+  margin-top: 6px;
+}
+
+/* Caveats: numbered, titled, body unchanged. */
+.caveat {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 260px;
+}
+.caveat-n {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-neutral-tertiary);
+}
+.caveat p { margin: 0; font-size: 14px; color: var(--text-neutral-tertiary); }
+
+/* Appendix panels. */
+details.panel {
+  background: var(--bg-neutral-default-primary);
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  margin: 0;
+}
+details.panel > summary { font-size: 17px; font-weight: 440; letter-spacing: -0.24px; }
+.group-head {
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  margin: 18px 0 0;
+}
+
+/* The ranked-disagreement table. The artboard builds this from nested grids;
+   a real <table> is kept instead — screen readers announce the header
+   relationships, and it prints as a table rather than as loose divs — styled
+   to land in the same place. */
+.spread {
+  border: 1px solid var(--border-neutral-default-secondary);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.spread table { width: 100%; border-collapse: collapse; margin: 0; font-size: 13px; }
+.spread thead th {
+  background: var(--bg-neutral-default-tertiary);
+  font-family: var(--font-semi-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.24px;
+  color: var(--text-neutral-tertiary);
+  font-weight: normal;
+  text-align: left;
+  padding: 12px 20px;
+  border: 0;
+}
+.spread td { padding: 12px 20px; border: 0; border-top: 1px solid var(--border-neutral-default-secondary); }
+.spread td.doc { font-family: var(--font-mono); }
+.spread td.field { color: var(--text-neutral-tertiary); }
+.spread td.count strong { font-weight: 440; }
+
+/* The price note earns the accent fill: every dollar figure on the page is
+   computed from this table, so the conditions under which those rates hold —
+   an introductory rate that expires, partner pricing that is not
+   interchangeable — belong somewhere a reader cannot skim past. */
+.price-note {
+  background: var(--bg-state-warning);
+  border-radius: var(--radius-card);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.price-note .eyebrow { color: var(--text-neutral-primary); }
+.price-note p { margin: 0; font-size: 14px; max-width: 78ch; }
+.price-note code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 440;
+}
+
+/* Per-model groups inside Appendix A, nested and collapsed: opening A should
+   answer "which models, and what was each one's constant" before it offers
+   fifty-one rows. */
+details.group { border-top: 1px solid var(--border-neutral-default-secondary); padding-top: 14px; margin-top: 14px; }
+details.group > summary { display: list-item; list-style-position: outside; margin-left: 16px; }
+.group-id { font-family: var(--font-mono); font-size: 14px; margin-right: 10px; }
+.group-meta { font-size: 13px; color: var(--text-neutral-tertiary); }

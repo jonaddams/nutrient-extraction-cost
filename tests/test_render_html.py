@@ -1,6 +1,6 @@
 import re
 
-from costlab import brand, render_html, report
+from costlab import agreement, brand, render_html, report
 from costlab.prices import PriceTable
 
 
@@ -60,7 +60,7 @@ def test_it_is_a_complete_document():
 
 def test_the_answer_band_leads_with_the_per_model_constant():
     out = render_html.render(_summary())
-    assert out.index("Nutrient SDK overhead") < out.index('id="appendix"')
+    assert out.index('id="cost"') < out.index('id="appendix"')
 
 
 def test_the_answer_band_says_so_when_there_is_no_delta_to_report():
@@ -77,9 +77,9 @@ def test_the_answer_band_says_so_when_there_is_no_delta_to_report():
     out = render_html.render(summary)
 
     assert "no delta to report" in out
-    answer_section = out[out.index("<section class=answer>") : out.index("</section>")]
-    assert "<table>" not in answer_section
-    assert "<div class=tiles>" not in answer_section
+    cost_band = out[out.index('id="cost"') : out.index("</section>")]
+    assert "<table>" not in cost_band
+    assert "<div class=cards>" not in cost_band
 
 
 def test_the_headline_figure_is_rounded_and_labelled_per_document():
@@ -99,7 +99,8 @@ def test_the_headline_figure_is_rounded_and_labelled_per_document():
 
     out = render_html.render(summary)
 
-    assert "+470 tokens per document" in out
+    assert "+470" in out
+    assert "input tokens per document" in out
     assert "+469 tokens per document" not in out
 
 
@@ -150,7 +151,14 @@ def test_the_document_is_now_whole():
 
 
 def _dis(doc, values):
-    return {"docId": doc, "field": "documentTitle", "state": "disagreed", "values": values}
+    """Distinct is the comparator's own count, computed here rather than
+    omitted -- `render_html._distinct` now indexes it strictly rather than
+    recomputing it from raw values (see agreement.py's `normalise_values`)."""
+    distinct = len(set(agreement.normalise_values(values).values()))
+    return {
+        "docId": doc, "field": "documentTitle", "state": "disagreed",
+        "values": values, "distinct": distinct,
+    }
 
 
 def test_representative_picks_the_widest_divergence_first():
@@ -180,28 +188,39 @@ def test_agreed_rows_are_never_offered_as_disagreements():
     assert omitted == 0
 
 
-def test_the_summary_says_how_many_disagreements_it_is_not_showing():
-    """A selection rule that quietly hid the least flattering disagreement would
-    be exactly the dishonesty this project keeps finding."""
+def test_every_disagreement_is_listed_not_just_a_sample():
+    """Supersedes the old omitted-count test, and asserts something stronger.
+
+    The previous layout showed three disagreements and stated how many it was
+    hiding; the redesign ranks every one of them by spread, so there is nothing
+    left to hide. If a future change reintroduces truncation, this fails —
+    which is the point, because a selection rule that quietly dropped the least
+    flattering row is exactly the dishonesty this project keeps finding.
+    """
     table = PriceTable(checked_on="2026-08-14", rates={})
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
-    summary["agreement"] = [_dis(f"doc{i}", {"x": "1", "y": f"{i}"}) for i in range(6)]
+    summary["agreement"] = [
+        _dis(f"doc{i}", {"a:direct": "1", "a:sdk": f"{i}"}) for i in range(6)
+    ]
     summary["agreementSummary"] = {
         "fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0,
         "unanswered": 0, "rate": 0.0,
     }
 
     out = render_html.render(summary)
+    ranked = out[out.index("by spread"):]
 
-    assert "3 more" in out
+    for i in range(6):
+        assert f"doc{i}" in ranked, f"doc{i} is missing from the ranked list"
+    assert "All six, by spread" in out  # spelled, like every small count in prose
 
 
 def test_the_framing_sentence_travels_with_the_disagreements():
     table = PriceTable(checked_on="2026-08-14", rates={})
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
-    summary["agreement"] = [_dis("a", {"x": "1", "y": "2"})]
+    summary["agreement"] = [_dis("a", {"a:direct": "1", "a:sdk": "2"})]
     summary["agreementSummary"] = {
         "fields": 1, "agreed": 0, "disagreed": 1, "ambiguous": 0,
         "unanswered": 0, "rate": 0.0,
@@ -230,7 +249,7 @@ def test_the_rate_falls_back_for_a_hand_built_summary():
     """
     summary = {
         "agreementSummary": {"fields": 1, "agreed": 1, "disagreed": 1, "ambiguous": 0},
-        "agreement": [_dis("a", {"x": "1", "y": "2"})],
+        "agreement": [_dis("a", {"a:direct": "1", "a:sdk": "2"})],
     }
 
     out = render_html._accuracy_band(summary, lambda s: s)
@@ -290,7 +309,7 @@ def test_unmeasurable_and_retried_notices_are_in_the_summary():
 def test_the_appendix_holds_the_per_document_table():
     out = render_html.render(_summary())
     appendix = out[out.index('id="appendix"'):]
-    assert 'id="per-document"' in appendix
+    assert 'id="appendix-a"' in appendix
     assert "sdkInputTokens" not in appendix  # keys are not rendered, values are
     assert "1,000" in appendix and "600" in appendix
 
@@ -307,14 +326,16 @@ def test_the_appendix_carries_every_disagreement():
     table = PriceTable(checked_on="2026-08-14", rates={})
     records = [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
-    summary["agreement"] = [_dis(f"doc{i}", {"x": "1", "y": f"{i}"}) for i in range(6)]
+    summary["agreement"] = [
+        _dis(f"doc{i}", {"a:direct": "1", "a:sdk": f"{i}"}) for i in range(6)
+    ]
     summary["agreementSummary"] = {
         "fields": 6, "agreed": 0, "disagreed": 6, "ambiguous": 0,
         "unanswered": 0, "rate": 0.0,
     }
 
     appendix = render_html.render(summary)
-    appendix = appendix[appendix.index('id="disagreements"'):]
+    appendix = appendix[appendix.index('id="appendix-c"'):]
 
     for i in range(6):
         assert f"doc{i}" in appendix

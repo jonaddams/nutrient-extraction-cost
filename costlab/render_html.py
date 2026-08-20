@@ -9,10 +9,17 @@ the answer.
 from __future__ import annotations
 
 import html as html_mod
+import re
 from typing import Any
 
-from costlab import brand
-from costlab.report import _money
+from costlab import agreement, brand
+from costlab.report import (
+    COORDINATES_CAVEAT,
+    OUTPUT_CAVEAT,
+    THINKING_CAVEAT,
+    TOKENIZER_CAVEAT,
+    _money,
+)
 
 # No figures here: this sentence is read on every run, including a prospect's
 # own, and the tables above are the only place on the page allowed to state a
@@ -27,29 +34,173 @@ PER_MODEL_NOTE = (
 )
 
 
-def _provenance_table(block: dict[str, Any] | None, e) -> str:
-    """The run's provenance, named plainly enough to be checked by a reader.
+CAVEAT_TITLES = {
+    COORDINATES_CAVEAT: "The delta is not waste",
+    OUTPUT_CAVEAT: "Output tokens are not comparable",
+    TOKENIZER_CAVEAT: "Tokens do not compare across providers",
+    THINKING_CAVEAT: "Thinking tokens are billed as output",
+}
 
-    Returns "" when no provenance was recorded — an older or synthetic summary
-    should not render a table of blanks.
+
+_WORDS = (
+    "zero one two three four five six seven eight nine ten eleven twelve "
+    "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty"
+).split()
+
+
+def _count(n: int) -> str:
+    """A bare count, spelled when small — "All seven", "All 240"."""
+    return _WORDS[n] if _spellable(n) else f"{n:,}"
+
+
+def _spellable(*counts: int) -> bool:
+    """True only when EVERY count in one sentence can be a word."""
+    return all(0 <= n < len(_WORDS) for n in counts)
+
+
+def _plural(n: int, one: str, many: str | None = None, *, spell: bool = False) -> str:
+    """A counted noun. `spell` writes small numbers as words.
+
+    The design's prose reads "Seventeen documents, three models" — words in
+    sentences, digits in tables and figures. Spelling is cosmetic, so it is
+    opt-in and never reaches a measurement: cards, tiles and table cells always
+    print the numeral.
+
+    Use `_spellable` to decide for a whole sentence rather than per number.
+    Spelling one count and not its neighbour ("17 documents, three models")
+    reads worse than either choice made consistently.
     """
-    if not block:
-        return ""
-    models = ", ".join(
-        f"{m['providerId']} / {m['model']}" for m in block["models"]
-    ) or "not recorded"
-    rows = [
-        ("Documents run", f"{block['documentCount']} from {block['corpusName']}"),
-        ("Models compared", models),
-        ("Credentials used", ", ".join(block["keySources"])),
-        ("Run", block["runDate"]),
-        ("Price table checked", block["priceTableDate"]),
-        ("Tool version", block["toolVersion"] or "not recorded"),
+    count = _WORDS[n] if spell and n < len(_WORDS) else f"{n:,}"
+    return f"{count} {one}" if n == 1 else f"{count} {many or one + 's'}"
+
+
+def _money_at_scale(value: float | None) -> str:
+    """Like `_money`, but 2dp at $1 or more.
+
+    `_money`'s fixed 4dp is right for the per-document cent figures it also
+    formats ($0.0037) and false precision for a per-100k-document projection
+    ($367.8000) — a dollar-scale figure does not need ten-thousandths of a
+    cent to be legible. `_money` itself is untouched: the appendix's
+    per-document columns and tests/test_report.py's pins on them depend on
+    its 4dp. This wraps it rather than duplicating its None/formatting rules.
+    """
+    if value is None or abs(value) < 1:
+        return _money(value)
+    return f"${value:,.2f}"
+
+
+def _spread(dmin: int | None, dmax: int | None) -> str:
+    """A per-call range, or the honest single figure when it isn't one.
+
+    "+1,226 to +1,226" is a degenerate range that reads as an error rather
+    than as the strongest fact on the page — a constant that never moved.
+    """
+    if dmin is None:
+        return "n/a"
+    if dmin == dmax:
+        return f"exactly {dmin:+,} on every call"
+    return f"{dmin:+,} to {dmax:+,}"
+
+
+def _distinct(row: dict[str, Any]) -> int:
+    """How many different answers one field actually drew.
+
+    The comparator's own count (see agreement.py's module docstring), never a
+    recomputation from the raw values here: `{None, "", "."}` is one shared
+    "no answer", not three distinct strings, and re-deriving that rule a
+    second time in the page is exactly how it would drift from the
+    comparator's. Indexed strictly — a row from `agreement()` always carries
+    this key, and a fixture that omits it describes a state the comparator
+    cannot actually produce.
+    """
+    return row["distinct"]
+
+
+def _by_provider_half(row: dict[str, Any]) -> list[tuple[str, str | None, str | None]]:
+    """One entry per provider: (providerId, direct value, sdk value).
+
+    Agreement keys are `providerId:half`, so a comparison table is a regroup of
+    what is already there — no new measurement, and nothing inferred. A key
+    that is not `<provider>:direct` or `<provider>:sdk` is raised on rather
+    than silently dropped: this page exists to not lose measurements, and a
+    half this function cannot place must not quietly vanish into two dashes
+    while the row's own caption still counts it.
+    """
+    grouped: dict[str, dict[str, Any]] = {}
+    for key, value in row["values"].items():
+        provider, sep, half = key.rpartition(":")
+        if not sep or half not in ("direct", "sdk"):
+            raise ValueError(
+                f"agreement key {key!r} is not '<provider>:direct' or "
+                "'<provider>:sdk' — cannot place it in the comparison table"
+            )
+        grouped.setdefault(provider, {})[half] = value
+    return [
+        (provider, halves.get("direct"), halves.get("sdk"))
+        for provider, halves in sorted(grouped.items())
     ]
-    body = "\n".join(
-        f"<tr><td>{e(k)}</td><td>{e(str(v))}</td></tr>" for k, v in rows
-    )
-    return f"<table class=prov>{body}</table>"
+
+
+def _header(summary: dict[str, Any], e) -> str:
+    block = summary.get("provenance") or {}
+    # Strict once `block` is known to exist: `provenance.build` always emits
+    # all seven keys, so a present block answering for a missing one would be
+    # a real bug worth a KeyError, not something to paper over with `.get`.
+    documents = block["documentCount"] if block else None
+    models = summary["byProvider"]
+
+    # Every figure in the standfirst is this run's. The design's own copy said
+    # "Seventeen documents, three models" — true of the run it was drawn from,
+    # false of a prospect's, and asserting it would repeat the defect this
+    # project has now fixed nine times.
+    if documents and models:
+        spell = _spellable(documents, len(models))
+        stand = (
+            f"{_plural(documents, 'document', spell=spell).capitalize()}, "
+            f"{_plural(len(models), 'model', spell=spell)}, "
+            "each run twice: once through the Nutrient SDK and once as a direct "
+            "model call. The SDK's token overhead is a constant per call, and "
+            "the two halves do not return the same thing."
+        )
+    else:
+        stand = (
+            "Each document is run twice: once through the Nutrient SDK and once "
+            "as a direct model call. The SDK's token overhead is a constant per "
+            "call, and the two halves do not return the same thing."
+        )
+
+    cells = ""
+    if block:
+        model_list = " · ".join(
+            f"{m['providerId']} / {m['model']}" for m in block.get("models", [])
+        )
+        # (label, value, monospace?, spans two columns?) — machine-shaped values
+        # are set in mono, the way the design does; the two long facts span two
+        # columns so the six cells tile the four-column grid exactly.
+        facts = [
+            ("Documents run", f"{block['documentCount']} from {block['corpusName']}", False, False),
+            ("Run", block["runDate"], True, False),
+            ("Price table checked", block["priceTableDate"], True, False),
+            ("Tool version", f"nutrient-extraction-cost {block['toolVersion']}", True, False),
+            ("Models compared", model_list or "not recorded", True, True),
+            ("Credentials used", " · ".join(block["keySources"]), True, True),
+        ]
+        cells = "\n".join(
+            f"<div class='prov-cell{' wide' if wide else ''}'>"
+            f"<span class=prov-k>{e(k)}</span>"
+            f"<span class='prov-v{' mono' if mono else ''}'>{e(str(v))}</span></div>"
+            for k, v, mono, wide in facts
+        )
+        cells = f"<div class=prov-grid>{cells}</div>"
+
+    return f"""
+<header>
+<p class=eyebrow>Extraction cost and accuracy · measured run</p>
+<h1>What document extraction costs, with and without the Nutrient SDK</h1>
+<p class=standfirst>{e(stand)}</p>
+</header>
+{cells}
+"""
 
 
 NO_DELTA_NOTE = (
@@ -58,65 +209,54 @@ NO_DELTA_NOTE = (
 )
 
 
-def _answer_band(summary: dict[str, Any], e) -> str:
-    """Band 1: the answer, before any of the supporting detail.
-
-    One tile per model with its per-call constant and cost per 100k, then a
-    table with the per-call spread, then the sentence that keeps a reader from
-    generalising the constant to a sibling model, then a pointer down to the
-    full per-document detail — safe to add only now that Task 8 gives
-    `#appendix` a target to land on.
-
-    When `byProvider` is empty — no document produced both an SDK and a direct
-    cell — the tiles and table would render as an empty shell that still reads
-    as though it answered something. Render a plain statement instead: this
-    page has already fixed multiple defects where an absent measurement was
-    printed as though it were a zero or a real figure.
-    """
-    if not summary["byProvider"]:
+def _cost_band(summary: dict[str, Any], e) -> str:
+    rows = summary["byProvider"]
+    if not rows:
         return f"""
-<section class=answer>
-<p class=supertitle>Nutrient SDK overhead</p>
-<p class=sub>{e(NO_DELTA_NOTE)}</p>
+<section class=band id="cost">
+<p class=eyebrow>01 — Cost</p>
+<h2>No paired measurement in this run</h2>
+<p class=standfirst>{e(NO_DELTA_NOTE)}</p>
 </section>
 """
-    tiles = "\n".join(
-        f"<div class=tile><div class=k>{e(r['label'])}</div>"
-        f"<div class=v>{round(r['deltaInputTokens'] / max(r['documents'], 1)):+,} tokens per document</div>"
-        f"<div class=k>{e(_money(r['deltaCostPer100k']))} per 100k docs</div></div>"
-        for r in summary["byProvider"]
+
+    cards = "\n".join(
+        f"<div class=card><span class=card-model>{e(r['label'])}</span>"
+        f"<div class=card-figure><span class=figure-lg>"
+        f"{round(r['deltaInputTokens'] / max(r['documents'], 1)):+,}</span>"
+        f"<span class=figure-note>input tokens per document</span></div>"
+        f"<div class='card-figure split'><span class=figure-md>"
+        f"{e(_money_at_scale(r['deltaCostPer100k']))}</span>"
+        f"<span class=figure-note>"
+        + ("per 100k documents" if r["deltaCostPer100k"] is not None
+           else "no list price confirmed")
+        + "</span></div></div>"
+        for r in rows
     )
-    prov_rows = "\n".join(
-        f"<tr><td>{e(r['label'])}</td><td class=n>{r['documents']}</td>"
-        f"<td class='n d'>"
-        + (
-            f"{r['deltaMin']:+,} to {r['deltaMax']:+,}"
-            if r["deltaMin"] is not None
-            else "n/a"
-        )
-        + f"</td><td class='n d'>{e(_money(r['deltaCostPer100k']))}</td></tr>"
-        for r in summary["byProvider"]
+    spread = ", ".join(
+        f"{r['label']} {_spread(r['deltaMin'], r['deltaMax'])}"
+        for r in rows
+        if r["deltaMin"] is not None
     )
     return f"""
-<section class=answer>
-<p class=supertitle>Nutrient SDK overhead</p>
-<div class=tiles>
-{tiles}
+<section class=band id="cost">
+<p class=eyebrow>01 — Cost</p>
+<h2>The SDK adds a fixed number of input tokens per call</h2>
+<p class=standfirst>The overhead is the same on the smallest document and the
+largest. It is a constant per model, not a percentage of the document, so it
+matters most on short documents and fades on long ones. Per-call spread across
+this run: {e(spread or "not measurable")}.</p>
+<div class=cards>
+{cards}
 </div>
-<table>
-<thead><tr><th>model</th><th class=n>documents measured</th><th class=n>per-call spread</th>
-<th class=n>cost per 100k docs (input)</th></tr></thead>
-{prov_rows}
-</table>
-<p class=sub>{e(PER_MODEL_NOTE)}</p>
-<p class=sub>Full per-document detail is in the
-<a href="#appendix">appendix</a>.</p>
+<p class=standfirst>{e(PER_MODEL_NOTE)} Per-document detail is in
+<a href="#appendix-a">Appendix A</a>; provider totals in
+<a href="#appendix-b">Appendix B</a>.</p>
 </section>
 """
 
 
 AGREEMENT_FRAMING = (
-    "Each row is a field where two configurations returned different answers. "
     "Looking at two values, you cannot tell which is right without a citation "
     "back to the page — and a citation is exactly what the grounded half "
     "returns and the direct half does not. Agreement is agreement, not "
@@ -131,10 +271,8 @@ def representative_disagreements(
 
     Deterministic by construction: most distinct values, then the widest
     character span between the shortest and longest value, then docId, then
-    field — two disagreements from the same document differing only by field
-    must not fall back to input order, which this function's caller does not
-    control. The appendix always carries the complete list and the summary
-    always states the omitted count — a rule that happened to hide the least
+    field. The appendix always carries the complete list and the summary always
+    states the omitted count — a rule that happened to hide the least
     flattering disagreement would be precisely the quiet dishonesty this tool
     exists to remove.
     """
@@ -150,14 +288,6 @@ def representative_disagreements(
 
 
 def _accuracy_band(summary: dict[str, Any], e) -> str:
-    """Band 2: the agreement rate and a representative sample of disagreements.
-
-    Reuses `agreementSummary["rate"]` when present rather than recomputing
-    agreed/judged — this project has already fixed six defects that were
-    exactly two definitions of the same number disagreeing with each other.
-    Guarded on `"rate" in a`, never on truthiness, because a measured rate of
-    0.0 is real and must not be treated as absent.
-    """
     a = summary["agreementSummary"]
     if not a["fields"]:
         return ""
@@ -165,45 +295,160 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
     if "rate" in a:
         rate = "not comparable" if a["rate"] is None else f"{a['rate']:.0%}"
     else:
-        rate = f"{a['agreed'] / judged:.0%}" if judged else "n/a"
-    chosen, omitted = representative_disagreements(summary["agreement"])
-    rows = "\n".join(
-        f"<tr><td>{e(r['docId'])}</td><td>{e(r['field'])}</td>"
-        f"<td class=v>{e(', '.join(f'{k}={v!r}' for k, v in sorted(r['values'].items())))}</td></tr>"
-        for r in chosen
+        rate = f"{a['agreed'] / judged:.0%}" if judged else "not comparable"
+    excluded = a.get("ambiguous", 0) + a.get("unanswered", 0)
+
+    shown, _ = representative_disagreements(summary["agreement"], limit=1)
+    # Counted across EVERY row, not only the disagreeing ones. Counting
+    # disagreements alone made a run where everything agreed — the best possible
+    # outcome — announce "Zero configurations", which is both false and absurd.
+    configurations = max(
+        (len(r["values"]) for r in summary["agreement"]), default=0
     )
-    more = (
-        f'<p class=sub>{omitted} more disagreement(s) are listed in full in the '
-        '<a href="#disagreements">appendix</a>.</p>'
-        if omitted
-        else ""
+
+    spell_h2 = _spellable(configurations, a["fields"], a["disagreed"])
+    # "No disagreements" reads as a clean bill of health -- true when
+    # everything was judged and agreed, false and misleading when nothing
+    # could be judged at all (every row ambiguous or unanswered). The two
+    # cases must not share a headline.
+    if judged == 0:
+        headline_tail = "nothing could be judged"
+        accent_note = "nothing could be judged"
+    else:
+        headline_tail = (
+            "no disagreements" if not a["disagreed"]
+            else _plural(a["disagreed"], "disagreement", spell=spell_h2)
+        )
+        accent_note = f"of judged fields agreed — {a['agreed']} of {judged}"
+
+    in_full = ""
+    if shown:
+        row = shown[0]
+        # The comparator's own normalisation, not `str(a) == str(b)` — the
+        # latter calls "Acme Corp." and "acme corp" a disagreement the
+        # comparator scored as agreement, accusing the SDK of a difference
+        # that was only ever a typography difference. Both an absent value
+        # (None, "", ".") and its raw form are handled through the same
+        # lookup, so a blank answer reads as the em dash it is rather than an
+        # unexplained empty box.
+        normalised = agreement.normalise_values(row["values"])
+        cells = ""
+        for provider, direct, sdk in _by_provider_half(row):
+            cells += f"<div class=p>{e(provider)}</div>"
+            direct_norm = normalised.get(f"{provider}:direct", agreement._ABSENT)
+            sdk_norm = normalised.get(f"{provider}:sdk", agreement._ABSENT)
+            direct_shown = "—" if direct_norm is agreement._ABSENT else str(direct)
+            sdk_shown = "—" if sdk_norm is agreement._ABSENT else str(sdk)
+            if direct_norm == sdk_norm:
+                # One box across both columns rather than the same string
+                # printed twice — the reader should see agreement, not repetition.
+                cells += (
+                    f"<div class='val agree'>{e(direct_shown)}"
+                    f"<span class=same-note>both halves identical</span></div>"
+                )
+            else:
+                cells += (
+                    f"<div class='val diff'>{e(direct_shown)}</div>"
+                    f"<div class='val diff'>{e(sdk_shown)}</div>"
+                )
+        in_full = f"""
+<p class=eyebrow>One disagreement in full</p>
+<article class=cmp>
+<div class=cmp-head>
+<span class=cmp-doc>{e(row['docId'])}</span>
+<span class=pill>{e(row['field'])}</span>
+<span class=figure-note>{_distinct(row)} distinct answers across {_plural(len(row['values']), 'configuration')}</span>
+</div>
+<div class=cmp-grid>
+<div class=h></div><div class=h>Direct call</div><div class=h>With Nutrient SDK</div>
+{cells}
+</div>
+</article>
+"""
+
+    ranked, _ = representative_disagreements(summary["agreement"], limit=10_000)
+
+    def _count_cell(row: dict[str, Any]) -> str:
+        """"N of M configurations differed" when nothing agreed, else the count.
+
+        Every configuration returning something different is a stronger
+        statement than "N distinct answers", and it is the row a reader should
+        look at first — so it says so rather than leaving them to notice that
+        the two numbers happen to match.
+        """
+        distinct, total = _distinct(row), len(row["values"])
+        if total <= 1:
+            # One configuration cannot differ from itself — "1 of 1
+            # configurations differed" is false, not just ungrammatical.
+            noun = "distinct answer" if distinct == 1 else "distinct answers"
+            return f"<strong>{distinct}</strong> {noun}"
+        if distinct == total:
+            return f"<strong>{distinct} of {total}</strong> configurations differed"
+        return f"<strong>{distinct}</strong> distinct answers"
+
+    ranked_rows = "\n".join(
+        f"<tr><td class=doc>{e(r['docId'])}</td>"
+        f"<td class=field>{e(r['field'])}</td>"
+        f"<td class=count>{_count_cell(r)}</td></tr>"
+        for r in ranked
     )
-    return f"""
-<h2>Where the models disagree</h2>
-<p class=sub>{e(AGREEMENT_FRAMING)}</p>
-<p class=sub><strong>{a['agreed']}/{judged} judged fields agreed ({rate})</strong>
-— {a['disagreed']} disagreement(s). Fields nobody answered are excluded from
-that rate.</p>
+    all_ranked = ""
+    if ranked:
+        # "All one, by spread" is ungrammatical -- a single item is not "all"
+        # of anything worth saying so.
+        count_phrase = "The one" if len(ranked) == 1 else f"All {_count(len(ranked))}"
+        all_ranked = f"""
+<p class=eyebrow>{count_phrase}, by spread</p>
+<div class=spread>
 <table>
-<thead><tr><th>document</th><th>field</th><th>what each returned</th></tr></thead>
-{rows}
+<thead><tr><th>document</th><th>field</th><th>distinct answers</th></tr></thead>
+{ranked_rows}
 </table>
-{more}
+</div>
+<p class=standfirst>Every value each configuration returned is in
+<a href="#appendix-c">Appendix C</a>.</p>
+"""
+
+    return f"""
+<section class=band id="agreement">
+<p class=eyebrow>02 — Accuracy</p>
+<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {_plural(a['fields'], 'field', spell=spell_h2)}, {headline_tail}</h2>
+<p class=standfirst>{e(AGREEMENT_FRAMING)}</p>
+<div class=cards>
+<div class='card accent'><span class=figure-xl>{e(rate)}</span>
+<span class=figure-note>{accent_note}</span></div>
+<div class=card><span class=figure-xl>{a['disagreed']}</span>
+<span class=figure-note>fields where configurations differed</span></div>
+<div class=card><span class=figure-xl>{excluded}</span>
+<span class=figure-note>fields excluded as unjudgeable or unanswered</span></div>
+</div>
+{in_full}
+{all_ranked}
+</section>
 """
 
 
-def _honesty_band(summary: dict[str, Any], e) -> str:
-    """Band 3: the caveats, kept out of any collapsible element.
+def _code_flags(escaped: str) -> str:
+    """Set `--flag` names in code, without letting anything else through.
 
-    A caveat a reader has to click for is a caveat we did not really make, so
-    this band renders in the document flow — no <details>, no accordion —
-    above the appendix built by `_appendix`. This used to be rendered a second
-    time, verbatim, in a legacy "Reading this honestly" section further down
-    the page; Task 8 deleted that duplicate once this band covered the same
-    ground, so there is now exactly one copy of every caveat on the page.
+    The price note is prose from prices.json, so it is escaped first; this only
+    ever wraps a run of `--word` that survived escaping. Escaping then
+    substituting a known-safe pattern keeps the inserted tags the only markup
+    that can reach the page.
     """
-    caveats = "\n".join(f"<li>{e(c)}</li>" for c in summary["caveats"])
-    notices = []
+    return re.sub(r"(--[a-z][a-z-]*)", r"<code>\1</code>", escaped)
+
+
+def _caveats_band(summary: dict[str, Any], e) -> str:
+    items = ""
+    for n, caveat in enumerate(summary["caveats"], start=1):
+        title = CAVEAT_TITLES.get(caveat, "Read this before quoting a figure")
+        items += (
+            f"<div class=caveat><span class=caveat-n>{n:02d}</span>"
+            f"<h3>{e(title)}</h3><p>{e(caveat)}</p></div>"
+        )
+
+    notices = ""
     if summary["unmeasurable"]:
         retried = (
             f" {summary['retried']} of them because the SDK retried: their "
@@ -212,24 +457,33 @@ def _honesty_band(summary: dict[str, Any], e) -> str:
             if summary.get("retried")
             else ""
         )
-        notices.append(
+        notices += (
             f"<p class=warn>{summary['unmeasurable']} cell(s) are not "
             f"measurable and are excluded from every total on this page."
             f"{retried}</p>"
         )
     if summary["mixedSchemas"]:
-        notices.append(
+        notices += (
             "<p class=warn>These records mix a shared cost-mode schema with "
             "answer-key schemas, so their token counts are not comparable with "
             "each other.</p>"
         )
+
     return f"""
+<section class=band id="caveats">
+<p class=eyebrow>03 — Caveats</p>
 <h2>Reading this honestly</h2>
-{"".join(notices)}
-<ul class=sub>
-{caveats}
-</ul>
-<p class=sub>{e(summary['priceNote'])}</p>
+<p class=standfirst>{_plural(len(summary['caveats']), 'thing', spell=True).capitalize()} that would make
+the numbers say something they do not say.</p>
+{notices}
+<div class=cards>
+{items}
+</div>
+<div class=price-note>
+<p class=eyebrow>On the prices used</p>
+<p>{_code_flags(e(summary['priceNote']))}</p>
+</div>
+</section>
 """
 
 
@@ -247,28 +501,61 @@ def _appendix(summary: dict[str, Any], e) -> str:
     # `deltaInputCost` in the headline delta $ column, `deltaCost` beside it and
     # explicitly labelled — see render_terminal for why publishing the
     # output-inclusive figure under an input-token heading misleads.
-    doc_rows = "\n".join(
-        f"<tr><td>{e(r['docId'])}</td><td>{e(r['providerId'])}</td>"
-        f"<td class=n>{r['sdkInputTokens']:,}</td>"
-        f"<td class=n>{r['directInputTokens']:,}</td>"
-        f"<td class='n d'>{r['deltaInputTokens']:+,}</td>"
-        f"<td class='n d'>{e(_money(r['deltaInputCost']))}</td>"
-        f"<td class=n>{e(_money(r['deltaCost']))}</td></tr>"
-        for r in summary["byDocument"]
-    )
+    def _doc_table(rows: list[dict[str, Any]]) -> str:
+        body = "\n".join(
+            f"<tr><td>{e(r['docId'])}</td><td>{e(r['providerId'])}</td>"
+            f"<td class=n>{r['sdkInputTokens']:,}</td>"
+            f"<td class=n>{r['directInputTokens']:,}</td>"
+            f"<td class='n d'>{r['deltaInputTokens']:+,}</td>"
+            f"<td class='n d'>{e(_money(r['deltaInputCost']))}</td>"
+            f"<td class=n>{e(_money(r['deltaCost']))}</td></tr>"
+            for r in rows
+        )
+        return f"""<div class=scroll>
+<table>
+  <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
+      <th class=n>direct input</th><th class=n>delta</th>
+      <th class=n>delta $ (input)</th>
+      <th class=n>delta $ incl. output (not like-for-like)</th></tr>
+{body}
+</table>
+</div>"""
+
+    # Grouped by model, because the constant is per model: a reader comparing
+    # two providers' rows in one undivided table is comparing tokenizers.
+    doc_groups = ""
+    for provider in summary["byProvider"]:
+        rows = [
+            r for r in summary["byDocument"]
+            if r["providerId"] == provider["providerId"]
+        ]
+        if not rows:
+            continue
+        each = round(provider["deltaInputTokens"] / max(provider["documents"], 1))
+        meta = (
+            f"{provider['label']} · {_plural(provider['documents'], 'document')} · "
+            f"{each:+,} input tokens each"
+        )
+        if provider["deltaCostPer100k"] is None:
+            meta += " · not priced"
+        # Nested and collapsed: opening A should show which models were measured
+        # and what each one's constant was, not 51 rows at once.
+        doc_groups += (
+            f"<details class=group><summary>"
+            f"<span class=group-id>{e(provider['providerId'])}</span>"
+            f"<span class=group-meta>{e(meta)}</span></summary>"
+            f"{_doc_table(rows)}</details>"
+        )
+    if not doc_groups:
+        doc_groups = _doc_table(summary["byDocument"])
 
     prov_rows = "\n".join(
         f"<tr><td>{e(r['label'])}</td><td class=n>{r['documents']}</td>"
         f"<td class='n d'>{r['deltaInputTokens']:+,}</td>"
         f"<td class=n>{r['deltaOutputTokens']:+,}</td>"
-        f"<td class=n>"
-        + (
-            f"{r['deltaMin']:+,} to {r['deltaMax']:+,}"
-            if r["deltaMin"] is not None
-            else "n/a"
-        )
-        + f"</td><td class='n d'>{e(_money(r['deltaCostPer100k']))}</td>"
-        f"<td class=n>{e(_money(r['deltaCostPer100kIncludingOutput']))}</td></tr>"
+        f"<td class=n>{e(_spread(r['deltaMin'], r['deltaMax']))}</td>"
+        f"<td class='n d'>{e(_money_at_scale(r['deltaCostPer100k']))}</td>"
+        f"<td class=n>{e(_money_at_scale(r['deltaCostPer100kIncludingOutput']))}</td></tr>"
         for r in summary["byProvider"]
     )
 
@@ -296,7 +583,7 @@ def _appendix(summary: dict[str, Any], e) -> str:
             for r in summary["accuracy"]
         )
         accuracy_section = f"""
-<details id="accuracy">
+<details class=panel id="appendix-accuracy">
 <summary>Accuracy, scored against the answer key</summary>
 {mixed_note}
 <p class=sub>Scored against the answer key. A field the key does not cover is
@@ -345,8 +632,8 @@ alongside it rather than as a like-for-like comparison.</p>
             if row["state"] == "disagreed"
         )
         disagreements_section = f"""
-<details id="disagreements">
-<summary>Every disagreement</summary>
+<details class=panel id="appendix-c">
+<summary>C · Every disagreement, in full</summary>
 {agreement_note}
 <p class=sub>{a['agreed']}/{a['agreed'] + a['disagreed']} judged fields agreed
 ({rate_shown}) — {a['disagreed']} disagreement(s) below. Excluded from that rate:
@@ -363,28 +650,20 @@ nothing to agree about. {a['fields']} field(s) were considered in total.</p>
 """
 
     return f"""
-<h2 id="appendix">Appendix</h2>
-<p class=sub>Everything the summary above is derived from.</p>
+<p class=eyebrow id="appendix">Appendix</p>
+<h2>Everything the summary is derived from</h2>
 
-<details id="per-document">
-<summary>Per document (input tokens)</summary>
-<div class=scroll>
-<table>
-  <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
-      <th class=n>direct input</th><th class=n>delta</th>
-      <th class=n>delta $ (input)</th>
-      <th class=n>delta $ incl. output (not like-for-like)</th></tr>
-{doc_rows}
-</table>
-</div>
+<details class=panel id="appendix-a" open>
+<summary>A · Per document, input tokens</summary>
+{doc_groups}
 <p class=sub>The <strong>delta $ (input)</strong> column prices the input-token
 delta, which measures the same document on both sides. The column beside it adds
 the output-token difference and is not like-for-like — the two calls are asked
 for different things, and output is priced several times higher than input.</p>
 </details>
 
-<details id="per-provider">
-<summary>Per provider</summary>
+<details class=panel id="appendix-b">
+<summary>B · Per provider</summary>
 <div class=scroll>
 <table>
   <tr><th>provider</th><th class=n>docs</th><th class=n>delta input</th>
@@ -404,8 +683,8 @@ rows instead.</p>
 {accuracy_section}
 {disagreements_section}
 
-<details id="prices">
-<summary>Price table</summary>
+<details class=panel id="appendix-d" open>
+<summary>D · Price table</summary>
 <p class=sub>List prices checked {e(summary['checkedOn'])}. Replace them with
 your negotiated rates using <code>--prices</code>.</p>
 </details>
@@ -453,12 +732,13 @@ def render(summary: dict[str, Any]) -> str:
 </style>
 <div class=wrap>
 <div class=logo>{logo}</div>
-<h1>What document extraction costs, with and without the Nutrient SDK</h1>
-{_provenance_table(summary.get("provenance"), e)}
-{_answer_band(summary, e)}
+{_header(summary, e)}
+{_cost_band(summary, e)}
 {_accuracy_band(summary, e)}
-{_honesty_band(summary, e)}
+{_caveats_band(summary, e)}
+<section class=band id="appendix-band">
 {_appendix(summary, e)}
+</section>
 {_footer(summary, e)}
 </div>
 </html>

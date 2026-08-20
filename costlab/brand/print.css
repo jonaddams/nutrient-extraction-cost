@@ -1,13 +1,24 @@
 /* costlab/brand/print.css
-   A printed copy must be complete: the appendix cannot stay collapsed. */
+   A printed copy must be complete: the appendix cannot stay collapsed.
+   The rule doing that work is `details::details-content` below: modern
+   engines hide a closed details element's body via `content-visibility` on
+   the internal ::details-content pseudo-element, which `display` cannot
+   override -- measured in Chrome, the `display: revert` rules alone moved
+   the printed page 0px, while adding the ::details-content rule took it
+   4694px -> 8217px, exactly matching all five closed panels opening. The
+   `display: revert` rules are kept only as a fallback for older engines
+   that predate ::details-content. */
 @media print {
+  details::details-content { content-visibility: visible !important; }
   details { display: block; }
   details > summary { list-style: none; font-weight: 440; }
   details[open] > summary, details > summary { margin-bottom: 8px; }
   details > *:not(summary) { display: revert !important; }
   details:not([open]) > *:not(summary) { display: revert !important; }
-  body { padding: 0; font-size: 11pt; }
-  .tile, .answer, table { break-inside: avoid; }
+  /* White for print. Browsers suppress backgrounds by default, but a reader who
+     enables them should not spend a cartridge tinting every page warm. */
+  body { padding: 0; font-size: 11pt; background: #fff; }
+  .card, .caveat, .cmp, details.group, .prov-cell, table { break-inside: avoid; }
   h2 { break-after: avoid; }
   a[href^="#"] { text-decoration: none; color: inherit; }
 }
