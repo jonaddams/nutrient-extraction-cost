@@ -34,15 +34,18 @@
 
 body {
   margin: 0;
-  padding: 40px 32px 64px;
-  background: var(--bg-neutral-default-primary);
+  padding: 56px 32px 96px;
+  /* Warm paper, not white: the cards, panels and provenance cells are white and
+     need a ground to sit on. On a white page they read as floating outlines. */
+  background: var(--bg-neutral-default-secondary);
   color: var(--text-neutral-primary);
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.55;
+  text-wrap: pretty;
 }
 
-.wrap { max-width: 1100px; margin: 0 auto; }
+.wrap { max-width: 1040px; margin: 0 auto; }
 
 /* Headings: variable weight 440 with negative tracking and line-height 1, per
    the design system's rules of thumb. */
@@ -433,7 +436,9 @@ details.group > summary { display: list-item; list-style-position: outside; marg
   details[open] > summary, details > summary { margin-bottom: 8px; }
   details > *:not(summary) { display: revert !important; }
   details:not([open]) > *:not(summary) { display: revert !important; }
-  body { padding: 0; font-size: 11pt; }
+  /* White for print. Browsers suppress backgrounds by default, but a reader who
+     enables them should not spend a cartridge tinting every page warm. */
+  body { padding: 0; font-size: 11pt; background: #fff; }
   .tile, .answer, table { break-inside: avoid; }
   h2 { break-after: avoid; }
   a[href^="#"] { text-decoration: none; color: inherit; }

@@ -9,7 +9,7 @@ it did not take.
 
 import re
 
-from costlab import render_html, report
+from costlab import brand, render_html, report
 from costlab.prices import PriceTable
 
 
@@ -401,3 +401,21 @@ def test_the_price_panel_is_lettered_like_its_siblings():
     out = render_html.render(_two_doc_summary())
     assert 'id="appendix-d"' in out
     assert "D · Price table" in out
+
+
+def test_the_page_has_a_ground_for_its_white_cards_to_sit_on():
+    """Warm paper page, white cards. On a white page the cards read as
+    floating outlines, which is what the first render looked like."""
+    css = brand.asset("theme.css")
+    body = css[css.index("body {") : css.index("}", css.index("body {"))]
+    assert "var(--bg-neutral-default-secondary)" in body
+    assert "var(--bg-neutral-default-primary)" not in body
+
+    # and the cards are still the lighter tone, or there is no contrast at all
+    card = css[css.index(".card {") : css.index("}", css.index(".card {"))]
+    assert "var(--bg-neutral-default-primary)" in card
+
+
+def test_printing_does_not_tint_every_page():
+    print_css = brand.asset("print.css")
+    assert "background: #fff" in print_css
