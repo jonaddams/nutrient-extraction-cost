@@ -29,6 +29,12 @@ class Provider:
     sdk_provider: str  # the value the Nutrient SDK expects
     supports_nutrient_cell: bool  # set from the Task 1 spike, never guessed
 
+    # Request keys the proxy strips before forwarding, because this upstream
+    # answers WRONG rather than complaining when it receives them. Empty for
+    # every hosted provider -- see RecordingProxy._drop_keys for why a local
+    # runtime needs logprobs gone.
+    drop_request_keys: tuple[str, ...] = ()
+
     # --- Wire shape. Not in the original plan; added because the Nutrient SDK
     # --- was observed sending Anthropic somewhere else entirely, and the proxy
     # --- must not carry a provider check of its own.
@@ -60,7 +66,16 @@ class Provider:
 # Sized to comfortably hold a field-extraction reply and no more — an unbounded
 # value would let a thinking model spend output tokens the comparison then has
 # to explain.
-_ANTHROPIC_MAX_TOKENS = 2048
+# Both dialects, though only Anthropic REQUIRES it. The OpenAI-wire body
+# went without one until a local runtime showed why that is not safe: under
+# grammar-constrained decoding an unbounded JSON `number` can fail to
+# terminate, and qwen3-vl-30b answered `"totalAmount": 4201.4500000000015...`
+# with the digits running on until the proxy's 600s timeout. One document took
+# longer than the entire 102-call frontier run. A cap turns a hang into a
+# truncated body, which `extracted_values` cannot parse and therefore records
+# as unreadable -- "not scoreable", never a mismatch, so the model is not
+# marked wrong for our own cutoff.
+_DIRECT_MAX_TOKENS = 2048
 
 PROVIDERS: dict[str, Provider] = {
     "anthropic": Provider(
@@ -115,6 +130,7 @@ PROVIDERS: dict[str, Provider] = {
         upstream_base=os.environ.get("LOCAL_BASE", "http://localhost:1234"),
         sdk_provider="local",
         supports_nutrient_cell=True,
+        drop_request_keys=("logprobs", "top_logprobs"),
     ),
 }
 
@@ -176,11 +192,12 @@ def direct_request(
                 "type": "json_schema",
                 "json_schema": {"name": "extraction", "schema": schema},
             },
+            "max_tokens": _DIRECT_MAX_TOKENS,
         }
 
     return {
         "model": model,
-        "max_tokens": _ANTHROPIC_MAX_TOKENS,
+        "max_tokens": _DIRECT_MAX_TOKENS,
         "messages": [
             {
                 "role": "user",

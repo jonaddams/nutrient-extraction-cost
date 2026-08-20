@@ -91,3 +91,44 @@ def test_local_defaults_to_the_runtime_that_was_actually_verified():
     2026-08-14 and returned a usage block. Ollama's 11434 was never reachable
     to test, so it is documented rather than defaulted to."""
     assert PROVIDERS["local"].upstream_base == "http://localhost:1234"
+
+
+def test_every_direct_request_bounds_its_own_output():
+    """An unbounded direct request can hang for the proxy's whole timeout.
+
+    Anthropic rejects a body without max_tokens, so that branch always had one
+    and the gap was invisible. The OpenAI-wire branch had none, and a local
+    runtime under grammar-constrained decoding emitted a JSON number whose
+    digits never terminated -- one document outlasting a 102-call frontier run.
+    The cap is what turns that into a truncated body, which reads back as
+    unreadable rather than as a wrong answer.
+    """
+    from costlab.providers import PROVIDERS, direct_request
+
+    schema = {
+        "type": "object",
+        "properties": {"totalAmount": {"type": "number"}},
+        "required": ["totalAmount"],
+        "additionalProperties": False,
+    }
+    for pid, provider in PROVIDERS.items():
+        body = direct_request(provider, provider.default_model, "doc text", schema)
+        assert body.get("max_tokens"), f"{pid} sends an unbounded direct request"
+
+
+def test_a_truncated_direct_answer_is_unreadable_not_a_wrong_answer():
+    """The cap must not turn a runaway into a confident zero. A body cut
+    mid-number is not valid JSON, so it reads back as None -- the harness
+    saying it could not read the answer, which scores as not-scoreable.
+    """
+    from costlab.runner import extracted_values
+
+    truncated = {
+        "choices": [
+            {
+                "finish_reason": "length",
+                "message": {"content": '{"totalAmount": 4201.450000000001500'},
+            }
+        ]
+    }
+    assert extracted_values(truncated, with_nutrient=False) is None
