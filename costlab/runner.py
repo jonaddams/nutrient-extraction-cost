@@ -427,6 +427,7 @@ def run(
             upstream_base=provider.upstream_base,
             out_dir=out_dir / provider_id,
             capture_bodies=capture_bodies,
+            drop_request_keys=frozenset(provider.drop_request_keys),
         )
         port = proxy.start()
         try:
