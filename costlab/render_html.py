@@ -74,6 +74,49 @@ def _plural(n: int, one: str, many: str | None = None, *, spell: bool = False) -
     return f"{count} {one}" if n == 1 else f"{count} {many or one + 's'}"
 
 
+def _scope(rows: list[dict[str, Any]]) -> tuple[list[str], int, int]:
+    """The shape of what was compared: distinct fields, documents, rows.
+
+    `agreementSummary["fields"]` counts ROWS, and a row is one field on one
+    document. Seventeen rows can be seventeen fields on one document or one
+    field on seventeen documents, and the summary alone cannot tell them
+    apart. The distinction is not cosmetic: a reader shown "seventeen fields,
+    seven disagreements" over a list where every disagreement names the same
+    field concludes the providers agreed on the OTHER sixteen, when in truth
+    there were no others and the ten agreements are that same field too.
+    """
+    return (
+        sorted({r["field"] for r in rows}),
+        len({r["docId"] for r in rows}),
+        len(rows),
+    )
+
+
+def _scope_sentence(rows: list[dict[str, Any]]) -> str:
+    """What the rate was computed over, said plainly enough to prevent the
+    misreading. Names the fields while they can be named — a reader can only
+    judge whether a field set is representative if they can see it."""
+    fields, documents, instances = _scope(rows)
+    if not fields:
+        return ""
+    spell = _spellable(len(fields), documents, instances)
+    docs = _plural(documents, "document", spell=spell)
+    if len(fields) == 1:
+        return (
+            f"Every comparison here is of the same single field, {fields[0]}, "
+            f"once per document across {docs}. It is the only field this run "
+            f"requested, so the rate describes that field and no other — the "
+            f"agreements are that field too."
+        )
+    named = ", ".join(fields)
+    if len(fields) > 8:
+        named = ", ".join(fields[:8]) + f", and {_count(len(fields) - 8)} more"
+    return (
+        f"{_plural(instances, 'comparison', spell=spell)} across {docs}, "
+        f"covering {_plural(len(fields), 'distinct field', spell=spell)}: {named}."
+    )
+
+
 def _money_at_scale(value: float | None) -> str:
     """Like `_money`, but 2dp at $1 or more.
 
@@ -306,7 +349,18 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         (len(r["values"]) for r in summary["agreement"]), default=0
     )
 
-    spell_h2 = _spellable(configurations, a["fields"], a["disagreed"])
+    scope_fields, scope_documents, _ = _scope(summary["agreement"])
+    scope_sentence = _scope_sentence(summary["agreement"])
+    spell_h2 = _spellable(
+        configurations, len(scope_fields), scope_documents, a["disagreed"]
+    )
+    # "seventeen fields" for one field seen on seventeen documents is the
+    # misreading this whole disclosure exists to stop, so the headline counts
+    # the fields and the documents separately rather than counting rows.
+    headline_scope = (
+        f"{_plural(len(scope_fields), 'field', spell=spell_h2)} across "
+        f"{_plural(scope_documents, 'document', spell=spell_h2)}"
+    )
     # "No disagreements" reads as a clean bill of health -- true when
     # everything was judged and agreed, false and misleading when nothing
     # could be judged at all (every row ambiguous or unanswered). The two
@@ -412,7 +466,8 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
     return f"""
 <section class=band id="agreement">
 <p class=eyebrow>02 — Accuracy</p>
-<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {_plural(a['fields'], 'field', spell=spell_h2)}, {headline_tail}</h2>
+<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {headline_scope}, {headline_tail}</h2>
+<p class=standfirst>{e(scope_sentence)}</p>
 <p class=standfirst>{e(AGREEMENT_FRAMING)}</p>
 <div class=cards>
 <div class='card accent'><span class=figure-xl>{e(rate)}</span>
@@ -640,6 +695,7 @@ alongside it rather than as a like-for-like comparison.</p>
 {a['ambiguous']} field(s) the comparator could not confidently judge, and
 {a.get('unanswered', 0)} that no provider answered at all — nobody answered, so there is
 nothing to agree about. {a['fields']} field(s) were considered in total.</p>
+<p class=sub>{e(_scope_sentence(summary['agreement']))}</p>
 <div class=scroll>
 <table>
   <tr><th>document</th><th>field</th><th>values</th></tr>

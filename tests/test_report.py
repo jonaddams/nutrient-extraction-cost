@@ -1,3 +1,4 @@
+import re
 from costlab.prices import PriceTable
 from costlab.report import render_html, render_json, render_terminal, summarise
 
@@ -329,7 +330,20 @@ def test_an_ambiguous_row_is_absent_from_the_rendered_disagreement_output():
     assert "asOf" not in terminal_text
 
     html = render_html(out)
-    assert "asOf" not in html
+    # The scope disclosure names every field that was COMPARED, ambiguous ones
+    # included -- a reader judging whether the field set is representative has
+    # to see all of it. So absence is asserted where the claim actually lives:
+    # the tables and the in-full comparison, which is where a field name means
+    # "these configurations disagreed". Asserting against the whole document
+    # would forbid the honest mention along with the dishonest one.
+    # Every rendering of a disagreement puts the field in a cell -- the
+    # appendix table, the ranked-by-spread table, the in-full comparison grid.
+    # Prose puts it in a paragraph. So the cells are where the claim lives.
+    cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", html, re.S)
+    assert not any("asOf" in c for c in cells)
+    assert "asOf" in html, (
+        "the field was compared, so the scope disclosure must still name it"
+    )
 
 
 # --- Fix round 1: unverifiedFields wording, and mixedSchemas false positives.
