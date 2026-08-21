@@ -478,10 +478,14 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         cells = ""
         for provider, direct, sdk in _by_provider_half(row):
             cells += f"<div class=p>{e(provider)}</div>"
-            direct_norm = normalised.get(f"{provider}:direct", agreement._ABSENT)
-            sdk_norm = normalised.get(f"{provider}:sdk", agreement._ABSENT)
-            direct_shown = "—" if direct_norm is agreement._ABSENT else str(direct)
-            sdk_shown = "—" if sdk_norm is agreement._ABSENT else str(sdk)
+            # Defaulted to the marker, not to None: a provider/half missing from
+            # the row entirely means the same thing as one that answered nothing,
+            # and the two must compare EQUAL below or the page accuses providers
+            # of disagreeing when neither answered.
+            direct_norm = normalised.get(f"{provider}:direct", agreement.ABSENT)
+            sdk_norm = normalised.get(f"{provider}:sdk", agreement.ABSENT)
+            direct_shown = "—" if agreement.is_absent(direct_norm) else str(direct)
+            sdk_shown = "—" if agreement.is_absent(sdk_norm) else str(sdk)
             if direct_norm == sdk_norm:
                 # One box across both columns rather than the same string
                 # printed twice — the reader should see agreement, not repetition.

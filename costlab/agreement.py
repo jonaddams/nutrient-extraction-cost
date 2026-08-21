@@ -166,7 +166,24 @@ class _Absent:
     normalisation is exactly the absence test)."""
 
 
-_ABSENT = _Absent()
+ABSENT = _Absent()
+
+# Public, because `render_html` needs it as the default when a provider/half is
+# missing from a row entirely: defaulting to anything else would make a missing
+# cell compare UNEQUAL to one that answered nothing, and the page would accuse
+# two providers of disagreeing when neither answered. Exported as the marker plus
+# the predicate below so no caller has to know it is a singleton compared by
+# identity.
+
+def is_absent(value: Any) -> bool:
+    """True when a NORMALISED value means "no answer".
+
+    Takes the output of `normalise_values`, not a raw extracted value — see
+    `_is_absent_raw` for the raw-side question. Identity, never truthiness: a
+    real extracted `0` is an answer, and a falsy check would render it as an em
+    dash, turning a measured value into a blank.
+    """
+    return value is ABSENT
 
 
 def _label(record: dict[str, Any]) -> str:
@@ -174,7 +191,7 @@ def _label(record: dict[str, Any]) -> str:
     return f"{record['providerId']}:{half}"
 
 
-def _is_absent(value: Any) -> bool:
+def _is_absent_raw(value: Any) -> bool:
     """True for a value that amounts to "no answer" -- None, "", or a
     punctuation-only placeholder like "." that normalises to nothing.
 
@@ -246,7 +263,7 @@ def normalise_values(values: dict[str, Any]) -> dict[str, Any]:
     for -- the same collapsing `distinct` counts by. Two cells map to the
     same result exactly when the comparator calls them the same answer:
     every absent value (None, "", a punctuation placeholder like ".")
-    collapses to the shared _ABSENT marker, and every present value
+    collapses to the shared ABSENT marker, and every present value
     normalises the row's chosen way -- the parsed number when every present
     value in the row looks numeric, otherwise the same text normalisation
     compare_field itself applies.
@@ -258,7 +275,7 @@ def normalise_values(values: dict[str, Any]) -> dict[str, Any]:
     paragraph for why a second definition of "the same answer" is exactly
     how this class of defect keeps recurring.
     """
-    present_values = [v for v in values.values() if not _is_absent(v)]
+    present_values = [v for v in values.values() if not _is_absent_raw(v)]
     type_ = (
         "number"
         if present_values and all(_looks_numeric(v) for v in present_values)
@@ -266,8 +283,8 @@ def normalise_values(values: dict[str, Any]) -> dict[str, Any]:
     )
     return {
         key: (
-            _ABSENT
-            if _is_absent(v)
+            ABSENT
+            if _is_absent_raw(v)
             else (_to_number(v) if type_ == "number" else _normalise_text(_js_string(v)))
         )
         for key, v in values.items()
@@ -320,7 +337,7 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             # back to "string", unchanged from prior behaviour (and moot: the
             # pairwise loop below never delegates to compare_field when
             # every value is absent).
-            present_values = [v for v in values.values() if not _is_absent(v)]
+            present_values = [v for v in values.values() if not _is_absent_raw(v)]
             type_ = (
                 "number"
                 if present_values and all(_looks_numeric(v) for v in present_values)
@@ -335,14 +352,14 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             # above) even when a third value sits between them.
             #
             # Absence is classified before either value ever reaches
-            # compare_field -- see _is_absent and the module docstring for
+            # compare_field -- see _is_absent_raw and the module docstring for
             # why compare_field's own None/"" rule must not decide a peer
             # comparison. Only once both values are confirmed present is the
             # verdict delegated, where compare_field's remaining branches are
             # symmetric in their two operands by construction.
             pair_verdicts = []
             for a, b in combinations(values.values(), 2):
-                a_absent, b_absent = _is_absent(a), _is_absent(b)
+                a_absent, b_absent = _is_absent_raw(a), _is_absent_raw(b)
                 if a_absent and b_absent:
                     pair_verdicts.append("match")
                 elif a_absent or b_absent:
@@ -374,7 +391,7 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             # The row is kept rather than skipped so it stays visible and so
             # the reconciliation identity below holds; it is excluded from the
             # rate's numerator and denominator alike.
-            if all(_is_absent(v) for v in values.values()):
+            if all(_is_absent_raw(v) for v in values.values()):
                 state = "unanswered"
             elif disagreed:
                 state = "disagreed"
@@ -385,10 +402,10 @@ def agreement(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
             # Unique ANSWERS, not mismatches against an arbitrary reference --
             # see the module docstring for why the latter overstates
-            # disagreement. Every absent value collapses to the same _ABSENT
+            # disagreement. Every absent value collapses to the same ABSENT
             # marker -- None and "" and "." are one answer, not three -- and
             # every present value normalises the row's chosen way: the parsed
-            # number, or compare_field's own text normalisation. _ABSENT can
+            # number, or compare_field's own text normalisation. ABSENT can
             # never collide with a real normalised value (a parsed number is
             # always a float; a normalised present string is never empty,
             # since emptiness after normalisation is exactly the absence
