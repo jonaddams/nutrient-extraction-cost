@@ -55,36 +55,43 @@ def merge_runs(runs: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[s
     if not runs:
         raise ValueError("no runs to merge")
 
-    # Which model each provider ran, and where we learned it, so the error can
-    # name the two runs a reader has to go and look at.
-    seen: dict[str, tuple[str, str]] = {}
+    # Every claim collected BEFORE any is judged. An earlier version walked the
+    # runs in order and only looked backwards, so a run with no recorded models
+    # escaped the check whenever it happened to be listed first — the same two
+    # runs were refused or silently merged depending on the order typed on the
+    # command line. A safety check an argument order can switch off is not one.
+    claims: dict[str, list[tuple[str, str | None]]] = {}
     for run in runs:
         models = _models_of(run)
         for provider_id in sorted(_providers_of(run)):
             model = None if models is None else models.get(provider_id)
-            if model is None:
-                if provider_id in seen:
-                    other_run, other_model = seen[provider_id]
-                    raise ValueError(
-                        f"{provider_id!r} appears in run {run['name']!r} and run "
-                        f"{other_run!r}, but {run['name']!r} did not record which "
-                        f"model it used. {other_run!r} used {other_model!r}. "
-                        f"A provider id is a route, not a model — refusing to "
-                        f"assume these are the same weights."
-                    )
-                continue
-            if provider_id in seen:
-                other_run, other_model = seen[provider_id]
-                if other_model != model:
-                    raise ValueError(
-                        f"{provider_id!r} ran {other_model!r} in run "
-                        f"{other_run!r} and {model!r} in run {run['name']!r}. "
-                        f"Merging would present two models as one row. Re-run "
-                        f"them under distinct provider ids, or report them "
-                        f"separately."
-                    )
-            else:
-                seen[provider_id] = (run["name"], model)
+            claims.setdefault(provider_id, []).append((run["name"], model))
+
+    for provider_id, entries in sorted(claims.items()):
+        if len(entries) < 2:
+            continue
+        unrecorded = [name for name, model in entries if model is None]
+        if unrecorded:
+            known = {model for _, model in entries if model is not None}
+            raise ValueError(
+                f"{provider_id!r} appears in {len(entries)} of these runs, but "
+                f"{', '.join(repr(n) for n in unrecorded)} did not record which "
+                f"model it used"
+                + (f" (the others used {', '.join(sorted(map(repr, known)))})"
+                   if known else "")
+                + ". A provider id is a route, not a model — refusing to assume "
+                "these are the same weights."
+            )
+        distinct = {model for _, model in entries}
+        if len(distinct) > 1:
+            detail = ", ".join(
+                f"{model!r} in run {name!r}" for name, model in entries
+            )
+            raise ValueError(
+                f"{provider_id!r} ran different models across these runs: "
+                f"{detail}. Merging would present two models as one row. Report "
+                f"them separately, or give them distinct provider ids."
+            )
 
     records = [record for run in runs for record in run["records"]]
 

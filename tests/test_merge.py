@@ -102,6 +102,25 @@ def test_a_run_without_recorded_models_cannot_be_merged_over_a_shared_provider()
     assert "local" in str(err.value)
 
 
+def test_the_unrecorded_model_check_does_not_depend_on_argument_order():
+    """The first version of this guard only looked backwards, so a run with no
+    recorded models escaped the check whenever it was listed FIRST: the same two
+    runs were refused or silently merged depending on the order typed on the
+    command line. A safety check that an argument order can switch off is not a
+    safety check.
+    """
+    with_models = _run("acc", "anthropic", "claude-sonnet-5",
+                       "2026-08-20T16:00:00-04:00")
+    without = _run("cost", "anthropic", "claude-sonnet-5",
+                   "2026-08-17T13:00:00-04:00")
+    without["provenance"].pop("models")
+
+    for order in ([without, with_models], [with_models, without]):
+        with pytest.raises(ValueError) as err:
+            merge_runs(order)
+        assert "cost" in str(err.value)
+
+
 def test_merged_provenance_names_every_run_and_its_date():
     """One report built from measurements taken at different times must say so;
     a single run date would be a false statement about when this was gathered."""

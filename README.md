@@ -61,7 +61,10 @@ Three things the scoring deliberately does:
   deliberately high.
 
 Accuracy mode gives each document its own schema, taken from the answer key, so its token counts
-are **not** comparable with a cost run's. Run them separately.
+are **not** comparable with a cost run's. Run each mode separately, then put both in one report with
+[`--join`](#joining-runs): a joined report computes the cost band from the shared-schema records and
+the accuracy band from the answer-key records, so the two are never compared, and it states on the
+page how many documents each band covers.
 
 ## Install and run
 
@@ -126,8 +129,16 @@ cannot join these runs: 'local' ran 'qwen/qwen3-vl-8b' in run 'a' and
 'qwen/qwen3-vl-30b' in run 'b'. Merging would present two models as one row.
 ```
 
-Joining a cost-mode run with an accuracy-mode run is allowed but still carries
-the mixed-schema warning, because their token counts are not comparable.
+**Joining a cost run to an accuracy run is how one report carries both.** When a
+report holds both kinds of record, each band takes only what it is entitled to:
+the cost band the shared-schema records, so a payload difference stays
+attributable to the document, and the accuracy band the answer-key records, which
+are the only ones that were actually asked the key's fields. Nothing is blended,
+and the page states how many documents each band covers — narrowing a band to a
+subset and saying nothing would read as covering everything.
+
+`examples/example-report.html` is exactly this: three runs joined, cost measured
+over 17 documents in cost mode and accuracy scored over 17 in accuracy mode.
 
 ## Your documents and where they go
 

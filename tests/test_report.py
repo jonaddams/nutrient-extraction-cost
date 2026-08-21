@@ -283,10 +283,17 @@ def test_a_multi_document_accuracy_run_with_differing_field_counts_does_not_warn
     assert "run cost and accuracy separately" not in render_terminal(out).lower()
 
 
-def test_a_report_genuinely_mixing_shared_and_key_derived_schemas_warns():
-    """The case the warning exists for: some records used the shared cost-mode
-    schema and others used a key-derived one in the SAME report, which is the
-    situation that actually makes token counts incomparable."""
+def test_a_report_genuinely_mixing_shared_and_key_derived_schemas_partitions():
+    """The case this exists for: some records used the shared cost-mode schema
+    and others a key-derived one in the SAME report, which is the situation that
+    actually makes token counts incomparable.
+
+    It used to warn and tell the reader to run cost and accuracy separately.
+    Now the bands are computed from different records instead, so the two are
+    never compared — a strictly stronger guarantee than advice the reader had to
+    act on. What must not regress is the disclosure: narrowing the cost band to
+    a subset of the documents while saying nothing reads as covering them all.
+    """
     recs = [
         {**_rec("a", "bedrock", True, 1000), "schemaFieldCount": 1,
          "schemaSource": "shared"},
@@ -299,7 +306,13 @@ def test_a_report_genuinely_mixing_shared_and_key_derived_schemas_warns():
     ]
     out = summarise(recs, _priced_table())
     assert out["mixedSchemas"] is True
-    assert "run cost and accuracy separately" in render_terminal(out).lower()
+    assert out["partitioned"] is True
+    # The cost band took the shared-schema document alone, so the +500
+    # key-derived delta cannot reach the per-model constant.
+    assert {r["docId"] for r in out["byDocument"]} == {"a"}
+    text = render_terminal(out).lower()
+    assert "computed from different documents" in text
+    assert "not comparable" in text
 
 
 def test_an_ambiguous_row_is_absent_from_the_rendered_disagreement_output():

@@ -640,11 +640,17 @@ def _caveats_band(summary: dict[str, Any], e) -> str:
             f"measurable and are excluded from every total on this page."
             f"{retried}</p>"
         )
-    if summary["mixedSchemas"]:
+    if summary.get("partitioned"):
         notices += (
-            "<p class=warn>These records mix a shared cost-mode schema with "
-            "answer-key schemas, so their token counts are not comparable with "
-            "each other.</p>"
+            "<p class=warn>Cost and accuracy on this page are "
+            "<strong>computed from different documents</strong>, because the two "
+            "need different requests: the cost figures come from "
+            f"{summary['costDocumentCount']} document(s) asked for one shared "
+            "schema, so a payload difference is attributable to the document, "
+            f"and the accuracy figures from {summary['accuracyDocumentCount']} "
+            "document(s) asked for their answer key's own fields, which is what "
+            "makes them scoreable. Neither set's token counts are comparable "
+            "with the other's, and nothing on this page compares them.</p>"
         )
 
     return f"""
@@ -738,10 +744,11 @@ def _appendix(summary: dict[str, Any], e) -> str:
     )
 
     mixed_note = (
-        "<p class=warn>These records mix a shared cost-mode schema with "
-        "answer-key-derived schemas, so their token counts are not comparable. "
-        "Run cost and accuracy separately.</p>"
-        if summary["mixedSchemas"]
+        "<p class=warn>Scored from the answer-key documents in this report "
+        "only. The shared-schema documents were never asked the key's fields, "
+        "so scoring them would manufacture a mismatch for a question nobody "
+        "put to the model.</p>"
+        if summary.get("partitioned")
         else ""
     )
 
