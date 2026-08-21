@@ -468,9 +468,9 @@ largest. It is a constant per model, not a percentage of the document, so it
 matters most on short documents and fades on long ones. Per-call spread across
 this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) exactly +468 on every call, OpenAI exactly +748 on every call.</p>
 <div class=cards>
-<div class=card><span class=card-model>Claude Sonnet 5</span><div class=card-figure><span class=figure-lg>+1,226</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$367.80</span><span class=figure-note>per 100k documents</span></div></div>
-<div class=card><span class=card-model>Qwen3-VL 235B (Bedrock)</span><div class=card-figure><span class=figure-lg>+468</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$24.80</span><span class=figure-note>per 100k documents</span></div></div>
-<div class=card><span class=card-model>OpenAI</span><div class=card-figure><span class=figure-lg>+748</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>not priced</span><span class=figure-note>no list price confirmed</span></div></div>
+<div class=card><span class=card-model>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></span><div class=card-figure><span class=figure-lg>+1,226</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$367.80</span><span class=figure-note>per 100k documents</span></div></div>
+<div class=card><span class=card-model>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></span><div class=card-figure><span class=figure-lg>+468</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$24.80</span><span class=figure-note>per 100k documents</span></div></div>
+<div class=card><span class=card-model>OpenAI<span class=row-sub>gpt-5.4</span></span><div class=card-figure><span class=figure-lg>+748</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>not priced</span><span class=figure-note>no list price confirmed</span></div></div>
 </div>
 <p class=standfirst>The overhead is a constant per call, and the constant is per model — not per vendor, and not per tokenizer generation. A different model, including a sibling from the same family, is a new measurement: the figures above do not transfer to it. Per-document detail is in
 <a href="#appendix-a">Appendix A</a>; provider totals in
@@ -657,9 +657,9 @@ for different things, and output is priced several times higher than input.</p>
       <th class=n>delta output</th><th class=n>per-call spread</th>
       <th class=n>$ / 100k docs (input)</th>
       <th class=n>$ / 100k incl. output</th></tr>
-<tr><td>Claude Sonnet 5</td><td class=n>17</td><td class='n d'>+20,842</td><td class=n>+596</td><td class=n>exactly +1,226 on every call</td><td class='n d'>$367.80</td><td class=n>$420.39</td></tr>
-<tr><td>Qwen3-VL 235B (Bedrock)</td><td class=n>17</td><td class='n d'>+7,956</td><td class=n>+594</td><td class=n>exactly +468 on every call</td><td class='n d'>$24.80</td><td class=n>$34.10</td></tr>
-<tr><td>OpenAI</td><td class=n>17</td><td class='n d'>+12,716</td><td class=n>+378</td><td class=n>exactly +748 on every call</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></td><td class=n>17</td><td class='n d'>+20,842</td><td class=n>+596</td><td class=n>exactly +1,226 on every call</td><td class='n d'>$367.80</td><td class=n>$420.39</td></tr>
+<tr><td>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></td><td class=n>17</td><td class='n d'>+7,956</td><td class=n>+594</td><td class=n>exactly +468 on every call</td><td class='n d'>$24.80</td><td class=n>$34.10</td></tr>
+<tr><td>OpenAI<span class=row-sub>gpt-5.4</span></td><td class=n>17</td><td class='n d'>+12,716</td><td class=n>+378</td><td class=n>exactly +748 on every call</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 </table>
 </div>
 <p class=sub>A narrow per-call spread is the point: the SDK's overhead behaves as

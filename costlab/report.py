@@ -189,6 +189,11 @@ def summarise(
                     if provider_id in PROVIDERS
                     else provider_id
                 ),
+                # The band's claim is that the constant is per MODEL, and two of
+                # the labels above name a vendor or a place rather than one. A
+                # per-model figure has to travel with the model that produced it,
+                # or two runs of different local weights render identical cards.
+                "model": model_for(provider_id),
                 "documents": len(rows),
                 "sdkInputTokens": sum(r["sdkInputTokens"] for r in rows),
                 "directInputTokens": sum(r["directInputTokens"] for r in rows),

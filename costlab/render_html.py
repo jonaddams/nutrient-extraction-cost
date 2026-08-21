@@ -252,6 +252,24 @@ NO_DELTA_NOTE = (
 )
 
 
+def _model_sub(row: dict[str, Any], e) -> str:
+    """The resolved model id under a label, wherever a per-model figure is shown.
+
+    Both bands need it for the same reason: `PROVIDERS["openai"].label` is
+    "OpenAI" and `local`'s is "Local runtime", a vendor and a place, so a figure
+    described as per-model can otherwise appear without naming a model. Fixing
+    the labels instead is not available — a local runtime's model comes from
+    LOCAL_MODEL at run time, which is why that label is generic.
+
+    Omitted when it would only repeat the label, so a provider whose label
+    already IS its model does not print the same string twice.
+    """
+    model = row.get("model")
+    if not model or model == row.get("label"):
+        return ""
+    return f"<span class=row-sub>{e(model)}</span>"
+
+
 def _cost_band(summary: dict[str, Any], e) -> str:
     rows = summary["byProvider"]
     if not rows:
@@ -264,7 +282,8 @@ def _cost_band(summary: dict[str, Any], e) -> str:
 """
 
     cards = "\n".join(
-        f"<div class=card><span class=card-model>{e(r['label'])}</span>"
+        f"<div class=card><span class=card-model>{e(r['label'])}"
+        f"{_model_sub(r, e)}</span>"
         f"<div class=card-figure><span class=figure-lg>"
         f"{round(r['deltaInputTokens'] / max(r['documents'], 1)):+,}</span>"
         f"<span class=figure-note>input tokens per document</span></div>"
@@ -371,17 +390,7 @@ def _accuracy_rungs(rows: list[dict[str, Any]], e) -> str:
     if not rows:
         return ""
     body = "".join(
-        # The model id sits under the label because the label alone is not
-        # always a model: two of the four name a vendor or a place, and this
-        # tool's own finding is that the overhead constant is per model, so a
-        # reader quoting a figure needs to know which weights produced it.
-        f"<tr><td>{e(r['label'])}"
-        + (
-            f"<span class=row-sub>{e(r['model'])}</span>"
-            if r.get("model") and r["model"] != r["label"]
-            else ""
-        )
-        + "</td>"
+        f"<tr><td>{e(r['label'])}{_model_sub(r, e)}</td>"
         f"<td><span class=pill>{e(_RUNG_LABELS.get(r['rung'], r['rung']))}</span></td>"
         f"<td class=n>{e(_half_figure(r['direct']))}</td>"
         f"<td class=n>{e(_half_figure(r['sdk']))}</td></tr>"
@@ -734,7 +743,8 @@ def _appendix(summary: dict[str, Any], e) -> str:
         doc_groups = _doc_table(summary["byDocument"])
 
     prov_rows = "\n".join(
-        f"<tr><td>{e(r['label'])}</td><td class=n>{r['documents']}</td>"
+        f"<tr><td>{e(r['label'])}{_model_sub(r, e)}</td>"
+        f"<td class=n>{r['documents']}</td>"
         f"<td class='n d'>{r['deltaInputTokens']:+,}</td>"
         f"<td class=n>{r['deltaOutputTokens']:+,}</td>"
         f"<td class=n>{e(_spread(r['deltaMin'], r['deltaMax']))}</td>"
