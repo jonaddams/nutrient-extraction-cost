@@ -275,6 +275,83 @@ def test_the_rates_it_shows_carry_the_date_they_were_checked():
     assert "2026-08-14" in emit.text
 
 
+# --- Opening the finished report -----------------------------------------
+#
+# Spec B's last clause was "runs, opens the report". The report on disk is the
+# deliverable; opening it is a convenience, so nothing here may turn a completed,
+# paid-for run into a failure.
+
+
+def test_the_report_is_opened_as_a_file_url():
+    from costlab import runner
+
+    opened = []
+    runner._open_report(
+        Path("/tmp/somewhere/report.html"), lambda *a: None, opener=opened.append
+    )
+    # Asserted by property, not as a literal: the path is resolved, and on macOS
+    # /tmp is a symlink to /private/tmp, so a hardcoded URL tests the platform
+    # rather than the code.
+    assert len(opened) == 1
+    assert opened[0].startswith("file:///")
+    assert opened[0].endswith("/somewhere/report.html")
+
+
+def test_a_path_with_spaces_is_still_a_valid_url():
+    """A prospect's folder is called "Q3 Claims", not "q3-claims"."""
+    from costlab import runner
+
+    opened = []
+    runner._open_report(
+        Path("/tmp/Q3 Claims/report.html"), lambda *a: None, opener=opened.append
+    )
+    assert opened[0].endswith("/Q3%20Claims/report.html"), opened
+    assert " " not in opened[0]
+
+
+def test_a_failing_opener_does_not_sink_a_finished_run():
+    """Headless box, no browser, locked-down desktop. The calls are already paid
+    for and the file already written — raising here would report the whole run as
+    a failure over a convenience."""
+    from costlab import runner
+
+    said = []
+
+    def explode(url):
+        raise OSError("no display")
+
+    runner._open_report(Path("/tmp/x/report.html"), said.append, opener=explode)
+    assert any("/tmp/x/report.html" in line for line in said)
+
+
+def test_an_opener_that_finds_no_browser_says_where_the_file_is():
+    """webbrowser.open returns False rather than raising when it cannot find a
+    browser, which is easy to treat as success."""
+    from costlab import runner
+
+    said = []
+    runner._open_report(Path("/tmp/x/report.html"), said.append, opener=lambda url: False)
+    assert any("/tmp/x/report.html" in line for line in said)
+
+
+def test_the_wizard_asks_for_the_report_to_be_opened():
+    from costlab import runner
+
+    argv = runner._wizard_argv(
+        {"providers": ["bedrock"], "corpus": "costlab/corpus"}
+    )
+    assert "--open" in argv
+
+
+def test_a_flag_driven_run_does_not_open_a_browser_by_default():
+    """Scripted and CI runs must not launch anything. Opening is opt-in, and the
+    wizard is the thing that opts in."""
+    from costlab import runner
+
+    assert runner._build_parser().parse_args(["--corpus", "x"]).open is False
+    assert runner._build_parser().parse_args(["--open"]).open is True
+
+
 def test_bare_argv_routes_to_the_wizard():
     """`costlab` with nothing after it. Checked against real argv rather than a
     parsed namespace, because every flag has a default and a namespace cannot

@@ -120,7 +120,9 @@ the table is named as unquotable rather than as free, and a self-hosted runtime 
 distinguished from it: one is billing money we cannot quote, the other is not
 billing at all.
 
-Anything other than `y`/`yes` calls nothing, and so does Ctrl-C.
+Anything other than `y`/`yes` calls nothing, and so does Ctrl-C. On `yes` it runs
+and then opens the report in your browser; if there is no browser to open, the run
+still succeeds and prints the path.
 
 ### Options
 
@@ -132,6 +134,7 @@ Anything other than `y`/`yes` calls nothing, and so does Ctrl-C.
 | `--mode cost\|accuracy` | `cost` (default): one shared schema for every document. `accuracy`: each document's own answer-key fields — see [Accuracy](#accuracy). |
 | `--answers PATH` | Score against this answer key instead of the bundled one. JSON or CSV (`docId,field,value,source`). Rescopes every document's request to that key's fields **regardless of `--mode`** — a cost-mode run supplying `--answers` still asks each document only for the key's fields, so its token counts are no longer comparable with an ordinary cost run's. |
 | `--join DIR,DIR` | Combine previous runs into one report instead of calling anything. See [Joining runs](#joining-runs). |
+| `--open` | Open the finished report in a browser. Off by default so a scripted or CI run launches nothing; the wizard turns it on. If no browser is available the run still succeeds and prints the path. |
 | `--no-capture-bodies` | Do not write request or response bodies to disk. |
 | `--out DIR` | Where to write results. Defaults to `out/`. |
 | `--yes` | Skip the confirmation prompt. |

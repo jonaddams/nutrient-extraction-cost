@@ -590,14 +590,15 @@ def _join(args) -> int:
     print()
     print(report.render_terminal(summary))
     print(f"\nreport -> {out_dir / 'report.html'}")
+    if args.open:
+        _open_report(out_dir / "report.html", print)
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
-    # Stamped before the run, not after: a report that claims it started when
-    # it finished is a false statement about a long run.
-    run_started = datetime.now().astimezone().isoformat(timespec="seconds")
-
+def _build_parser() -> argparse.ArgumentParser:
+    """The one place a flag is defined, so the wizard and a scripted run
+    cannot drift into two different sets of options.
+    """
     parser = argparse.ArgumentParser(
         prog="costlab",
         description=(
@@ -654,6 +655,62 @@ def main(argv: list[str] | None = None) -> int:
             "measurements as one row."
         ),
     )
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help=(
+            "open the finished report in a browser. Off by default so a "
+            "scripted or CI run launches nothing; the wizard turns it on."
+        ),
+    )
+    return parser
+
+
+def _wizard_argv(chosen: dict[str, Any]) -> list[str]:
+    """The wizard's answers as flags.
+
+    Re-entering through the same parser a typed command uses is what stops the
+    wizard becoming a second, differently-behaved way to start a run — so its
+    output is argv, not a bag of keyword arguments.
+    """
+    return [
+        "--providers", ",".join(chosen["providers"]),
+        "--corpus", str(chosen["corpus"]),
+        "--yes",
+        # Spec B's last clause: the wizard runs, then opens the report.
+        "--open",
+    ]
+
+
+def _open_report(path: Path, emit, opener=None) -> None:
+    """Show the finished report, or say where it is.
+
+    The file on disk is the deliverable and the calls behind it are already paid
+    for, so nothing here may raise: a locked-down desktop, a headless box or an
+    SSH session must not turn a completed run into a failure. `webbrowser.open`
+    signals "no browser" by returning False rather than raising, which is easy to
+    read as success, so both outcomes are handled.
+    """
+    if opener is None:
+        import webbrowser
+
+        opener = webbrowser.open
+    # as_uri() percent-encodes, so a folder called "Q3 Claims" survives.
+    url = path.resolve().as_uri()
+    try:
+        opened = opener(url)
+    except Exception as err:  # noqa: BLE001 - a convenience must not be fatal
+        emit(f"Could not open a browser ({err}). The report is at {path}")
+        return
+    if opened is False:
+        emit(f"No browser available. The report is at {path}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Stamped before the run, not after: a report that claims it started when
+    # it finished is a false statement about a long run.
+    run_started = datetime.now().astimezone().isoformat(timespec="seconds")
+
     # Bare `costlab`, with nothing after it, is the wizard. Checked against the
     # real argv rather than against defaults, because every flag has a default
     # and a parsed namespace cannot tell "unset" from "set to the default".
@@ -667,14 +724,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         if chosen is None:
             return 1
-        # Re-entered through the same parser the flags use, so the wizard cannot
-        # drift into a second, differently-behaved way of starting a run.
-        return main([
-            "--providers", ",".join(chosen["providers"]),
-            "--corpus", str(chosen["corpus"]),
-            "--yes",
-        ])
+        return main(_wizard_argv(chosen))
 
+    parser = _build_parser()
     args = parser.parse_args(argv)
 
     if args.join:
@@ -817,6 +869,8 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print(report.render_terminal(summary))
     print(f"\nreport -> {out_dir / 'report.html'}")
+    if args.open:
+        _open_report(out_dir / "report.html", print)
     return 0
 
 
