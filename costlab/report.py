@@ -21,7 +21,7 @@ from .agreement import agreement, agreement_summary
 from .answers import AnswerKey
 from .prices import PriceTable
 from .providers import PROVIDERS
-from .score import score_records, score_summary
+from .score import accuracy_by_model, score_records, score_summary
 
 # Stated wherever the two halves are compared on price. They are not
 # feature-equivalent, and a comparison that omits this is the most misleading
@@ -234,6 +234,17 @@ def summarise(
         "unmeasurable": unmeasurable,
         "retried": retried,
         "accuracy": accuracy,
+        # The same numbers as `accuracy`, regrouped one row per model and
+        # ordered frontier to self-hosted. Kept alongside rather than replacing
+        # it: the appendix still lists the halves separately, and a consumer
+        # reading `accuracy` should not have to learn a new shape.
+        "accuracyByModel": accuracy_by_model(
+            accuracy,
+            PROVIDERS,
+            # Resolved per provider rather than passed through raw, so a row
+            # names the weights even when the run recorded no explicit model.
+            {r["providerId"]: model_for(r["providerId"]) for r in accuracy},
+        ),
         "agreement": agreement_rows,
         "agreementSummary": agreement_summary(agreement_rows),
         "mixedSchemas": mixed_schemas,

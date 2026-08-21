@@ -223,6 +223,16 @@ section.band {
   letter-spacing: 0.24px;
   color: var(--text-neutral-tertiary);
 }
+/* A model id under a table row's label. Mono and not uppercased: it is an
+   identifier a reader may need to copy, not a caption. */
+.row-sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-neutral-tertiary);
+  margin-top: 3px;
+}
+
 .card-figure { display: flex; flex-direction: column; gap: 2px; }
 .card-figure.split { padding-top: 14px; border-top: 1px solid var(--border-neutral-default-primary); }
 .figure-lg {
@@ -468,9 +478,10 @@ this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) 
 </section>
 
 
-<section class=band id="agreement">
-<p class=eyebrow>02 — Accuracy</p>
+<section class=band id="accuracy">
+<p class=eyebrow>02 — Agreement</p>
 <h2>Six configurations, one field across seventeen documents, seven disagreements</h2>
+
 <p class=standfirst>Every comparison here is of the same single field, documentTitle, once per document across seventeen documents. It is the only field this run requested, so the rate describes that field and no other — the agreements are that field too.</p>
 <p class=standfirst>Looking at two values, you cannot tell which is right without a citation back to the page — and a citation is exactly what the grounded half returns and the direct half does not. Agreement is agreement, not correctness: two models can agree and both be wrong.</p>
 <div class=cards>
@@ -511,6 +522,7 @@ this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) 
 </div>
 <p class=standfirst>Every value each configuration returned is in
 <a href="#appendix-c">Appendix C</a>.</p>
+
 
 </section>
 

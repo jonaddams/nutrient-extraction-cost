@@ -218,6 +218,16 @@ section.band {
   letter-spacing: 0.24px;
   color: var(--text-neutral-tertiary);
 }
+/* A model id under a table row's label. Mono and not uppercased: it is an
+   identifier a reader may need to copy, not a caption. */
+.row-sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-neutral-tertiary);
+  margin-top: 3px;
+}
+
 .card-figure { display: flex; flex-direction: column; gap: 2px; }
 .card-figure.split { padding-top: 14px; border-top: 1px solid var(--border-neutral-default-primary); }
 .figure-lg {

@@ -330,9 +330,89 @@ def representative_disagreements(
     return ordered[:limit], max(len(ordered) - limit, 0)
 
 
+# What each rung concedes, spelled out. "frontier" and "self-hosted" alone are
+# jargon; the reader needs to see that moving down the table trades a hosted API
+# for weights you run, because that trade IS the argument.
+_RUNG_LABELS = {
+    "frontier": "frontier · hosted API",
+    "hosted": "open weights · hosted",
+    "self-hosted": "open weights · self-hosted",
+}
+
+
+def _half_figure(half: dict[str, Any] | None) -> str:
+    """One half's score, with its own denominator.
+
+    Three outcomes that must stay visibly different: the half never ran (em
+    dash), it ran and nothing was scoreable (`not scoreable`), or it has a
+    figure. Rendering either of the first two as `0%` would say the model got
+    everything wrong, which is a different and much worse claim than not
+    knowing.
+    """
+    if half is None:
+        return "—"
+    if half["accuracy"] is None:
+        return "not scoreable"
+    return f"{half['matched']}/{half['verified']} ({half['accuracy']:.0%})"
+
+
+def _accuracy_rungs(rows: list[dict[str, Any]], e) -> str:
+    """One row per model, frontier to self-hosted.
+
+    Organised by model rather than by provider-and-half because the comparison a
+    buyer is making is between models, and the on-prem rung is the argument:
+    a self-hosted model landing near a frontier one is the finding. Grouped by
+    provider-and-half, the reader has to join those rows themselves.
+
+    Each half keeps its own denominator on purpose — the two are routinely
+    computed over different document counts, and one shared denominator would
+    hide that while inviting a like-for-like reading.
+    """
+    if not rows:
+        return ""
+    body = "".join(
+        # The model id sits under the label because the label alone is not
+        # always a model: two of the four name a vendor or a place, and this
+        # tool's own finding is that the overhead constant is per model, so a
+        # reader quoting a figure needs to know which weights produced it.
+        f"<tr><td>{e(r['label'])}"
+        + (
+            f"<span class=row-sub>{e(r['model'])}</span>"
+            if r.get("model") and r["model"] != r["label"]
+            else ""
+        )
+        + "</td>"
+        f"<td><span class=pill>{e(_RUNG_LABELS.get(r['rung'], r['rung']))}</span></td>"
+        f"<td class=n>{e(_half_figure(r['direct']))}</td>"
+        f"<td class=n>{e(_half_figure(r['sdk']))}</td></tr>"
+        for r in rows
+    )
+    return f"""
+<div class=scroll id="accuracy-by-model">
+<table>
+<thead><tr><th>model</th><th>runs on</th><th class=n>direct call</th>
+    <th class=n>with Nutrient SDK</th></tr></thead>
+{body}
+</table>
+</div>
+<p class=standfirst>Scored against the answer key: a field the key does not
+cover is never counted against a model, and a cell the harness could not read
+counts as <em>not scoreable</em> rather than as a zero. The two halves of a row
+may be computed over <strong>different document counts</strong>, so each carries
+its own denominator — read a difference between them alongside those, not as a
+like-for-like comparison. Full per-half detail, including what was excluded as
+not confidently compared, is in
+<a href="#appendix-accuracy">the accuracy panel</a>.</p>
+"""
+
+
 def _accuracy_band(summary: dict[str, Any], e) -> str:
     a = summary["agreementSummary"]
-    if not a["fields"]:
+    rungs = _accuracy_rungs(summary.get("accuracyByModel", []), e)
+    # Either half of this band can be empty: a cost-mode run has nothing scored,
+    # and a single-configuration run has nothing to compare. The band is only
+    # absent when both are.
+    if not a["fields"] and not rungs:
         return ""
     judged = a["agreed"] + a["disagreed"]
     if "rate" in a:
@@ -463,10 +543,17 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
 <a href="#appendix-c">Appendix C</a>.</p>
 """
 
-    return f"""
-<section class=band id="agreement">
-<p class=eyebrow>02 — Accuracy</p>
-<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {headline_scope}, {headline_tail}</h2>
+    # The agreement sentence carries the scope disclosure that stops "one field
+    # on seventeen documents" reading as "seventeen fields". It is the h2 when
+    # agreement is all this band has, and a standfirst under the accuracy
+    # headline when it is not -- but it is never dropped.
+    agreement_sentence = (
+        f"{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, "
+        f"{headline_scope}, {headline_tail}"
+    )
+    agreement_block = ""
+    if a["fields"]:
+        agreement_block = f"""
 <p class=standfirst>{e(scope_sentence)}</p>
 <p class=standfirst>{e(AGREEMENT_FRAMING)}</p>
 <div class=cards>
@@ -479,6 +566,42 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
 </div>
 {in_full}
 {all_ranked}
+"""
+
+    if rungs:
+        # Scored accuracy leads. Agreement is context for it, not a substitute:
+        # two models can agree and both be wrong, so a page that opens on an
+        # agreement rate has buried the figure a buyer is actually buying.
+        scored = summary["accuracyByModel"]
+        heading = (
+            f"{_plural(len(scored), 'model', spell=_spellable(len(scored))).capitalize()} "
+            "scored against the answer key"
+        )
+        eyebrow = "02 — Accuracy"
+        lead = rungs
+        follow = (
+            f"<p class=eyebrow>Where the configurations disagree</p>"
+            f"<p class=standfirst>{e(agreement_sentence)}</p>{agreement_block}"
+            if agreement_block
+            else ""
+        )
+    else:
+        # Nothing was scored, so the band cannot claim accuracy. Saying
+        # "Accuracy" over an agreement rate is the mislabel this restructure
+        # exists to remove -- it must not survive in the keyless case either.
+        heading = agreement_sentence
+        eyebrow = "02 — Agreement"
+        lead = ""
+        follow = agreement_block
+
+    # Joined rather than interpolated on their own lines: either slot can be
+    # empty, and two empty slots left three blank lines in the shipped page.
+    body = "\n".join(part for part in (lead, follow) if part.strip())
+    return f"""
+<section class=band id="accuracy">
+<p class=eyebrow>{eyebrow}</p>
+<h2>{heading}</h2>
+{body}
 </section>
 """
 

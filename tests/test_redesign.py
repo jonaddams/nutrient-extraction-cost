@@ -95,7 +95,7 @@ def test_one_field_over_many_documents_is_not_reported_as_many_fields():
     providers agreed on three other fields. There were no other fields.
     """
     html = render_html.render(_one_field_many_docs())
-    head = html[html.index('id="agreement"'):]
+    head = html[html.index('id="accuracy"'):]
     headline = head[head.index("<h2>"):head.index("</h2>")]
 
     assert "four fields" not in headline.lower(), (
@@ -620,7 +620,7 @@ def test_nothing_judged_says_so_plainly():
 
     assert "no disagreements" not in headline
     assert "nothing could be judged" in headline
-    accuracy = out[out.index('id="agreement"'):]
+    accuracy = out[out.index('id="accuracy"'):]
     card = accuracy[: accuracy.index("card accent") + 400]
     assert "0 of 0" not in card
     assert "nothing could be judged" in card
@@ -693,7 +693,7 @@ def test_the_flagship_card_does_not_print_four_decimals_over_a_dollar():
     ]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
     out = render_html.render(summary)
-    cost = out[out.index('id="cost"'): out.index('id="agreement"')]
+    cost = out[out.index('id="cost"'): out.index('id="accuracy"')]
     assert "$4000.0000" not in cost
     assert re.search(r"\$[\d,]+\.\d{2}<", cost)
 
