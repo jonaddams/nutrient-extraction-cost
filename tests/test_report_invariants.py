@@ -57,7 +57,15 @@ def _assert_invariants(html: str, label: str) -> None:
     assert "/Users/" not in html, f"{label} leaks a local path"
     assert "/home/" not in html, f"{label} leaks a local path"
     assert "C:\\" not in html, f"{label} leaks a local path"
-    assert not re.search(r"SDK-0\d\d", html), f"{label} names an internal defect id"
+    # Two id shapes: the internal SDK-0NN registry, and NAVI-NN, the Linear key
+    # that became the tracker when the team moved off JIRA. Deliberately NOT a
+    # generic LETTERS-DIGITS pattern: this report renders extracted field values,
+    # so a real invoice number (INV-5465) or model label (GPT-5) would trip a
+    # broad guard and turn the suite red on honest data. Add prefixes as trackers
+    # appear rather than widening the shape.
+    assert not re.search(r"SDK-0\d\d|NAVI-\d+", html), (
+        f"{label} names an internal defect id"
+    )
     assert not re.search(r"(sk-[A-Za-z0-9]{8}|Bearer\s+\S+)", html), (
         f"{label} looks like it carries a credential"
     )
@@ -69,8 +77,8 @@ def test_a_freshly_rendered_report_holds_the_invariants():
 
 
 def test_the_committed_example_holds_the_invariants():
-    """The example is the first thing a prospect opens, and it ships in a public
-    repo, so it is held to the same properties as a live render."""
+    """The example is the first thing a prospect opens, and it ships to a named
+    recipient, so it is held to the same properties as a live render."""
     assert EXAMPLE.exists(), f"missing {EXAMPLE}"
     _assert_invariants(EXAMPLE.read_text(), "committed example")
 
@@ -104,3 +112,24 @@ def test_the_fetch_invariant_actually_fires_on_a_css_url_reference():
         _assert_invariants(
             '<style>.x{background:url(https://evil/x.css)}</style>', "synthetic"
         )
+
+
+def test_the_defect_id_invariant_fires_on_a_linear_key():
+    """The tracker moved from an internal SDK-0NN registry to Linear, and the
+    guard knew only the old shape. This pins the new one.
+
+    The key here is deliberately synthetic, following test_provenance's synthetic
+    path: proving the shape is caught does not require shipping a real issue id
+    in a file that goes to a customer.
+    """
+    with pytest.raises(AssertionError):
+        _assert_invariants("<p>see NAVI-9999 for the runtime fix</p>", "synthetic")
+
+
+def test_the_defect_id_invariant_spares_real_extracted_values():
+    """The deliberate narrowness, pinned. This report renders extracted field
+    values, so a generic LETTERS-DIGITS guard would fail on an honest invoice
+    number or model label and teach whoever hit it to delete the guard."""
+    _assert_invariants(
+        "<p>Invoice INV-5465 extracted by GPT-5 and Qwen3-VL-235B</p>", "synthetic"
+    )

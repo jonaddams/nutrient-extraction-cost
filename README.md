@@ -139,16 +139,16 @@ extractions. This is why the with-Nutrient cell for a document runs before its d
 ## Provider support
 
 All four providers honour the SDK's endpoint override and return a usage block the proxy can read,
-so all four are measurable. The three cloud providers also **extract** correctly; LM Studio's
-with-Nutrient cells return zero fields for a reason that is not the SDK's or this tool's, described
-under [Local runtimes](#local-runtimes).
+so all four are measurable, and all four **extract** correctly. A local runtime needs two request
+keys stripped before it will, for a reason that is not this tool's, described under
+[Local runtimes](#local-runtimes).
 
 | Provider | Credential | Wire protocol | Priced in the bundled table | Extraction verified |
 |---|---|---|---|---|
 | Anthropic | `ANTHROPIC_API_KEY` | `POST /v1/messages` | yes | yes |
 | OpenAI | `OPENAI_API_KEY` | `POST /v1/chat/completions` | no — see below | yes |
 | Bedrock | `BEDROCK_API_KEY` | `POST /v1/chat/completions` | yes | yes |
-| Local runtime | none | `POST /v1/chat/completions` | no — no per-token price exists | **no — tokens only, see below** |
+| Local runtime | none | `POST /v1/chat/completions` | no — no per-token price exists | yes — with two request keys stripped, see below |
 
 A provider missing from the price table reports its token counts and **"not priced"** rather than
 `$0.00`. A zero would assert the calls were free, which is a different claim from not knowing what
@@ -163,22 +163,31 @@ export LOCAL_BASE=http://localhost:11434
 export LOCAL_MODEL=your-model-id
 ```
 
-**The with-Nutrient cells do not currently work against LM Studio, and the failure is silent.**
-Measured 2026-08-17 against LM Studio serving `qwen/qwen3-vl-8b` and `qwen/qwen3-vl-30b`: the SDK
-requests structured output (`response_format: json_schema`) together with `logprobs`, and LM Studio
-then omits the grammar-forced tokens from the assembled `content` string. What comes back is the
-model's own words with every schema-determined span deleted —
+**The with-Nutrient cells work against LM Studio, but only because this tool strips two request
+keys before forwarding.** Measured 2026-08-17 against LM Studio serving `qwen/qwen3-vl-8b` and
+`qwen/qwen3-vl-30b`: the SDK requests structured output (`response_format: json_schema`) together
+with `logprobs`, and LM Studio then omits the grammar-forced tokens from the assembled `content`
+string. What comes back is the model's own words with every schema-determined span deleted —
 
 ```
  "Progress Invoice - Riverside Mixed-Use Development — Phase 2"},b2", "b3", "b4"]
 ```
 
-— which is not parseable, so the SDK reports a successful call that extracted **zero fields**. Same
-request minus `logprobs` returns well-formed JSON from the same model, and Bedrock answers the
-identical `logprobs` + `json_schema` pair correctly, so this is LM Studio's assembly of `content`
-rather than the pair being unsupportable. Until it is fixed, a local run measures **tokens only**:
-the input-token delta is still exact, and the direct cells still return values, but treat any
-accuracy or agreement number from a local run as meaningless rather than as a poor score.
+— which is not parseable, and the SDK reports a **successful** call anyway. Across a corpus run that
+surfaced as zero extracted fields; on a single document printing `TOTAL $4,201.45` it surfaced as an
+extracted total of `201.45`. A wrong number that looks right is a different class of problem from a
+visible failure, which is why this is worth the workaround rather than a caveat.
+
+The proxy therefore removes `logprobs` and `top_logprobs` from a local runtime's requests before
+forwarding them. **Neither key contributes to prompt tokens, so the measurement this tool exists to
+make is unaffected** — and with them gone the same model returns correct values, source blocks and
+bounding boxes, verified across a 17-document corpus run on 2026-08-20 in which every with-Nutrient
+cell parsed. Bedrock answers the identical `logprobs` + `json_schema` pair correctly, so the
+dropped tokens are LM Studio's assembly of `content` rather than the pair being unsupportable.
+
+Nutrient's SDK team has reproduced the unconditional `logprobs` request and fixed it upstream; once
+you are on a release carrying that fix, the strip is no longer needed. Until then leave it in place:
+without it a local run's extracted values are silently wrong rather than visibly missing.
 
 **On macOS, a local runtime on another host needs Local Network permission — and there is usually
 no checkbox to grant it.** If the runtime is plainly up and reachable in a browser but the tool
