@@ -85,6 +85,43 @@ skip the prompt in a script.
 Output lands in `out/`: `records.json` (one record per document per cell), `report.html`,
 `report.json`, and the captured request bodies.
 
+### Just run it
+
+`costlab` with no arguments asks four questions and then waits for an explicit
+yes:
+
+```
+Providers detected:
+  anthropic    Claude Sonnet 5              ANTHROPIC_API_KEY is set
+  bedrock      Qwen3-VL 235B (Bedrock)      BEDROCK_API_KEY is set
+  local        Local runtime                no credential needed
+
+Which providers? comma-separated, or blank for all [anthropic, bedrock, local]:
+Documents folder? blank for the bundled corpus [costlab/corpus]:
+
+17 document(s) x 6 call(s) each = 102 call(s)
+Each provider below will be billed for its share of those calls:
+  Claude Sonnet 5              $3.00 per million input tokens
+  Qwen3-VL 235B (Bedrock)      $0.53 per million input tokens
+  Local runtime                runs on your own hardware — no per-token charge
+
+List prices checked 2026-08-14.
+What this actually costs depends on how long your documents are, which is not
+known until each provider has read and tokenised them, so no total is quoted here.
+
+Proceed and spend against these providers? [y/N]
+```
+
+The call count is exact. **No total is quoted**, because spend depends on how long
+your documents are and nothing knows that until each provider has tokenised them —
+a confident figure printed immediately before money is spent is the one most
+likely to be trusted and least able to be supported. A provider with no rate in
+the table is named as unquotable rather than as free, and a self-hosted runtime is
+distinguished from it: one is billing money we cannot quote, the other is not
+billing at all.
+
+Anything other than `y`/`yes` calls nothing, and so does Ctrl-C.
+
 ### Options
 
 | | |

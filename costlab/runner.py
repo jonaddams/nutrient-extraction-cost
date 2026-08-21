@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import costlab
-from . import prices, provenance, report
+from . import prices, provenance, report, wizard
 from .answers import AnswerKey, load_answers, load_answers_csv, schema_for
 from .merge import merge_runs
 from .providers import PROVIDERS, Provider, available, direct_request
@@ -654,6 +654,27 @@ def main(argv: list[str] | None = None) -> int:
             "measurements as one row."
         ),
     )
+    # Bare `costlab`, with nothing after it, is the wizard. Checked against the
+    # real argv rather than against defaults, because every flag has a default
+    # and a parsed namespace cannot tell "unset" from "set to the default".
+    if not (argv if argv is not None else sys.argv[1:]):
+        chosen = wizard.run(
+            ask=input,
+            emit=print,
+            env=dict(os.environ),
+            table=prices.load(None),
+            load_corpus=load_corpus,
+        )
+        if chosen is None:
+            return 1
+        # Re-entered through the same parser the flags use, so the wizard cannot
+        # drift into a second, differently-behaved way of starting a run.
+        return main([
+            "--providers", ",".join(chosen["providers"]),
+            "--corpus", str(chosen["corpus"]),
+            "--yes",
+        ])
+
     args = parser.parse_args(argv)
 
     if args.join:
