@@ -91,9 +91,43 @@ Output lands in `out/`: `records.json` (one record per document per cell), `repo
 | `--prices FILE` | Use your negotiated rates instead of the bundled list prices. |
 | `--mode cost\|accuracy` | `cost` (default): one shared schema for every document. `accuracy`: each document's own answer-key fields — see [Accuracy](#accuracy). |
 | `--answers PATH` | Score against this answer key instead of the bundled one. JSON or CSV (`docId,field,value,source`). Rescopes every document's request to that key's fields **regardless of `--mode`** — a cost-mode run supplying `--answers` still asks each document only for the key's fields, so its token counts are no longer comparable with an ordinary cost run's. |
+| `--join DIR,DIR` | Combine previous runs into one report instead of calling anything. See [Joining runs](#joining-runs). |
 | `--no-capture-bodies` | Do not write request or response bodies to disk. |
 | `--out DIR` | Where to write results. Defaults to `out/`. |
 | `--yes` | Skip the confirmation prompt. |
+
+### Joining runs
+
+One report can be built from several previous runs, calling nothing and spending
+nothing:
+
+```bash
+costlab --join out/frontier-run,out/local-run --out out/joined
+```
+
+This exists because the accuracy comparison a buyer wants — frontier models down
+to a self-hosted one — is not something one invocation can produce. The frontier
+models need three hosted credentials; a self-hosted model needs a runtime you
+control, serving one model at a time. Joining lets each run happen when it can
+and still be read together.
+
+The joined report **says that it is joined**: the provenance grid lists every
+run's date, and a caveat states that figures gathered at different times are
+close to like-for-like rather than exactly so.
+
+It **refuses** a merge where one provider id covers different models. A provider
+id is a route, not a model — every local runtime in this project reports as
+`local` — so combining two local runs would sum two different sets of weights
+into one row and label it with whichever run's provenance came last. If a run did
+not record which model it used, that counts as unconfirmed and is refused too:
+
+```
+cannot join these runs: 'local' ran 'qwen/qwen3-vl-8b' in run 'a' and
+'qwen/qwen3-vl-30b' in run 'b'. Merging would present two models as one row.
+```
+
+Joining a cost-mode run with an accuracy-mode run is allowed but still carries
+the mixed-schema warning, because their token counts are not comparable.
 
 ## Your documents and where they go
 

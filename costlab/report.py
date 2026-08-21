@@ -19,6 +19,7 @@ from typing import Any
 
 from .agreement import agreement, agreement_summary
 from .answers import AnswerKey
+from .merge import JOINED_RUNS_CAVEAT
 from .prices import PriceTable
 from .providers import PROVIDERS
 from .score import accuracy_by_model, score_records, score_summary
@@ -253,6 +254,13 @@ def summarise(
             OUTPUT_CAVEAT,
             TOKENIZER_CAVEAT,
             THINKING_CAVEAT,
+            # Only when it applies. A caveat present on every report is one
+            # every reader learns to skip, which costs the ones that matter.
+            *(
+                [JOINED_RUNS_CAVEAT]
+                if len((provenance or {}).get("sourceRuns", [])) > 1
+                else []
+            ),
         ],
     }
 

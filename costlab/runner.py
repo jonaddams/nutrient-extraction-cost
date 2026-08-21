@@ -32,6 +32,7 @@ from typing import Any
 import costlab
 from . import prices, provenance, report
 from .answers import AnswerKey, load_answers, load_answers_csv, schema_for
+from .merge import merge_runs
 from .providers import PROVIDERS, Provider, available, direct_request
 from .proxy import RecordingProxy
 
@@ -523,6 +524,75 @@ def run(
     return results
 
 
+def _join(args) -> int:
+    """Build one report from previous runs. Calls nothing, spends nothing.
+
+    Reads each directory's `records.json` and the `provenance` block of its
+    `report.json`, because provenance is where the models are recorded and the
+    models are what makes a merge safe or refusable.
+    """
+    dirs = [Path(d.strip()) for d in args.join.split(",") if d.strip()]
+    if len(dirs) < 2:
+        print("--join needs at least two run directories", file=sys.stderr)
+        return 2
+
+    runs = []
+    for d in dirs:
+        records_path = d / "records.json"
+        if not records_path.exists():
+            print(f"{records_path} not found", file=sys.stderr)
+            return 2
+        report_path = d / "report.json"
+        prov = None
+        if report_path.exists():
+            prov = json.loads(report_path.read_text()).get("provenance")
+        runs.append({
+            "name": d.name,
+            "records": json.loads(records_path.read_text()),
+            "provenance": prov,
+        })
+
+    try:
+        records, prov = merge_runs(runs)
+    except ValueError as err:
+        print(f"cannot join these runs: {err}", file=sys.stderr)
+        return 2
+
+    # A key is needed to score, and every joined report so far is an accuracy
+    # comparison. Without one the bands still render; they just carry agreement
+    # rather than accuracy, which the band already says honestly.
+    key = None
+    if args.answers:
+        key = (
+            load_answers_csv(args.answers)
+            if str(args.answers).lower().endswith(".csv")
+            else load_answers(args.answers)
+        )
+    elif any(r.get("schemaSource") == "answer-key" for r in records):
+        key = load_answers()
+
+    table = prices.load(args.prices)
+    summary = report.summarise(
+        records,
+        table,
+        models={m["providerId"]: m["model"] for m in prov["models"]},
+        key=key,
+        provenance=prov,
+    )
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "records.json").write_text(json.dumps(records, indent=2))
+    (out_dir / "report.json").write_text(report.render_json(summary))
+    (out_dir / "report.html").write_text(report.render_html(summary))
+    print(f"joined {len(runs)} run(s), {len(records)} record(s):")
+    for run in prov["sourceRuns"]:
+        print(f"  {run['name']:28} {run['runDate']:26} {', '.join(run['providers'])}")
+    print()
+    print(report.render_terminal(summary))
+    print(f"\nreport -> {out_dir / 'report.html'}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # Stamped before the run, not after: a report that claims it started when
     # it finished is a false statement about a long run.
@@ -573,7 +643,21 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="answer key to score against: JSON, or CSV with docId,field,value,source",
     )
+    parser.add_argument(
+        "--join",
+        default=None,
+        help=(
+            "comma-separated directories of PREVIOUS runs to combine into one "
+            "report, e.g. out/acc-frontier,out/acc-local. Calls nothing and "
+            "spends nothing. Refuses if one provider id covers different "
+            "models across the runs, since that would present two "
+            "measurements as one row."
+        ),
+    )
     args = parser.parse_args(argv)
+
+    if args.join:
+        return _join(args)
 
     chosen = available()
     if args.providers:
