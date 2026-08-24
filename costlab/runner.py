@@ -666,20 +666,70 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _wizard_argv(chosen: dict[str, Any]) -> list[str]:
-    """The wizard's answers as flags.
+def _wizard_argvs(chosen: dict[str, Any]) -> list[list[str]]:
+    """The wizard's answers as commands, in the order they must run.
 
     Re-entering through the same parser a typed command uses is what stops the
     wizard becoming a second, differently-behaved way to start a run — so its
-    output is argv, not a bag of keyword arguments.
+    output is argv, not a bag of keyword arguments. "Both" is therefore not a
+    new path through this module either: it is a cost run, an accuracy run, and
+    a --join of the two, each of them a command someone could have typed.
+
+    Returns a list because of that: one command for a single mode, three for
+    both. The caller runs them in order and stops on the first failure.
     """
-    return [
+    base = [
         "--providers", ",".join(chosen["providers"]),
         "--corpus", str(chosen["corpus"]),
         "--yes",
-        # Spec B's last clause: the wizard runs, then opens the report.
-        "--open",
     ]
+    mode = chosen["mode"]
+    answers = chosen.get("answers")
+    out = str(chosen.get("out") or "out")
+
+    # Spec B's last clause: the wizard runs, then opens the report. Only ever
+    # the LAST command below carries --open — three commands must not open
+    # three tabs, and the report worth opening is the last one written.
+    if mode != "both":
+        argv = base + ["--mode", mode, "--out", out]
+        # Left off when blank: --mode accuracy already defaults to the bundled
+        # key, and naming its path here would put a second copy of it here.
+        if answers:
+            argv += ["--answers", answers]
+        return [argv + ["--open"]]
+
+    # Separate directories, because a shared --out would have the accuracy run
+    # overwrite the cost run's records.json and the join would then be one run
+    # joined with itself. The joined report lands in `out` itself, above both.
+    cost_out, acc_out = f"{out}/cost", f"{out}/accuracy"
+    cost = base + ["--mode", "cost", "--out", cost_out]
+    accuracy = base + ["--mode", "accuracy", "--out", acc_out]
+    join = ["--join", f"{cost_out},{acc_out}", "--out", out]
+    if answers:
+        # Both the run and the join: the joined report is the one someone reads,
+        # and scoring it against the bundled key when the run used another would
+        # print the wrong numbers as the answer.
+        accuracy += ["--answers", answers]
+        join += ["--answers", answers]
+    return [cost, accuracy, join + ["--open"]]
+
+
+def _scoreable(corpus_dir: Path, answers_path: str | None) -> int:
+    """How many of a corpus's documents an answer key can score.
+
+    The wizard needs this to price an accuracy run, because `rescope_to_key`
+    drops every document the key has no entry for — so the run is as large as
+    the overlap, not as large as the corpus. Reading the corpus a second time
+    is local disk and cheap, and it keeps the wizard from having to know what a
+    Doc is.
+    """
+    # load_answers(None) is the bundled key, which is what a blank answer means.
+    key = (
+        load_answers_csv(answers_path)
+        if answers_path and str(answers_path).lower().endswith(".csv")
+        else load_answers(answers_path)
+    )
+    return sum(1 for doc in load_corpus(corpus_dir) if schema_for(key, doc.id))
 
 
 def _open_report(path: Path, emit, opener=None) -> None:
@@ -721,10 +771,18 @@ def main(argv: list[str] | None = None) -> int:
             env=dict(os.environ),
             table=prices.load(None),
             load_corpus=load_corpus,
+            scoreable=_scoreable,
         )
         if chosen is None:
             return 1
-        return main(_wizard_argv(chosen))
+        # Stops on the first failure rather than pressing on: joining a
+        # directory a failed run never wrote would present a partial
+        # measurement as a complete one.
+        for wizard_argv in _wizard_argvs(chosen):
+            code = main(wizard_argv)
+            if code != 0:
+                return code
+        return 0
 
     parser = _build_parser()
     args = parser.parse_args(argv)

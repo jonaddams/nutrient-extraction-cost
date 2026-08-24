@@ -99,7 +99,7 @@ def test_no_credentials_at_all_stops_before_asking_to_spend():
 
 
 def test_it_offers_only_the_providers_whose_credential_is_set():
-    ask = Asker("", "", "y")
+    ask = Asker("", "", "", "y")
     emit = Emitter()
     out = wizard.run(
         ask=ask,
@@ -117,7 +117,7 @@ def test_it_offers_only_the_providers_whose_credential_is_set():
 
 def test_a_blank_provider_answer_means_every_one_detected():
     out = wizard.run(
-        ask=Asker("", "", "y"),
+        ask=Asker("", "", "", "y"),
         emit=Emitter(),
         env=_env(BEDROCK_API_KEY="x"),
         table=_priced(),
@@ -130,7 +130,7 @@ def test_a_subset_can_be_chosen_which_is_how_a_costly_provider_is_excluded():
     """The reason this question exists: a provider you do not want billed today
     has to be removable without editing the environment."""
     out = wizard.run(
-        ask=Asker("bedrock", "", "y"),
+        ask=Asker("bedrock", "", "", "y"),
         emit=Emitter(),
         env=_env(BEDROCK_API_KEY="x"),
         table=_priced(),
@@ -142,7 +142,7 @@ def test_a_subset_can_be_chosen_which_is_how_a_costly_provider_is_excluded():
 def test_an_unknown_provider_is_re_asked_rather_than_silently_dropped():
     """Silently ignoring a typo would run a different, cheaper set than the
     reader asked for and report it as what they asked for."""
-    ask = Asker("bedrok", "bedrock", "", "y")
+    ask = Asker("bedrok", "bedrock", "", "", "y")
     emit = Emitter()
     out = wizard.run(
         ask=ask,
@@ -156,7 +156,7 @@ def test_an_unknown_provider_is_re_asked_rather_than_silently_dropped():
 
 
 def test_a_missing_documents_folder_is_re_asked():
-    ask = Asker("", "/definitely/not/here", "", "y")
+    ask = Asker("", "/definitely/not/here", "", "", "y")
     emit = Emitter()
     out = wizard.run(
         ask=ask,
@@ -174,7 +174,7 @@ def test_the_exact_call_count_is_stated():
     local has both, so two providers over three documents is twelve calls."""
     emit = Emitter()
     wizard.run(
-        ask=Asker("", "", "y"),
+        ask=Asker("", "", "", "y"),
         emit=emit,
         env=_env(BEDROCK_API_KEY="x"),
         table=_priced(),
@@ -189,7 +189,7 @@ def test_a_hosted_provider_with_no_list_price_is_named_as_unquotable():
     warning that matters when a budget is nearly spent."""
     emit = Emitter()
     wizard.run(
-        ask=Asker("", "", "y"),
+        ask=Asker("", "", "", "y"),
         emit=emit,
         env=_env(ANTHROPIC_API_KEY="x"),
         table=_priced(),
@@ -207,7 +207,7 @@ def test_a_self_hosted_runtime_is_not_described_as_unquotable_spend():
     cannot add to it."""
     emit = Emitter()
     wizard.run(
-        ask=Asker("local", "", "y"),
+        ask=Asker("local", "", "", "y"),
         emit=emit,
         env=_env(ANTHROPIC_API_KEY="x"),
         table=_priced(),
@@ -225,7 +225,7 @@ def test_it_never_quotes_a_total_it_cannot_know():
     unsupported figure this project keeps removing from the report."""
     emit = Emitter()
     wizard.run(
-        ask=Asker("", "", "y"),
+        ask=Asker("", "", "", "y"),
         emit=emit,
         env=_env(BEDROCK_API_KEY="x"),
         table=_priced(),
@@ -239,7 +239,7 @@ def test_it_never_quotes_a_total_it_cannot_know():
 def test_anything_other_than_yes_cancels():
     for reply in ("", "n", "no", "later", "Y E S"):
         out = wizard.run(
-            ask=Asker("", "", reply),
+            ask=Asker("", "", "", reply),
             emit=Emitter(),
             env=_env(BEDROCK_API_KEY="x"),
             table=_priced(),
@@ -250,7 +250,7 @@ def test_anything_other_than_yes_cancels():
 
 def test_yes_returns_the_chosen_settings():
     out = wizard.run(
-        ask=Asker("", "", "yes"),
+        ask=Asker("", "", "", "yes"),
         emit=Emitter(),
         env=_env(BEDROCK_API_KEY="x"),
         table=_priced(),
@@ -266,7 +266,7 @@ def test_the_rates_it_shows_carry_the_date_they_were_checked():
     rule; the wizard states prices too, so it inherits the rule."""
     emit = Emitter()
     wizard.run(
-        ask=Asker("", "", "y"),
+        ask=Asker("", "", "", "y"),
         emit=Emitter() and emit,
         env=_env(BEDROCK_API_KEY="x"),
         table=_priced(),
@@ -337,10 +337,11 @@ def test_an_opener_that_finds_no_browser_says_where_the_file_is():
 def test_the_wizard_asks_for_the_report_to_be_opened():
     from costlab import runner
 
-    argv = runner._wizard_argv(
-        {"providers": ["bedrock"], "corpus": "costlab/corpus"}
+    argvs = runner._wizard_argvs(
+        {"providers": ["bedrock"], "corpus": "costlab/corpus", "mode": "cost",
+         "answers": None, "out": "out"}
     )
-    assert "--open" in argv
+    assert "--open" in argvs[-1]
 
 
 def test_a_flag_driven_run_does_not_open_a_browser_by_default():
@@ -404,3 +405,360 @@ def test_a_keyboard_interrupt_at_a_prompt_cancels_cleanly():
         load_corpus=_corpus_of(2),
     )
     assert out is None
+
+
+# --- What to measure: cost, accuracy, or both ----------------------------
+#
+# The wizard could only ever produce a cost run: it re-entered `main` with
+# --providers/--corpus/--yes/--open and never --mode or --answers, so the one
+# artifact it could not build was the cost+accuracy report that is now the
+# committed example. Choosing "both" doubles the calls a run makes, which is
+# exactly the kind of decision this wizard exists to put in front of someone
+# before it is billed — so the choice is asked, and priced per run.
+
+
+def _scoreable_of(n):
+    """A stand-in for "how many of these documents can the key score".
+
+    Takes the same two things the real one needs — where the documents are and
+    which key to score against — so a test can describe a corpus the bundled
+    key only partly covers.
+    """
+
+    def scoreable(corpus_path, answers_path):
+        return n
+
+    return scoreable
+
+
+def test_blank_measures_cost_which_is_the_cheaper_run():
+    """The default must be the run that spends least. Someone hitting enter
+    through the wizard has not asked to double their bill."""
+    out = wizard.run(
+        ask=Asker("", "", "", "y"),
+        emit=Emitter(),
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(2),
+    )
+    assert out["mode"] == "cost"
+
+
+def test_the_wizard_asks_what_to_measure():
+    ask = Asker("", "", "", "y")
+    wizard.run(
+        ask=ask,
+        emit=Emitter(),
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(2),
+    )
+    asked = " ".join(ask.prompts).lower()
+    assert "cost" in asked and "accuracy" in asked and "both" in asked
+
+
+def test_choosing_accuracy_records_the_mode():
+    out = wizard.run(
+        ask=Asker("", "", "accuracy", "", "y"),
+        emit=Emitter(),
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(2),
+        scoreable=_scoreable_of(2),
+    )
+    assert out["mode"] == "accuracy"
+
+
+def test_an_unrecognised_mode_is_re_asked_rather_than_defaulted():
+    """The same rule the provider question follows: quietly running something
+    other than what was typed, then reporting it as what was typed, is the
+    failure this tool exists to remove."""
+    ask = Asker("", "", "acuracy", "accuracy", "", "y")
+    emit = Emitter()
+    out = wizard.run(
+        ask=ask,
+        emit=emit,
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(2),
+        scoreable=_scoreable_of(2),
+    )
+    assert out["mode"] == "accuracy"
+    assert "acuracy" in emit.text
+
+
+def test_cost_mode_never_asks_for_an_answer_key():
+    """A cost run does not score, so a key question there is a question about
+    nothing."""
+    ask = Asker("", "", "", "y")
+    wizard.run(
+        ask=ask,
+        emit=Emitter(),
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(2),
+    )
+    assert not any("answer key" in p.lower() for p in ask.prompts)
+
+
+def test_a_blank_answer_key_means_the_bundled_one():
+    out = wizard.run(
+        ask=Asker("", "", "accuracy", "", "y"),
+        emit=Emitter(),
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(2),
+        scoreable=_scoreable_of(2),
+    )
+    assert out["answers"] is None
+
+
+def test_a_supplied_answer_key_is_carried_into_the_run():
+    out = wizard.run(
+        ask=Asker("", "", "accuracy", "mine.csv", "y"),
+        emit=Emitter(),
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(2),
+        scoreable=_scoreable_of(2),
+    )
+    assert out["answers"] == "mine.csv"
+
+
+def test_accuracy_prices_only_the_documents_the_key_can_score():
+    """`rescope_to_key` drops any document the key has no entry for. Quoting the
+    whole corpus would overstate the run the reader is about to authorise."""
+    emit = Emitter()
+    out = wizard.run(
+        ask=Asker("", "", "accuracy", "", "y"),
+        emit=emit,
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(17),
+        scoreable=_scoreable_of(3),
+    )
+    # bedrock and local are both detected here and both have a grounded half,
+    # so four calls per document — over the 3 scoreable ones, not all 17.
+    assert out["calls"] == 12
+    assert "3 of 17" in emit.text
+
+
+def test_a_corpus_the_key_cannot_score_at_all_is_refused_not_scheduled():
+    """Today this exits 2 after the wizard has already promised a run. The
+    wizard knows enough to say so before asking for a yes."""
+    emit = Emitter()
+    out = wizard.run(
+        ask=Asker("", "", "accuracy", "", "cost", "y"),
+        emit=emit,
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(17),
+        scoreable=_scoreable_of(0),
+    )
+    assert "nothing an accuracy run could score" in emit.text
+    assert out["mode"] == "cost", "it must fall back to a question, not a run"
+
+
+def test_both_states_each_run_and_the_combined_total():
+    emit = Emitter()
+    out = wizard.run(
+        ask=Asker("", "", "both", "", "y"),
+        emit=emit,
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(10),
+        scoreable=_scoreable_of(10),
+    )
+    assert out["mode"] == "both"
+    # 10 documents x 4 calls, twice over: a cost run and an accuracy run.
+    assert out["calls"] == 80
+    assert "40 call" in emit.text, "each run's own count"
+    assert "80 call" in emit.text, "and the total they add up to"
+
+
+def test_both_says_out_loud_that_it_is_two_runs():
+    """The doubling is the whole reason this question exists. It must be stated,
+    not left to be inferred from a larger number."""
+    emit = Emitter()
+    wizard.run(
+        ask=Asker("", "", "both", "", "y"),
+        emit=emit,
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(10),
+        scoreable=_scoreable_of(10),
+    )
+    text = emit.text.lower()
+    assert "two runs" in text or "two separate runs" in text
+
+
+def test_both_still_quotes_no_total_in_dollars():
+    """The rule the wizard was built on survives the larger number."""
+    emit = Emitter()
+    wizard.run(
+        ask=Asker("", "", "both", "", "y"),
+        emit=emit,
+        env=_env(BEDROCK_API_KEY="x"),
+        table=_priced(),
+        load_corpus=_corpus_of(10),
+        scoreable=_scoreable_of(10),
+    )
+    assert "estimated total" not in emit.text.lower()
+    assert "depends on" in emit.text.lower()
+
+
+# --- The wizard's answers as commands ------------------------------------
+#
+# The wizard re-enters the same parser a typed command uses, so it cannot become
+# a second, differently-behaved way to start a run. "Both" is therefore not a
+# new code path through the runner — it is three ordinary commands in order: a
+# cost run, an accuracy run, and a --join of the two.
+
+
+def _chosen(**kw):
+    base = {
+        "providers": ["bedrock"],
+        "corpus": "costlab/corpus",
+        "mode": "cost",
+        "answers": None,
+        "out": "out",
+        "confirmed": True,
+    }
+    base.update(kw)
+    return base
+
+
+def test_a_cost_wizard_run_is_one_command():
+    from costlab import runner
+
+    argvs = runner._wizard_argvs(_chosen(mode="cost"))
+    assert len(argvs) == 1
+    assert argvs[0][argvs[0].index("--mode") + 1] == "cost"
+    assert "--open" in argvs[0]
+
+
+def test_an_accuracy_wizard_run_carries_its_key():
+    from costlab import runner
+
+    argvs = runner._wizard_argvs(_chosen(mode="accuracy", answers="mine.csv"))
+    assert len(argvs) == 1
+    assert argvs[0][argvs[0].index("--mode") + 1] == "accuracy"
+    assert argvs[0][argvs[0].index("--answers") + 1] == "mine.csv"
+
+
+def test_the_bundled_key_is_left_unstated_rather_than_guessed_at():
+    """--mode accuracy already defaults to the bundled key. Passing a path we
+    invented would hardcode its location into the wizard."""
+    from costlab import runner
+
+    argvs = runner._wizard_argvs(_chosen(mode="accuracy"))
+    assert "--answers" not in argvs[0]
+
+
+def test_both_is_a_cost_run_an_accuracy_run_and_a_join():
+    from costlab import runner
+
+    argvs = runner._wizard_argvs(_chosen(mode="both"))
+    assert len(argvs) == 3
+    assert [a[a.index("--mode") + 1] for a in argvs[:2]] == ["cost", "accuracy"]
+    assert "--join" in argvs[2]
+
+
+def test_the_two_runs_of_both_write_to_different_directories():
+    """One --out for both would have the accuracy run overwrite the cost run's
+    records, and the join would then be a run joined with itself."""
+    from costlab import runner
+
+    argvs = runner._wizard_argvs(_chosen(mode="both"))
+    first = argvs[0][argvs[0].index("--out") + 1]
+    second = argvs[1][argvs[1].index("--out") + 1]
+    assert first != second
+
+
+def test_the_join_reads_exactly_the_two_directories_just_written():
+    from costlab import runner
+
+    argvs = runner._wizard_argvs(_chosen(mode="both"))
+    cost_out = argvs[0][argvs[0].index("--out") + 1]
+    acc_out = argvs[1][argvs[1].index("--out") + 1]
+    joined = argvs[2][argvs[2].index("--join") + 1].split(",")
+    assert joined == [cost_out, acc_out]
+
+
+def test_only_the_last_command_of_both_opens_a_browser():
+    """Three commands must not open three tabs. The joined report is the
+    deliverable; the two runs behind it are intermediate."""
+    from costlab import runner
+
+    argvs = runner._wizard_argvs(_chosen(mode="both"))
+    assert [("--open" in a) for a in argvs] == [False, False, True]
+
+
+def test_a_custom_key_reaches_the_join_so_the_report_scores_against_it():
+    """The joined report is the one someone reads. Scoring it against the
+    bundled key when the run used a different one would report the wrong
+    numbers as the answer."""
+    from costlab import runner
+
+    argvs = runner._wizard_argvs(_chosen(mode="both", answers="mine.csv"))
+    assert argvs[2][argvs[2].index("--answers") + 1] == "mine.csv"
+
+
+def test_main_runs_every_wizard_command_in_order():
+    from costlab import runner
+
+    seen = []
+    original_wizard, original_main = runner.wizard.run, runner.main
+    runner.wizard.run = lambda **kw: _chosen(mode="both")
+    try:
+
+        def fake_main(argv=None):
+            if argv == []:
+                return original_main([])
+            seen.append(argv)
+            return 0
+
+        runner.main = fake_main
+        assert fake_main([]) == 0
+    finally:
+        runner.wizard.run, runner.main = original_wizard, original_main
+    assert len(seen) == 3, "a both-run is three commands"
+    assert "--join" in seen[-1]
+
+
+def test_a_failed_run_stops_the_sequence_before_the_join():
+    """Joining a directory the failed run never wrote would report a partial
+    measurement as a complete one."""
+    from costlab import runner
+
+    seen = []
+    original_wizard, original_main = runner.wizard.run, runner.main
+    runner.wizard.run = lambda **kw: _chosen(mode="both")
+    try:
+
+        def fake_main(argv=None):
+            if argv == []:
+                return original_main([])
+            seen.append(argv)
+            return 2
+
+        runner.main = fake_main
+        assert fake_main([]) == 2
+    finally:
+        runner.wizard.run, runner.main = original_wizard, original_main
+    assert len(seen) == 1, "the second command must not run after a failure"
+    assert seen[0][seen[0].index("--mode") + 1] == "cost", "it stopped at the first"
+
+
+def test_offering_accuracy_without_a_way_to_count_it_says_so():
+    """A caller that offers accuracy but injects no counter is a programming
+    error. It must not quietly price the whole corpus — that is exactly the
+    overstatement the count exists to prevent."""
+    with pytest.raises(TypeError, match="scoreable"):
+        wizard.run(
+            ask=Asker("", "", "accuracy", ""),
+            emit=Emitter(),
+            env=_env(BEDROCK_API_KEY="x"),
+            table=_priced(),
+            load_corpus=_corpus_of(2),
+        )

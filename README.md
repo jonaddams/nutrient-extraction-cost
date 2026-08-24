@@ -87,7 +87,7 @@ Output lands in `out/`: `records.json` (one record per document per cell), `repo
 
 ### Just run it
 
-`costlab` with no arguments asks four questions and then waits for an explicit
+`costlab` with no arguments asks a few questions and then waits for an explicit
 yes:
 
 ```
@@ -99,7 +99,16 @@ Providers detected:
 Which providers? comma-separated, or blank for all [anthropic, bedrock, local]:
 Documents folder? blank for the bundled corpus [costlab/corpus]:
 
-17 document(s) x 6 call(s) each = 102 call(s)
+  cost       token cost, one shared schema across every document
+  accuracy   scored against an answer key, each document's own fields
+  both       two runs, joined into one report — costs the sum of the two
+Measure cost, accuracy, or both? blank for cost [cost, accuracy, both]:
+Answer key to score against? blank for the bundled one, or a path to JSON or CSV:
+
+This is two runs, one after the other, joined into one report — so it costs the sum of both.
+  cost run       17 document(s) x 6 call(s) each = 102 call(s)
+  accuracy run   17 document(s) x 6 call(s) each = 102 call(s)
+  total          204 call(s)
 Each provider below will be billed for its share of those calls:
   Claude Sonnet 5              $3.00 per million input tokens
   Qwen3-VL 235B (Bedrock)      $0.53 per million input tokens
@@ -120,9 +129,24 @@ the table is named as unquotable rather than as free, and a self-hosted runtime 
 distinguished from it: one is billing money we cannot quote, the other is not
 billing at all.
 
+**Cost, accuracy, or both.** Blank is `cost`, the cheaper run. `both` is what
+produces the report in `examples/` — the one carrying a cost band and a scored
+accuracy band together — and it is asked rather than assumed because it is two
+runs, so it costs the sum of the two. It runs a cost run, then an accuracy run,
+then `--join`s them; each is an ordinary command you could have typed yourself,
+and the two runs land in `out/cost` and `out/accuracy` with the joined report
+above them in `out/`.
+
+An accuracy run is only as large as the documents your answer key covers, because
+a document the key has no entry for is skipped rather than asked about — so its
+call count is quoted over those documents, not over the whole corpus, and you are
+told when the two differ. A corpus the key cannot score at all is refused at the
+question rather than after the yes.
+
 Anything other than `y`/`yes` calls nothing, and so does Ctrl-C. On `yes` it runs
 and then opens the report in your browser; if there is no browser to open, the run
-still succeeds and prints the path.
+still succeeds and prints the path. A `both` run opens the joined report only —
+three commands, one tab.
 
 ### Options
 
