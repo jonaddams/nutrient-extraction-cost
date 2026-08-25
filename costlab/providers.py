@@ -51,6 +51,16 @@ class Provider:
     auth_prefix: str = "Bearer "
     extra_headers: tuple[tuple[str, str], ...] = ()
 
+    # Which parameter bounds the direct call's output. Declared per provider
+    # rather than per dialect: three providers speak the OpenAI wire and they do
+    # NOT agree on this key. OpenAI's newer models reject `max_tokens` with a
+    # 400, while Bedrock and a local runtime accepted it and returned usage in
+    # the same run OpenAI's direct half failed in -- so renaming it for the
+    # whole dialect would break the two halves that work to fix the one that
+    # does not. `_DIRECT_MAX_TOKENS` is the value either way; only the name
+    # differs.
+    output_cap_key: str = "max_tokens"
+
     @property
     def is_openai_wire(self) -> bool:
         """True when this provider speaks the OpenAI chat-completions dialect.
@@ -101,6 +111,9 @@ PROVIDERS: dict[str, Provider] = {
         upstream_base="https://api.openai.com",
         sdk_provider="openai",
         supports_nutrient_cell=True,
+        # gpt-5.4 rejects `max_tokens` with a 400 naming this as the
+        # replacement. Reproduced live 2026-08-25.
+        output_cap_key="max_completion_tokens",
     ),
     "bedrock": Provider(
         id="bedrock",
@@ -192,7 +205,7 @@ def direct_request(
                 "type": "json_schema",
                 "json_schema": {"name": "extraction", "schema": schema},
             },
-            "max_tokens": _DIRECT_MAX_TOKENS,
+            provider.output_cap_key: _DIRECT_MAX_TOKENS,
         }
 
     return {

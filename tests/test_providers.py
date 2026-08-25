@@ -113,7 +113,12 @@ def test_every_direct_request_bounds_its_own_output():
     }
     for pid, provider in PROVIDERS.items():
         body = direct_request(provider, provider.default_model, "doc text", schema)
-        assert body.get("max_tokens"), f"{pid} sends an unbounded direct request"
+        # By the provider's own declared key, not a hardcoded name: OpenAI needs
+        # `max_completion_tokens` and rejects `max_tokens` outright, so asserting
+        # one name would either miss the cap or force the name that 400s.
+        assert body.get(provider.output_cap_key), (
+            f"{pid} sends an unbounded direct request"
+        )
 
 
 def test_a_truncated_direct_answer_is_unreadable_not_a_wrong_answer():
@@ -132,3 +137,41 @@ def test_a_truncated_direct_answer_is_unreadable_not_a_wrong_answer():
         ]
     }
     assert extracted_values(truncated, with_nutrient=False) is None
+
+
+def test_openai_bounds_output_with_the_parameter_its_api_accepts():
+    """gpt-5.4 refuses `max_tokens` outright. Reproduced against the live API on
+    2026-08-25, on the first OpenAI call made since the cap was introduced:
+
+        400 invalid_request_error  unsupported_parameter
+        Unsupported parameter: 'max_tokens' is not supported with this model.
+        Use 'max_completion_tokens' instead.
+
+    Every one of the 17 direct OpenAI cells in a run failed this way while the
+    with-Nutrient half succeeded, because the SDK builds its own body. The run
+    still exited 0 and the report simply carried an unpriced half -- which is
+    why this is a test and not a comment.
+    """
+    from costlab.providers import PROVIDERS, direct_request
+
+    body = direct_request(
+        PROVIDERS["openai"], "gpt-5.4", "doc text", {"type": "object"}
+    )
+    assert body.get("max_completion_tokens"), "the cap OpenAI accepts"
+    assert "max_tokens" not in body, "the cap OpenAI rejects with a 400"
+
+
+def test_the_other_openai_wire_providers_keep_the_parameter_they_accepted():
+    """Bedrock and the local runtime both took `max_tokens` and returned usage
+    in the same run OpenAI's direct half failed in. Renaming the parameter for
+    the whole dialect would break the two halves that work to fix the one that
+    does not, so the name is per-provider.
+    """
+    from costlab.providers import PROVIDERS, direct_request
+
+    for pid in ("bedrock", "local"):
+        body = direct_request(
+            PROVIDERS[pid], PROVIDERS[pid].default_model, "doc text", {"type": "object"}
+        )
+        assert body.get("max_tokens"), f"{pid} accepted max_tokens; keep sending it"
+        assert "max_completion_tokens" not in body, f"{pid} was never tested with it"
