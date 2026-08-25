@@ -226,7 +226,7 @@ One, and a reason for it:
 
 | | |
 |---|---|
-| `nutrient-sdk` | The thing being measured. |
+| `nutrient-sdk>=1.0.11` | The thing being measured. The floor is not housekeeping — see [the local runtime section](#local-runtimes) for the defect an older SDK reintroduces silently. |
 
 Everything else is the Python standard library — `http.server` for the proxy, `urllib.request` for
 outbound calls. No web framework, no provider SDKs, no HTTP client library. The dependency list is
@@ -272,8 +272,9 @@ export LOCAL_BASE=http://localhost:11434
 export LOCAL_MODEL=your-model-id
 ```
 
-**The with-Nutrient cells work against LM Studio, but only because this tool strips two request
-keys before forwarding.** Measured 2026-08-17 against LM Studio serving `qwen/qwen3-vl-8b` and
+**The with-Nutrient cells work against LM Studio. They used to need a workaround; as of
+`nutrient-sdk` 1.0.11 they do not, and this section is the history of why the floor in
+`pyproject.toml` is where it is.** Measured 2026-08-17 against LM Studio serving `qwen/qwen3-vl-8b` and
 `qwen/qwen3-vl-30b`: the SDK requests structured output (`response_format: json_schema`) together
 with `logprobs`, and LM Studio then omits the grammar-forced tokens from the assembled `content`
 string. What comes back is the model's own words with every schema-determined span deleted —
@@ -287,16 +288,25 @@ surfaced as zero extracted fields; on a single document printing `TOTAL $4,201.4
 extracted total of `201.45`. A wrong number that looks right is a different class of problem from a
 visible failure, which is why this is worth the workaround rather than a caveat.
 
-The proxy therefore removes `logprobs` and `top_logprobs` from a local runtime's requests before
+The proxy used to remove `logprobs` and `top_logprobs` from a local runtime's requests before
 forwarding them. **Neither key contributes to prompt tokens, so the measurement this tool exists to
-make is unaffected** — and with them gone the same model returns correct values, source blocks and
-bounding boxes, verified across a 17-document corpus run on 2026-08-20 in which every with-Nutrient
-cell parsed. Bedrock answers the identical `logprobs` + `json_schema` pair correctly, so the
-dropped tokens are LM Studio's assembly of `content` rather than the pair being unsupportable.
+make was unaffected either way** — and with them gone the same model returned correct values, source
+blocks and bounding boxes, verified across a 17-document corpus run on 2026-08-20. Bedrock answers
+the identical `logprobs` + `json_schema` pair correctly, so the dropped tokens were LM Studio's
+assembly of `content` rather than the pair being unsupportable.
 
-Nutrient's SDK team has reproduced the unconditional `logprobs` request and fixed it upstream; once
-you are on a release carrying that fix, the strip is no longer needed. Until then leave it in place:
-without it a local run's extracted values are silently wrong rather than visibly missing.
+**Fixed upstream in `nutrient-sdk` 1.0.11, and the strip was retired on 2026-08-25** after a real
+local run confirmed it — not on the strength of release notes, because the defect's whole character
+was that it failed silently and reported success. What that run showed: 1.0.11 **still sends**
+`logprobs` (36 of 53 captured request bodies carried it), and with the strip removed the SDK half
+came back 34 of 34 readable, scoring 50/57 direct and 51/58 SDK — identical to the run that had the
+strip, with zero unscoreable cells. So the fix repaired the SDK's handling rather than suppressing
+the parameter, which is what makes the strip genuinely redundant rather than merely unexercised.
+
+`pyproject.toml` therefore requires `nutrient-sdk>=1.0.11`. That floor is load-bearing: on an older
+SDK nothing now stands between this defect and your report, and it would show up as extracted values
+that are silently wrong rather than visibly missing. pip refusing to install is the only loud
+failure available.
 
 **On macOS, a local runtime on another host needs Local Network permission — and there is usually
 no checkbox to grant it.** If the runtime is plainly up and reachable in a browser but the tool

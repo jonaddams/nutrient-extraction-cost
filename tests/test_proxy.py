@@ -245,13 +245,28 @@ def test_an_unparseable_body_is_passed_through_rather_than_guessed_at():
     assert proxy._drop_keys(raw) is raw
 
 
-def test_only_the_local_provider_drops_request_keys():
-    """A hosted provider's confidence scores are a real feature. Stripping
-    logprobs everywhere would silently degrade them to fix a local-only bug.
+def test_no_provider_drops_request_keys_any_more():
+    """The logprobs strip is retired. NAVI-39 is fixed in nutrient-sdk 1.0.11,
+    which `pyproject.toml` now requires, so nothing needs compensating for.
+
+    Verified against a real local run before removal, never on release notes --
+    that defect failed silently and reported success. 1.0.11 STILL SENDS
+    logprobs (36 of 53 captured request bodies carried it), and the SDK half
+    came back 34/34 readable with accuracy identical to the run that had the
+    strip: 50/57 direct, 51/58 SDK, zero unscoreable. So the fix repaired the
+    handling rather than suppressing the parameter, and the strip is genuinely
+    redundant rather than merely unexercised.
+
+    The mechanism itself stays -- `_drop_keys` is tested above and is provider
+    agnostic. Only its one user is gone. If a future upstream needs the same
+    treatment, declare it on that provider; do not strip for everyone, because
+    a hosted provider's confidence scores are a real feature and stripping
+    logprobs globally would silently degrade them.
     """
     from costlab.providers import PROVIDERS
 
-    assert PROVIDERS["local"].drop_request_keys == ("logprobs", "top_logprobs")
     for pid, provider in PROVIDERS.items():
-        if pid != "local":
-            assert provider.drop_request_keys == (), pid
+        assert provider.drop_request_keys == (), (
+            f"{pid} still strips {provider.drop_request_keys}; if that is "
+            f"deliberate, this test is the place to say why"
+        )

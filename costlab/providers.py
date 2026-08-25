@@ -30,9 +30,15 @@ class Provider:
     supports_nutrient_cell: bool  # set from the Task 1 spike, never guessed
 
     # Request keys the proxy strips before forwarding, because this upstream
-    # answers WRONG rather than complaining when it receives them. Empty for
-    # every hosted provider -- see RecordingProxy._drop_keys for why a local
-    # runtime needs logprobs gone.
+    # answers WRONG rather than complaining when it receives them.
+    #
+    # Empty for every provider as of 2026-08-25. The one user was the local
+    # runtime, compensating for NAVI-39 -- the SDK's logprobs handling
+    # corrupting a local answer -- which nutrient-sdk 1.0.11 fixes, and which
+    # `pyproject.toml` now requires. The mechanism is kept because it is the
+    # honest shape for this class of upstream defect: declare it on the ONE
+    # provider that needs it, never strip for everyone, since a hosted
+    # provider's confidence scores are a real feature.
     drop_request_keys: tuple[str, ...] = ()
 
     # --- Wire shape. Not in the original plan; added because the Nutrient SDK
@@ -143,7 +149,10 @@ PROVIDERS: dict[str, Provider] = {
         upstream_base=os.environ.get("LOCAL_BASE", "http://localhost:1234"),
         sdk_provider="local",
         supports_nutrient_cell=True,
-        drop_request_keys=("logprobs", "top_logprobs"),
+        # No drop_request_keys. It carried ("logprobs", "top_logprobs") until
+        # 2026-08-25 to work around NAVI-39; nutrient-sdk 1.0.11 fixes that and
+        # is now the required floor. If a local SDK half ever comes back
+        # unreadable again, that strip is the first thing to reinstate.
     ),
 }
 
