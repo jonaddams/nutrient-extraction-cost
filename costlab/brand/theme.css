@@ -437,16 +437,21 @@ details.group > summary { display: list-item; list-style-position: outside; marg
 .dis-none { font-size: 13px; color: var(--text-neutral-tertiary); }
 .dis-table { font-size: 13px; margin: 4px 0 0; }
 .dis-table th { white-space: nowrap; }
-.dis-model { font-family: var(--font-mono); white-space: nowrap; vertical-align: top; }
-.dis-half { vertical-align: top; }
+.dis-table td { vertical-align: top; }
+.dis-model { font-family: var(--font-mono); white-space: nowrap; }
+/* The mark's own column, kept narrow and non-shrinking so every glyph on the
+   page lands at the same x-position and the table reads straight down. */
+.dis-mark { width: 1.6em; padding-right: 0; text-align: center; }
+/* Half the remaining width each, so a long value in one half cannot squeeze
+   its counterpart into a column of single words. */
+.dis-table td.dis-v, .dis-table th:nth-child(3), .dis-table th:nth-child(5) {
+  width: 45%;
+}
 /* Wraps rather than truncates: a value that differs only in its tail -- an
    extra "TRAILER NO: ..." -- is exactly the difference being shown, and an
    ellipsis would hide the evidence. */
 .dis-v { font-family: var(--font-mono); overflow-wrap: anywhere; }
-.mark {
-  display: inline-block; width: 1.1em; margin-right: 6px;
-  font-weight: 600; text-align: center;
-}
+.mark { display: inline-block; font-weight: 600; }
 .mark-match { color: var(--text-state-success); }
 .mark-mismatch { color: var(--text-state-error); }
 .mark-unverified { color: var(--text-neutral-tertiary); }

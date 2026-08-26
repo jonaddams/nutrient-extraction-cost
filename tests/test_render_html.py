@@ -531,3 +531,66 @@ def test_a_half_that_answered_nothing_is_absent_not_wrong():
     )
     html = render_html.render(summary)
     assert "no answer" in html
+
+
+def test_a_marks_words_are_an_attribute_not_visible_text():
+    """The glyph says it. The words exist only so the mark is not glyph-only for
+    a screen reader — they must never render beside the value, which is what a
+    stray print rule outside its @media block did on first attempt.
+    """
+    summary = _keyed_summary(
+        {("anthropic", False): "383350", ("anthropic", True): "345015"},
+        {"inv": {"totalAmount": {"value": "345015", "source": "Amount Due"}}},
+    )
+    html = render_html.render(summary)
+    section = html[html.index('id="appendix-c"'):]
+    assert 'aria-label="matches the key"' in section
+    assert ">matches the key<" not in section, "must not be visible text"
+    assert ">does not match the key<" not in section
+
+
+def test_the_mark_is_its_own_column_beside_each_value():
+    """Five columns: model, mark, direct, mark, SDK. The marks line up down the
+    page so the table can be scanned without reading a single value."""
+    summary = _keyed_summary(
+        {("anthropic", False): "383350", ("anthropic", True): "345015"},
+        {"inv": {"totalAmount": {"value": "345015", "source": "Amount Due"}}},
+    )
+    html = render_html.render(summary)
+    section = html[html.index('id="appendix-c"'):]
+    row = re.search(r"<tr>(?:(?!</tr>).)*383350(?:(?!</tr>).)*</tr>", section, re.S)
+    assert row, "expected a data row containing the wrong value"
+    assert row.group(0).count("<td") == 5, "model + mark + value + mark + value"
+
+
+def test_the_print_stylesheet_does_not_leak_onto_the_screen():
+    """Every rule in print.css must sit inside its @media print block. One that
+    does not applies always — which is how the screen-reader-only mark labels
+    became visible next to every value."""
+    from costlab import brand
+
+    css = brand.asset("print.css")
+    depth = 0
+    for i, ch in enumerate(css):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            assert depth >= 0, "unbalanced braces in print.css"
+    assert depth == 0, "unbalanced braces in print.css"
+    # Everything after the media block closes is unscoped.
+    start = css.index("@media print")
+    d, end = 0, None
+    for i in range(start, len(css)):
+        if css[i] == "{":
+            d += 1
+        elif css[i] == "}":
+            d -= 1
+            if d == 0:
+                end = i
+                break
+    assert end is not None
+    trailing = css[end + 1:]
+    # Comments are fine; a rule is not.
+    stripped = re.sub(r"/\*.*?\*/", "", trailing, flags=re.S).strip()
+    assert not stripped, f"unscoped rules after @media print: {stripped[:200]!r}"

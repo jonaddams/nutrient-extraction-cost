@@ -184,32 +184,41 @@ _MARKS = {
 
 
 def _mark(state: str) -> str:
+    """The glyph, with its words in an attribute rather than beside it.
+
+    The tick or cross IS the statement -- printing "matches the key" next to
+    every value triples the width of a column whose whole job is to be scanned.
+    But a glyph alone is nothing to a screen reader, so the words travel as an
+    aria-label on an image-role span. Not as visible text, and not as a
+    visually-hidden sibling either: the hidden-sibling version leaked onto the
+    screen the moment a print rule landed outside its @media block.
+    """
     kind, glyph, words = _MARKS[state]
     return (
-        f"<span class='mark mark-{kind}' aria-hidden=true>{glyph}</span>"
-        f"<span class=sr>{words}</span>"
+        f"<span class='mark mark-{kind}' role=img "
+        f'aria-label="{_escape(words, quote=True)}">{glyph}</span>'
     )
 
 
 def _half_cell(value: Any, normalised: Any, verdict: str | None, scored: bool) -> str:
-    """One half's answer, with the mark that says whether it is right.
+    """One half as TWO cells: its mark, then its value.
 
-    `normalised` decides absence, never the raw value: the comparator treats
-    None, "" and a punctuation-only placeholder as the same "no answer", and a
-    cell that showed an empty box for one and a dash for another would be
-    describing our parsing rather than the model's behaviour.
+    Separate columns rather than one cell, so every mark on the page sits at the
+    same two x-positions and the table can be read straight down them without
+    taking in a single value. `normalised` decides absence, never the raw value:
+    the comparator treats None, "" and a punctuation-only placeholder as the
+    same "no answer", and a cell showing an empty box for one and a dash for
+    another would be describing our parsing rather than the model's behaviour.
     """
     if agreement.is_absent(normalised):
-        return f"<td class=dis-half>{_mark('absent')}</td>"
-    if not scored:
-        state = "unscored"
-    else:
-        # A verdict is missing only when the key covers the field but this
-        # configuration is absent from the row, which the branch above caught.
-        state = verdict or "unscored"
+        return (
+            f"<td class=dis-mark>{_mark('absent')}</td>"
+            "<td class=dis-v><span class=dis-none>no answer</span></td>"
+        )
+    state = (verdict or "unscored") if scored else "unscored"
     return (
-        f"<td class=dis-half>{_mark(state)}"
-        f"<span class=dis-v>{_escape(str(value))}</span></td>"
+        f"<td class=dis-mark>{_mark(state)}</td>"
+        f"<td class=dis-v>{_escape(str(value))}</td>"
     )
 
 
@@ -277,7 +286,7 @@ def _disagreement_table(row: dict[str, Any]) -> str:
 {expected}
 <div class=scroll>
 <table class=dis-table>
-<thead><tr><th>model</th><th>direct</th><th>with Nutrient SDK</th></tr></thead>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
 {body}
 </table>
 </div>
