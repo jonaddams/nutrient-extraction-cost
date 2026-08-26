@@ -22,3 +22,12 @@
   h2 { break-after: avoid; }
   a[href^="#"] { text-decoration: none; color: inherit; }
 }
+
+/* Print: the glyph may lose its colour, so show each mark's words inline
+   rather than leaving a bare tick to carry the meaning. */
+.sr {
+  position: static; width: auto; height: auto;
+  margin: 0 0 0 4px; overflow: visible; clip: auto;
+  font-size: 10px; color: #555;
+}
+.dis { break-inside: avoid; }

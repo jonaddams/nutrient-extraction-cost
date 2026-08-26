@@ -22,7 +22,12 @@ from .answers import AnswerKey
 from .merge import JOINED_RUNS_CAVEAT
 from .prices import PriceTable
 from .providers import PROVIDERS
-from .score import accuracy_by_model, score_records, score_summary
+from .score import (
+    accuracy_by_model,
+    annotate_agreement,
+    score_records,
+    score_summary,
+)
 
 # Stated wherever the two halves are compared on price. They are not
 # feature-equivalent, and a comparison that omits this is the most misleading
@@ -240,7 +245,10 @@ def summarise(
 
     scored = score_records(scoring_records, key) if key else []
     accuracy = score_summary(scored) if scored else []
-    agreement_rows = agreement(scoring_records)
+    # Annotated AFTER the rows are built, never during: `agreement_summary`
+    # below counts states off these rows, and the annotation must be additive so
+    # that adding a column to a table cannot move the published agreement rate.
+    agreement_rows = annotate_agreement(agreement(scoring_records), key)
 
 
     return {

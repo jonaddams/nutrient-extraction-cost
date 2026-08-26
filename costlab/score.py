@@ -180,3 +180,49 @@ def accuracy_by_model(
     return sorted(
         paired.values(), key=lambda r: (_RUNG_ORDER[r["rung"]], r["label"])
     )
+
+
+def annotate_agreement(
+    rows: list[dict[str, Any]], key: AnswerKey | None
+) -> list[dict[str, Any]]:
+    """Each agreement row, plus the answer key's value and a verdict per
+    configuration.
+
+    Appendix C could only print what each configuration returned, which leaves a
+    reader looking at eight strings with no way to tell which is right -- the
+    very sentence that appendix uses to explain what the grounded half buys. The
+    key holds the value and `compare_field` already decides the verdict; neither
+    reached the page.
+
+    Returns NEW rows. The agreement rate is computed off the originals, so
+    mutating them would move a published number as a side effect of adding a
+    column.
+
+    Three verdict states, not two, and the third is the reason a bare tick/cross
+    column would be a downgrade: "unverified" is a comparison the comparator
+    declined to make -- an ambiguous slash date, a number it could not parse --
+    and calling that a mismatch marks a provider wrong for our own uncertainty.
+    A field the key does not cover gets NO verdict at all, which is different
+    again: it is not unverified, it is unasked.
+    """
+    out = []
+    for row in rows:
+        fields = key.fields_for(row["docId"]) if key else {}
+        entry = fields.get(row["field"])
+        verdicts: dict[str, str] = {}
+        if entry is not None:
+            type_ = field_type(entry.get("value"))
+            verdicts = {
+                config: compare_field(value, entry, type_)
+                for config, value in row["values"].items()
+            }
+        out.append({
+            **row,
+            # The key's value verbatim, not normalised: this is the reference a
+            # reader checks the others against, so it must read as the document
+            # prints it rather than as the comparator sees it.
+            "expected": entry.get("value") if entry is not None else None,
+            "expectedSource": entry.get("source") if entry is not None else None,
+            "verdicts": verdicts,
+        })
+    return out

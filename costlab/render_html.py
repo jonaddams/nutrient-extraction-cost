@@ -13,6 +13,8 @@ import re
 from typing import Any
 
 from costlab import agreement, brand
+from costlab.providers import PROVIDERS
+from costlab.score import _RUNG_ORDER, rung
 from costlab.report import (
     COORDINATES_CAVEAT,
     OUTPUT_CAVEAT,
@@ -158,6 +160,129 @@ def _distinct(row: dict[str, Any]) -> int:
     """
     return row["distinct"]
 
+
+
+_escape = html_mod.escape
+
+
+# Four states, not two. A tick and a cross cannot express the two outcomes that
+# are neither: a comparison the comparator declined to make (an ambiguous slash
+# date, an unparseable number) and a field the answer key never covered. Marking
+# either of those wrong would accuse a provider of an error that is ours or
+# nobody's -- the same distinction the accuracy band already keeps in its "not
+# scoreable" and "not confidently compared" columns.
+#
+# Each mark carries a WORD as well as a glyph. A bare tick is nothing to a screen
+# reader and ambiguous in print, and this page is meant to be printable.
+_MARKS = {
+    "match": ("match", "\u2713", "matches the key"),
+    "mismatch": ("mismatch", "\u2717", "does not match the key"),
+    "unverified": ("unverified", "~", "not compared confidently"),
+    "unscored": ("unscored", "\u2014", "not in the answer key"),
+    "absent": ("unscored", "\u2014", "no answer"),
+}
+
+
+def _mark(state: str) -> str:
+    kind, glyph, words = _MARKS[state]
+    return (
+        f"<span class='mark mark-{kind}' aria-hidden=true>{glyph}</span>"
+        f"<span class=sr>{words}</span>"
+    )
+
+
+def _half_cell(value: Any, normalised: Any, verdict: str | None, scored: bool) -> str:
+    """One half's answer, with the mark that says whether it is right.
+
+    `normalised` decides absence, never the raw value: the comparator treats
+    None, "" and a punctuation-only placeholder as the same "no answer", and a
+    cell that showed an empty box for one and a dash for another would be
+    describing our parsing rather than the model's behaviour.
+    """
+    if agreement.is_absent(normalised):
+        return f"<td class=dis-half>{_mark('absent')}</td>"
+    if not scored:
+        state = "unscored"
+    else:
+        # A verdict is missing only when the key covers the field but this
+        # configuration is absent from the row, which the branch above caught.
+        state = verdict or "unscored"
+    return (
+        f"<td class=dis-half>{_mark(state)}"
+        f"<span class=dis-v>{_escape(str(value))}</span></td>"
+    )
+
+
+def _disagreement_table(row: dict[str, Any]) -> str:
+    """One field's disagreement: the key's value, then a row per model.
+
+    The two halves of a model sit on ONE row because direct-against-SDK is the
+    question this whole report exists to answer; splitting them into two rows
+    would leave a reader matching them up by eye. Models run frontier to
+    self-hosted, the same order the accuracy band uses, so nobody has to learn
+    a second ordering.
+    """
+    normalised = agreement.normalise_values(row["values"])
+    verdicts = row.get("verdicts") or {}
+    scored = row.get("expected") is not None or bool(verdicts)
+
+    def order(entry):
+        provider = entry[0]
+        spec = PROVIDERS.get(provider)
+        return (_RUNG_ORDER.get(rung(spec), 9) if spec else 9, provider)
+
+    body = ""
+    for provider, direct, sdk in sorted(_by_provider_half(row), key=order):
+        body += (
+            f"<tr><td class=dis-model>{_escape(provider)}</td>"
+            + _half_cell(
+                direct,
+                normalised.get(f"{provider}:direct", agreement.ABSENT),
+                verdicts.get(f"{provider}:direct"),
+                scored,
+            )
+            + _half_cell(
+                sdk,
+                normalised.get(f"{provider}:sdk", agreement.ABSENT),
+                verdicts.get(f"{provider}:sdk"),
+                scored,
+            )
+            + "</tr>"
+        )
+
+    if scored:
+        source = row.get("expectedSource")
+        cite = f"<span class=dis-src>read from: {_escape(str(source))}</span>" if source else ""
+        expected = (
+            f"<div class=dis-expected><span class=dis-label>Expected</span>"
+            f"<span class=dis-v>{_escape(str(row['expected']))}</span>{cite}</div>"
+        )
+    else:
+        # Said once per table rather than repeated in every cell: without it a
+        # column of dashes looks like missing data instead of a question that
+        # was never asked.
+        expected = (
+            "<div class=dis-expected><span class=dis-label>Expected</span>"
+            "<span class=dis-none>not in the answer key \u2014 the answers below "
+            "are shown without a correctness mark</span></div>"
+        )
+
+    return f"""
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>{_escape(row['docId'])}</span>
+<span class=pill>{_escape(row['field'])}</span>
+<span class=figure-note>{_distinct(row)} distinct answers</span>
+</div>
+{expected}
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th>direct</th><th>with Nutrient SDK</th></tr></thead>
+{body}
+</table>
+</div>
+</article>
+"""
 
 def _by_provider_half(row: dict[str, Any]) -> list[tuple[str, str | None, str | None]]:
     """One entry per provider: (providerId, direct value, sdk value).
@@ -825,8 +950,7 @@ alongside it rather than as a like-for-like comparison.</p>
         # fabricate a disagreement in the exact artifact this feature exists to
         # produce.
         disagreement_rows = "\n".join(
-            f"<tr><td>{e(row['docId'])}</td><td>{e(row['field'])}</td>"
-            f"<td>{e(', '.join(f'{k}={v!r}' for k, v in sorted(row['values'].items())))}</td></tr>"
+            _disagreement_table(row)
             for row in summary["agreement"]
             if row["state"] == "disagreed"
         )
@@ -840,12 +964,7 @@ alongside it rather than as a like-for-like comparison.</p>
 {a.get('unanswered', 0)} that no provider answered at all — nobody answered, so there is
 nothing to agree about. {a['fields']} field(s) were considered in total.</p>
 <p class=sub>{e(_scope_sentence(summary['agreement']))}</p>
-<div class=scroll>
-<table>
-  <tr><th>document</th><th>field</th><th>values</th></tr>
 {disagreement_rows}
-</table>
-</div>
 </details>
 """
 

@@ -384,3 +384,150 @@ def test_the_footer_uses_the_brand_casing():
     footer = footer[footer.index("<footer"):]
     assert "nutrient.io" in footer
     assert "NUTRIENT" not in footer
+
+
+# --- Appendix C: expected value, per-configuration verdict, one row per model ---
+#
+# The old appendix printed `provider:half='value'` reprs in a single cell. A
+# reader looking at eight strings could not tell which was right -- the exact
+# sentence that appendix used to justify the grounded half. It now shows the
+# answer key's value as the reference, one row per model with direct and SDK
+# side by side, and a mark per half.
+
+
+def _keyed_summary(extracted_by_config, key_documents, field="totalAmount"):
+    """A summary whose agreement rows are annotated against a real key."""
+    from costlab.answers import AnswerKey
+
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = []
+    for (pid, sdk), value in extracted_by_config.items():
+        records.append({
+            "docId": "inv",
+            "providerId": pid,
+            "withNutrient": sdk,
+            "usage": {"inputTokens": 100, "outputTokens": 10, "cachedInputTokens": 0},
+            "status": 200,
+            "calls": 1,
+            "attempts": 1,
+            "latencyMs": 1000.0,
+            "extracted": {field: value},
+            "requestedFields": [field],
+            "schemaSource": "answer-key",
+        })
+    return report.summarise(
+        records,
+        table,
+        models={pid: "m" for pid, _ in extracted_by_config},
+        key=AnswerKey(checked_on="2026-08-26", documents=key_documents),
+    )
+
+
+def test_the_expected_value_is_shown_as_the_reference_to_read_against():
+    summary = _keyed_summary(
+        {("anthropic", False): "383350", ("anthropic", True): "345015"},
+        {"inv": {"totalAmount": {"value": "345015", "source": "Amount Due $345,015.00"}}},
+    )
+    html = render_html.render(summary)
+    assert "345015" in html
+    assert "expected" in html.lower()
+
+
+def test_a_correct_half_and_a_wrong_half_are_marked_differently():
+    """The whole point of the column: telling them apart without reading both
+    strings and knowing the document."""
+    summary = _keyed_summary(
+        {("anthropic", False): "383350", ("anthropic", True): "345015"},
+        {"inv": {"totalAmount": {"value": "345015", "source": "Amount Due"}}},
+    )
+    html = render_html.render(summary)
+    assert "mark-match" in html, "the correct half carries a match mark"
+    assert "mark-mismatch" in html, "the wrong half carries a mismatch mark"
+
+
+def test_a_mark_is_never_a_bare_glyph():
+    """A tick alone is unreadable to a screen reader and ambiguous in print.
+    Every mark carries a word."""
+    summary = _keyed_summary(
+        {("anthropic", False): "383350", ("anthropic", True): "345015"},
+        {"inv": {"totalAmount": {"value": "345015", "source": "Amount Due"}}},
+    )
+    html = render_html.render(summary)
+    for word in ("matches the key", "does not match"):
+        assert word in html, word
+
+
+def test_a_field_the_key_does_not_cover_is_neutral_never_a_cross():
+    """Marking an unscored field wrong would invent a correctness claim. The
+    agreement band is usable with no key at all."""
+    summary = _keyed_summary(
+        {("anthropic", False): "Recipe", ("anthropic", True): "From Lola"},
+        {"inv": {"someOtherField": {"value": "x", "source": "y"}}},
+    )
+    # Scoped to the appendix markup: the inlined stylesheet defines
+    # `.mark-mismatch` as a selector, so a whole-document search would match the
+    # CSS rather than any actual mark.
+    html = render_html.render(summary)
+    section = html[html.index('id="appendix-c"'):]
+    assert "mark-mismatch" not in section, "nothing here was compared to anything"
+    assert "mark-unscored" in section
+    assert "not in the answer key" in section
+
+
+def test_an_ambiguous_comparison_gets_its_own_mark():
+    """Neither right nor wrong: the comparator declined. Folding this into the
+    cross would mark a provider wrong for our own uncertainty.
+
+    The row has to genuinely DISAGREE to appear here at all — a field that is
+    only ambiguous lands in state "ambiguous", which this appendix excludes on
+    purpose rather than print as a disagreement nobody established. So one half
+    returns the key's date with the components swapped (ambiguous against a
+    slash date, which the comparator will not guess at) and the other returns a
+    different month entirely (a plain mismatch)."""
+    summary = _keyed_summary(
+        {("anthropic", False): "1/4/2026", ("anthropic", True): "December 2020"},
+        {"inv": {"totalAmount": {"value": "4/1/2026", "source": "Date"}}},
+    )
+    html = render_html.render(summary)
+    assert "mark-unverified" in html
+    assert "not compared confidently" in html
+    assert "mark-mismatch" in html, "and the other half is a plain miss"
+
+
+def test_models_run_frontier_to_self_hosted():
+    """The same ordering the accuracy band uses, so a reader does not have to
+    learn two."""
+    summary = _keyed_summary(
+        {("local", False): "a", ("local", True): "a",
+         ("anthropic", False): "b", ("anthropic", True): "b"},
+        {"inv": {"totalAmount": {"value": "b", "source": "y"}}},
+    )
+    html = render_html.render(summary)
+    section = html[html.index("appendix-c"):]
+    assert section.index("anthropic") < section.index("local")
+
+
+def test_the_two_halves_of_a_model_sit_on_one_row():
+    """Direct against SDK is the question the report exists to answer, so it
+    belongs on one line rather than two rows to be matched up by eye."""
+    summary = _keyed_summary(
+        {("anthropic", False): "383350", ("anthropic", True): "345015"},
+        {"inv": {"totalAmount": {"value": "345015", "source": "Amount Due"}}},
+    )
+    html = render_html.render(summary)
+    section = html[html.index("appendix-c"):]
+    row = re.search(r"<tr[^>]*>(?:(?!</tr>).)*383350(?:(?!</tr>).)*</tr>", section, re.S)
+    assert row, "the wrong value should be inside a table row"
+    assert "345015" in row.group(0), "and its own model's other half on the same row"
+    # Both marks on the one row is what proves the halves are paired rather
+    # than merely co-located in a single dumped cell.
+    assert "mark-match" in row.group(0) and "mark-mismatch" in row.group(0)
+
+
+def test_a_half_that_answered_nothing_is_absent_not_wrong():
+    summary = _keyed_summary(
+        {("anthropic", False): "345015", ("anthropic", True): None},
+        {"inv": {"totalAmount": {"value": "345015", "source": "Amount Due"}}},
+    )
+    html = render_html.render(summary)
+    assert "no answer" in html
