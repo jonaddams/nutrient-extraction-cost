@@ -191,3 +191,90 @@ def test_the_suite_runs_outside_utc():
     assert tz != "UTC"
     # Actually in effect, not merely set in the environment.
     assert time.timezone != 0 or time.altzone != 0
+
+
+# --- A key value the page does not actually print --------------------------
+#
+# Every answer-key entry carries the `source` line it was read from -- that
+# citation is what the word "verified" means in this corpus. One bundled entry
+# records a value the page does not print: heavenly-hamburgers-recipe's
+# documentTitle is "Heavenly Hamburgers", read from a page printing
+# "Heavenly Here's what's cookin': Hamburgers", because the title is interleaved
+# with a graphic. That value is a human reconstruction, and no extraction can be
+# judged against it -- a model returning what the page literally prints is not
+# wrong, and one returning the reconstruction is not right for any reason we can
+# evidence.
+#
+# The key DECLARES this with `"reconstructed": true`. It is never inferred.
+# Inferring it -- testing whether the value appears inside its own source -- was
+# tried first and is dangerous: it holds only where sources are full verbatim
+# quotes, so an abbreviated "Invoice No: ..." or a descriptive "read from the
+# header" in a prospect's key would make every string field look reconstructed
+# and silently stop being scored.
+
+
+def test_a_reconstructed_key_value_cannot_be_compared():
+    from costlab.compare import compare_field
+
+    entry = {
+        "value": "Heavenly Hamburgers",
+        "source": "Heavenly Here's what's cookin': Hamburgers",
+        "reconstructed": True,
+    }
+    assert compare_field("Heavenly Hamburgers", entry, "string") == "unverified"
+    assert compare_field("From. Lola to", entry, "string") == "unverified"
+
+
+def test_an_empty_answer_is_also_unjudgeable_against_a_reconstruction():
+    """Not "mismatch". If we cannot establish what the right answer was, we
+    cannot establish that a blank is the wrong one either."""
+    from costlab.compare import compare_field
+
+    entry = {"value": "Heavenly Hamburgers", "source": "...", "reconstructed": True}
+    assert compare_field("", entry, "string") == "unverified"
+
+
+def test_an_unflagged_entry_scores_normally_however_its_source_reads():
+    """The guard must NOT be inferred from the source text. An abbreviated
+    source is ordinary in a hand-written key and must not remove the field from
+    the measurement."""
+    from costlab.compare import compare_field
+
+    entry = {"value": "AC-2025-1047", "source": "Invoice No: ..."}
+    assert compare_field("AC-2025-1047", entry, "string") == "match"
+    assert compare_field("AC-9999", entry, "string") == "mismatch"
+
+
+def test_the_flag_applies_to_numbers_too():
+    """Nothing about the reason is text-specific: a total someone worked out
+    from line items rather than read off the page is the same problem."""
+    from costlab.compare import compare_field
+
+    entry = {"value": 345015, "source": "sum of line items", "reconstructed": True}
+    assert compare_field(345015, entry, "number") == "unverified"
+
+
+def test_only_one_bundled_key_entry_is_flagged_as_reconstructed():
+    """A guard on the corpus itself. A flagged field stops being scored, so a
+    future key edit that adds one must be deliberate and visible."""
+    from costlab.answers import load_answers
+    from costlab.compare import is_reconstruction
+
+    key = load_answers()
+    found = [
+        f"{doc}.{name}"
+        for doc, fields in key.documents.items()
+        for name, entry in fields.items()
+        if is_reconstruction(entry)
+    ]
+    assert found == ["heavenly-hamburgers-recipe.documentTitle"], found
+
+
+def test_the_flagged_entry_explains_itself_in_the_key():
+    """The flag removes a field from every provider's score. The key has to say
+    why, where the next person to read it will look."""
+    from costlab.answers import load_answers
+
+    entry = load_answers().documents["heavenly-hamburgers-recipe"]["documentTitle"]
+    assert entry.get("reconstructed") is True
+    assert "graphic" in entry.get("reconstructedWhy", "")

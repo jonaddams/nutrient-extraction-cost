@@ -262,9 +262,26 @@ def _disagreement_table(row: dict[str, Any]) -> str:
     if scored:
         source = row.get("expectedSource")
         cite = f"<span class=dis-src>read from: {_escape(str(source))}</span>" if source else ""
+        why = ""
+        if row.get("expectedReconstructed"):
+            # Said here rather than left to the mark column. The key itself
+            # declared this value a human reading of the page, so nothing below
+            # can be right or wrong against it -- and a reader owed that
+            # sentence should not have to infer it from a row of tildes.
+            reason = row.get("expectedReconstructedWhy") or (
+                "The answer key records this value as a human reading of the "
+                "page rather than a line the page prints."
+            )
+            why = (
+                "<p class=dis-why>Not scoreable: "
+                f"{_escape(str(reason))} Every answer below is shown without a "
+                "correctness mark, and this field is excluded from the accuracy "
+                "figures rather than counted against any model.</p>"
+            )
         expected = (
             f"<div class=dis-expected><span class=dis-label>Expected</span>"
             f"<span class=dis-v>{_escape(str(row['expected']))}</span>{cite}</div>"
+            f"{why}"
         )
     else:
         # Said once per table rather than repeated in every cell: without it a

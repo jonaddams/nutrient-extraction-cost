@@ -594,3 +594,39 @@ def test_the_print_stylesheet_does_not_leak_onto_the_screen():
     # Comments are fine; a rule is not.
     stripped = re.sub(r"/\*.*?\*/", "", trailing, flags=re.S).strip()
     assert not stripped, f"unscoped rules after @media print: {stripped[:200]!r}"
+
+
+def test_a_reconstructed_expected_value_explains_its_own_tildes():
+    """A reader shown an expected value and a column of non-committal marks,
+    with no reason, concludes the tool failed. The key declared the value a
+    human reading; the page has to say so."""
+    from costlab.answers import AnswerKey
+
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = []
+    for pid, sdk, value in (("anthropic", False, "From Lola"),
+                            ("anthropic", True, "Heavenly Hamburgers")):
+        records.append({
+            "docId": "recipe", "providerId": pid, "withNutrient": sdk,
+            "usage": {"inputTokens": 100, "outputTokens": 10, "cachedInputTokens": 0},
+            "status": 200, "calls": 1, "attempts": 1, "latencyMs": 1.0,
+            "extracted": {"documentTitle": value},
+            "requestedFields": ["documentTitle"], "schemaSource": "answer-key",
+        })
+    summary = report.summarise(
+        records, table, models={"anthropic": "m"},
+        key=AnswerKey(checked_on="2026-08-26", documents={"recipe": {"documentTitle": {
+            "value": "Heavenly Hamburgers",
+            "source": "Heavenly Here's what's cookin': Hamburgers",
+            "reconstructed": True,
+            "reconstructedWhy": "The title is interleaved with a graphic.",
+        }}}),
+    )
+    html = render_html.render(summary)
+    section = html[html.index('id="appendix-c"'):]
+    assert "Not scoreable" in section
+    assert "interleaved with a graphic" in section
+    assert "excluded from the accuracy figures" in section
+    # And not a single cross: nothing here was judged.
+    assert "mark-mismatch" not in section
+    assert "mark-unverified" in section

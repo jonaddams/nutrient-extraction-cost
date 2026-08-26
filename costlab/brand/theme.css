@@ -435,6 +435,10 @@ details.group > summary { display: list-item; list-style-position: outside; marg
 }
 .dis-src { font-size: 12px; color: var(--text-neutral-tertiary); }
 .dis-none { font-size: 13px; color: var(--text-neutral-tertiary); }
+.dis-why {
+  font-size: 12px; color: var(--text-neutral-tertiary);
+  margin: 6px 0 0; max-width: 680px;
+}
 .dis-table { font-size: 13px; margin: 4px 0 0; }
 .dis-table th { white-space: nowrap; }
 .dis-table td { vertical-align: top; }

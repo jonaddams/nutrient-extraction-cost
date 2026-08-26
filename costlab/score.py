@@ -223,6 +223,16 @@ def annotate_agreement(
             # prints it rather than as the comparator sees it.
             "expected": entry.get("value") if entry is not None else None,
             "expectedSource": entry.get("source") if entry is not None else None,
+            # Carried so the page can explain a column of non-committal marks.
+            # A reader shown an expected value and eight tildes, with no reason
+            # given, will assume the tool failed rather than that the key
+            # declined.
+            "expectedReconstructed": (
+                bool(entry.get("reconstructed")) if entry is not None else False
+            ),
+            "expectedReconstructedWhy": (
+                entry.get("reconstructedWhy") if entry is not None else None
+            ),
             "verdicts": verdicts,
         })
     return out
