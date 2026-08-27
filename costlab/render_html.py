@@ -477,7 +477,7 @@ def _cost_band(summary: dict[str, Any], e) -> str:
     if missing:
         named = ", ".join(f"{m['providerId']} / {m['model']}" for m in missing)
         missing_note = (
-            f"<p class=standfirst><strong>No per-call figure for {_escape(named)}"
+            f"\n<p class=standfirst><strong>No per-call figure for {_escape(named)}"
             "</strong> in this run. A cell the SDK retried carries the tokens of "
             "several calls, so its difference is not a per-call delta and is left "
             "out rather than shown as one; where every cell of a model retried, "
@@ -495,8 +495,7 @@ this run: {e(spread or "not measurable")}.</p>
 <div class=cards>
 {cards}
 </div>
-{missing_note}
-<p class=standfirst>{e(PER_MODEL_NOTE)} Per-document detail is in
+{missing_note}<p class=standfirst>{e(PER_MODEL_NOTE)} Per-document detail is in
 <a href="#appendix-a">Appendix A</a>; provider totals in
 <a href="#appendix-b">Appendix B</a>.</p>
 </section>
