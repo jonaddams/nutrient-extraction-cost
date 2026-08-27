@@ -526,10 +526,10 @@ largest. It is a constant per model, not a percentage of the document, so it
 matters most on short documents and fades on long ones. Per-call spread across
 this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) exactly +468 on every call, Local runtime exactly +468 on every call, OpenAI exactly +748 on every call.</p>
 <div class=cards>
-<div class=card><span class=card-model>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></span><div class=card-figure><span class=figure-lg>+1,226</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$367.80</span><span class=figure-note>per 100k documents</span></div></div>
+<div class=card><span class=card-model>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></span><div class=card-figure><span class=figure-lg>+1,226</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$245.20</span><span class=figure-note>per 100k documents</span></div></div>
 <div class=card><span class=card-model>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></span><div class=card-figure><span class=figure-lg>+468</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$24.80</span><span class=figure-note>per 100k documents</span></div></div>
 <div class=card><span class=card-model>Local runtime<span class=row-sub>qwen/qwen3-vl-8b</span></span><div class=card-figure><span class=figure-lg>+468</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>not priced</span><span class=figure-note>no list price confirmed</span></div></div>
-<div class=card><span class=card-model>OpenAI<span class=row-sub>gpt-5.4</span></span><div class=card-figure><span class=figure-lg>+748</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>not priced</span><span class=figure-note>no list price confirmed</span></div></div>
+<div class=card><span class=card-model>OpenAI<span class=row-sub>gpt-5.4</span></span><div class=card-figure><span class=figure-lg>+748</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$187.00</span><span class=figure-note>per 100k documents</span></div></div>
 </div>
 <p class=standfirst>The overhead is a constant per call, and the constant is per model — not per vendor, and not per tokenizer generation. A different model, including a sibling from the same family, is a new measurement: the figures above do not transfer to it. Per-document detail is in
 <a href="#appendix-a">Appendix A</a>; provider totals in
@@ -617,7 +617,7 @@ the numbers say something they do not say.</p>
 </div>
 <div class=price-note>
 <p class=eyebrow>On the prices used</p>
-<p>Rates are per million tokens, in USD, at published list prices. Bedrock is partner-priced by AWS and is NOT interchangeable with Anthropic first-party rates. Claude Sonnet 5&#x27;s introductory input rate of 2.00 ends 2026-08-31, reverting to the 3.00 listed here. Providers absent from this table are reported as not priced rather than as free: no list price was confirmed for the default OpenAI model, and a local runtime has no per-token price at all — its cost is hardware and electricity, which this tool does not attempt to model. Override with <code>--prices</code> to use your negotiated rates.</p>
+<p>Rates are per million tokens, in USD, at published list prices, each read off the vendor&#x27;s own pricing page on the date above. Claude Sonnet 5 is $2/$10: the introductory rate announced through 2026-08-31 is now the standard price and the scheduled increase to $3/$15 was cancelled, so an earlier version of this table overstated Anthropic by 50%. OpenAI&#x27;s gpt-5.4 is the STANDARD tier under 272K context; the Batch and Flex tiers are half that and Fast Mode is double, and this tool makes ordinary synchronous calls. Bedrock is partner-priced by AWS and is NOT interchangeable with Anthropic first-party rates; the figures here are US East, and other regions differ (Asia Pacific Sydney is $0.5459/$2.7398). Cached input is cheaper than fresh input at every vendor and this table does not model it, so a run that hits a cache costs less than reported, never more. A local runtime has no per-token price at all — its cost is hardware and electricity, which this tool does not attempt to model, and it is reported as not priced rather than as free. Override with <code>--prices</code> to use your negotiated rates.</p>
 </div>
 </section>
 
@@ -634,23 +634,23 @@ the numbers say something they do not say.</p>
       <th class=n>direct input</th><th class=n>delta</th>
       <th class=n>delta $ (input)</th>
       <th class=n>delta $ incl. output (not like-for-like)</th></tr>
-<tr><td>apricot-cake-recipe</td><td>anthropic</td><td class=n>1,563</td><td class=n>337</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>bill-of-lading</td><td>anthropic</td><td class=n>2,603</td><td class=n>1,377</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
-<tr><td>construction-pay-application</td><td>anthropic</td><td class=n>3,133</td><td class=n>1,907</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>dear-magnus-thank-you-note</td><td>anthropic</td><td class=n>1,811</td><td class=n>585</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0050</td></tr>
-<tr><td>emergency-dept-billing-worksheet</td><td>anthropic</td><td class=n>2,624</td><td class=n>1,398</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>employment-application</td><td>anthropic</td><td class=n>2,116</td><td class=n>890</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
-<tr><td>happy-tooth-invoice-excel</td><td>anthropic</td><td class=n>2,718</td><td class=n>1,492</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0042</td></tr>
-<tr><td>heavenly-hamburgers-recipe</td><td>anthropic</td><td class=n>1,841</td><td class=n>615</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0053</td></tr>
-<tr><td>invoice-ac-2025-1047</td><td>anthropic</td><td class=n>5,167</td><td class=n>3,941</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
-<tr><td>lumen-invoice</td><td>anthropic</td><td class=n>2,992</td><td class=n>1,766</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0060</td></tr>
-<tr><td>meridian-annual-report</td><td>anthropic</td><td class=n>18,723</td><td class=n>17,497</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>meridian-balance-sheet</td><td>anthropic</td><td class=n>2,607</td><td class=n>1,381</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
-<tr><td>meridian-income-statement</td><td>anthropic</td><td class=n>2,214</td><td class=n>988</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>northgate-auto-claim-fnol</td><td>anthropic</td><td class=n>2,650</td><td class=n>1,424</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0065</td></tr>
-<tr><td>northgate-claim-file</td><td>anthropic</td><td class=n>9,117</td><td class=n>7,891</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>regional-health-record</td><td>anthropic</td><td class=n>31,188</td><td class=n>29,962</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>scanned-invoice</td><td>anthropic</td><td class=n>3,163</td><td class=n>1,937</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>apricot-cake-recipe</td><td>anthropic</td><td class=n>1,563</td><td class=n>337</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>bill-of-lading</td><td>anthropic</td><td class=n>2,603</td><td class=n>1,377</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>construction-pay-application</td><td>anthropic</td><td class=n>3,133</td><td class=n>1,907</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>dear-magnus-thank-you-note</td><td>anthropic</td><td class=n>1,811</td><td class=n>585</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0034</td></tr>
+<tr><td>emergency-dept-billing-worksheet</td><td>anthropic</td><td class=n>2,624</td><td class=n>1,398</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>employment-application</td><td>anthropic</td><td class=n>2,116</td><td class=n>890</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>happy-tooth-invoice-excel</td><td>anthropic</td><td class=n>2,718</td><td class=n>1,492</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0028</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>anthropic</td><td class=n>1,841</td><td class=n>615</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0036</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>anthropic</td><td class=n>5,167</td><td class=n>3,941</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>lumen-invoice</td><td>anthropic</td><td class=n>2,992</td><td class=n>1,766</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0040</td></tr>
+<tr><td>meridian-annual-report</td><td>anthropic</td><td class=n>18,723</td><td class=n>17,497</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>meridian-balance-sheet</td><td>anthropic</td><td class=n>2,607</td><td class=n>1,381</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>meridian-income-statement</td><td>anthropic</td><td class=n>2,214</td><td class=n>988</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>anthropic</td><td class=n>2,650</td><td class=n>1,424</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0044</td></tr>
+<tr><td>northgate-claim-file</td><td>anthropic</td><td class=n>9,117</td><td class=n>7,891</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>regional-health-record</td><td>anthropic</td><td class=n>31,188</td><td class=n>29,962</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
+<tr><td>scanned-invoice</td><td>anthropic</td><td class=n>3,163</td><td class=n>1,937</td><td class='n d'>+1,226</td><td class='n d'>$0.0025</td><td class=n>$0.0027</td></tr>
 </table>
 </div></details><details class=group><summary><span class=group-id>bedrock</span><span class=group-meta>Qwen3-VL 235B (Bedrock) · 16 documents · +468 input tokens each</span></summary><div class=scroll>
 <table>
@@ -699,29 +699,29 @@ the numbers say something they do not say.</p>
 <tr><td>regional-health-record</td><td>local</td><td class=n>21,830</td><td class=n>21,362</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>scanned-invoice</td><td>local</td><td class=n>1,891</td><td class=n>1,423</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 </table>
-</div></details><details class=group><summary><span class=group-id>openai</span><span class=group-meta>OpenAI · 17 documents · +748 input tokens each · not priced</span></summary><div class=scroll>
+</div></details><details class=group><summary><span class=group-id>openai</span><span class=group-meta>OpenAI · 17 documents · +748 input tokens each</span></summary><div class=scroll>
 <table>
   <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
       <th class=n>direct input</th><th class=n>delta</th>
       <th class=n>delta $ (input)</th>
       <th class=n>delta $ incl. output (not like-for-like)</th></tr>
-<tr><td>apricot-cake-recipe</td><td>openai</td><td class=n>950</td><td class=n>202</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>bill-of-lading</td><td>openai</td><td class=n>1,594</td><td class=n>846</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>construction-pay-application</td><td>openai</td><td class=n>1,974</td><td class=n>1,226</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>dear-magnus-thank-you-note</td><td>openai</td><td class=n>1,088</td><td class=n>340</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>emergency-dept-billing-worksheet</td><td>openai</td><td class=n>1,578</td><td class=n>830</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>employment-application</td><td>openai</td><td class=n>1,346</td><td class=n>598</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>happy-tooth-invoice-excel</td><td>openai</td><td class=n>1,745</td><td class=n>997</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>heavenly-hamburgers-recipe</td><td>openai</td><td class=n>1,157</td><td class=n>409</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>invoice-ac-2025-1047</td><td>openai</td><td class=n>3,496</td><td class=n>2,748</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>lumen-invoice</td><td>openai</td><td class=n>1,938</td><td class=n>1,190</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>meridian-annual-report</td><td>openai</td><td class=n>12,141</td><td class=n>11,393</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>meridian-balance-sheet</td><td>openai</td><td class=n>1,674</td><td class=n>926</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>meridian-income-statement</td><td>openai</td><td class=n>1,408</td><td class=n>660</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>northgate-auto-claim-fnol</td><td>openai</td><td class=n>1,679</td><td class=n>931</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>northgate-claim-file</td><td>openai</td><td class=n>5,839</td><td class=n>5,091</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>regional-health-record</td><td>openai</td><td class=n>20,290</td><td class=n>19,542</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>scanned-invoice</td><td>openai</td><td class=n>2,068</td><td class=n>1,320</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>apricot-cake-recipe</td><td>openai</td><td class=n>950</td><td class=n>202</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>bill-of-lading</td><td>openai</td><td class=n>1,594</td><td class=n>846</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>construction-pay-application</td><td>openai</td><td class=n>1,974</td><td class=n>1,226</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>dear-magnus-thank-you-note</td><td>openai</td><td class=n>1,088</td><td class=n>340</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>emergency-dept-billing-worksheet</td><td>openai</td><td class=n>1,578</td><td class=n>830</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>employment-application</td><td>openai</td><td class=n>1,346</td><td class=n>598</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>happy-tooth-invoice-excel</td><td>openai</td><td class=n>1,745</td><td class=n>997</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>openai</td><td class=n>1,157</td><td class=n>409</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>openai</td><td class=n>3,496</td><td class=n>2,748</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0023</td></tr>
+<tr><td>lumen-invoice</td><td>openai</td><td class=n>1,938</td><td class=n>1,190</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>meridian-annual-report</td><td>openai</td><td class=n>12,141</td><td class=n>11,393</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>meridian-balance-sheet</td><td>openai</td><td class=n>1,674</td><td class=n>926</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>meridian-income-statement</td><td>openai</td><td class=n>1,408</td><td class=n>660</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>openai</td><td class=n>1,679</td><td class=n>931</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0021</td></tr>
+<tr><td>northgate-claim-file</td><td>openai</td><td class=n>5,839</td><td class=n>5,091</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>regional-health-record</td><td>openai</td><td class=n>20,290</td><td class=n>19,542</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
+<tr><td>scanned-invoice</td><td>openai</td><td class=n>2,068</td><td class=n>1,320</td><td class='n d'>+748</td><td class='n d'>$0.0019</td><td class=n>$0.0022</td></tr>
 </table>
 </div></details>
 <p class=sub>The <strong>delta $ (input)</strong> column prices the input-token
@@ -738,10 +738,10 @@ for different things, and output is priced several times higher than input.</p>
       <th class=n>delta output</th><th class=n>per-call spread</th>
       <th class=n>$ / 100k docs (input)</th>
       <th class=n>$ / 100k incl. output</th></tr>
-<tr><td>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></td><td class=n>17</td><td class='n d'>+20,842</td><td class=n>+883</td><td class=n>exactly +1,226 on every call</td><td class='n d'>$367.80</td><td class=n>$445.71</td></tr>
+<tr><td>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></td><td class=n>17</td><td class='n d'>+20,842</td><td class=n>+883</td><td class=n>exactly +1,226 on every call</td><td class='n d'>$245.20</td><td class=n>$297.14</td></tr>
 <tr><td>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></td><td class=n>16</td><td class='n d'>+7,488</td><td class=n>-691</td><td class=n>exactly +468 on every call</td><td class='n d'>$24.80</td><td class=n>$13.32</td></tr>
 <tr><td>Local runtime<span class=row-sub>qwen/qwen3-vl-8b</span></td><td class=n>17</td><td class='n d'>+7,956</td><td class=n>+283</td><td class=n>exactly +468 on every call</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>OpenAI<span class=row-sub>gpt-5.4</span></td><td class=n>17</td><td class='n d'>+12,716</td><td class=n>+370</td><td class=n>exactly +748 on every call</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>OpenAI<span class=row-sub>gpt-5.4</span></td><td class=n>17</td><td class='n d'>+12,716</td><td class=n>+370</td><td class=n>exactly +748 on every call</td><td class='n d'>$187.00</td><td class=n>$219.65</td></tr>
 </table>
 </div>
 <p class=sub>A narrow per-call spread is the point: the SDK's overhead behaves as
@@ -972,7 +972,7 @@ REF PO: #NX-99023-2026</td></tr><tr><td class=dis-model>local</td><td class=dis-
 
 <details class=panel id="appendix-d" open>
 <summary>D · Price table</summary>
-<p class=sub>List prices checked 2026-08-14. Replace them with
+<p class=sub>List prices checked 2026-08-27. Replace them with
 your negotiated rates using <code>--prices</code>.</p>
 </details>
 
@@ -981,7 +981,7 @@ your negotiated rates using <code>--prices</code>.</p>
 <footer>
 <p>This file includes values extracted from the documents that were run, so handle it the way you would handle those documents. Nothing was sent to Nutrient: the tool has no telemetry and no Nutrient endpoint.</p>
 <p>Measured by nutrient-extraction-cost 0.1.0 · list prices checked
-2026-08-14 · Nutrient, nutrient.io</p>
+2026-08-27 · Nutrient, nutrient.io</p>
 </footer>
 
 </div>
