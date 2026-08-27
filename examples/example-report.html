@@ -545,7 +545,7 @@ this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) 
 <table>
 <thead><tr><th>model</th><th>runs on</th><th class=n>direct call</th>
     <th class=n>with Nutrient SDK</th></tr></thead>
-<tr><td>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></td><td><span class=pill>frontier · hosted API</span></td><td class=n>51/57 (89%)</td><td class=n>52/57 (91%)</td></tr><tr><td>OpenAI<span class=row-sub>gpt-5.4</span></td><td><span class=pill>frontier · hosted API</span></td><td class=n>53/57 (93%)</td><td class=n>53/57 (93%)</td></tr><tr><td>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></td><td><span class=pill>open weights · hosted</span></td><td class=n>49/57 (86%)</td><td class=n>51/57 (89%)</td></tr><tr><td>Local runtime<span class=row-sub>qwen/qwen3-vl-8b</span></td><td><span class=pill>open weights · self-hosted</span></td><td class=n>50/56 (89%)</td><td class=n>52/57 (91%)</td></tr>
+<tr><td>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></td><td><span class=pill>frontier · hosted API</span></td><td class=n>53/57 (93%)</td><td class=n>54/57 (95%)</td></tr><tr><td>OpenAI<span class=row-sub>gpt-5.4</span></td><td><span class=pill>frontier · hosted API</span></td><td class=n>55/57 (96%)</td><td class=n>55/57 (96%)</td></tr><tr><td>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></td><td><span class=pill>open weights · hosted</span></td><td class=n>51/57 (89%)</td><td class=n>53/57 (93%)</td></tr><tr><td>Local runtime<span class=row-sub>qwen/qwen3-vl-8b</span></td><td><span class=pill>open weights · self-hosted</span></td><td class=n>52/56 (93%)</td><td class=n>54/57 (95%)</td></tr>
 </table>
 </div>
 <p class=standfirst>Scored against the answer key: a field the key does not
@@ -771,14 +771,14 @@ alongside it rather than as a like-for-like comparison.</p>
 <table>
   <tr><th>provider</th><th>half</th><th class=n>accuracy</th>
       <th class=n>not scoreable</th><th class=n>not confidently compared</th></tr>
-<tr><td>anthropic</td><td>direct</td><td class=n>51/57 (89%)</td><td class=n>0</td><td class=n>1</td></tr>
-<tr><td>anthropic</td><td>with Nutrient</td><td class=n>52/57 (91%)</td><td class=n>0</td><td class=n>1</td></tr>
-<tr><td>bedrock</td><td>direct</td><td class=n>49/57 (86%)</td><td class=n>0</td><td class=n>1</td></tr>
-<tr><td>bedrock</td><td>with Nutrient</td><td class=n>51/57 (89%)</td><td class=n>0</td><td class=n>1</td></tr>
-<tr><td>local</td><td>direct</td><td class=n>50/56 (89%)</td><td class=n>0</td><td class=n>2</td></tr>
-<tr><td>local</td><td>with Nutrient</td><td class=n>52/57 (91%)</td><td class=n>0</td><td class=n>1</td></tr>
-<tr><td>openai</td><td>direct</td><td class=n>53/57 (93%)</td><td class=n>0</td><td class=n>1</td></tr>
-<tr><td>openai</td><td>with Nutrient</td><td class=n>53/57 (93%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>anthropic</td><td>direct</td><td class=n>53/57 (93%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>anthropic</td><td>with Nutrient</td><td class=n>54/57 (95%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>bedrock</td><td>direct</td><td class=n>51/57 (89%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>bedrock</td><td>with Nutrient</td><td class=n>53/57 (93%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>local</td><td>direct</td><td class=n>52/56 (93%)</td><td class=n>0</td><td class=n>2</td></tr>
+<tr><td>local</td><td>with Nutrient</td><td class=n>54/57 (95%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>openai</td><td>direct</td><td class=n>55/57 (96%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>openai</td><td>with Nutrient</td><td class=n>55/57 (96%)</td><td class=n>0</td><td class=n>1</td></tr>
 </table>
 </div>
 </details>
@@ -822,13 +822,13 @@ TRAILER NO: TR-8841-EU</td></tr><tr><td class=dis-model>local</td><td class=dis-
 <div class=scroll>
 <table class=dis-table>
 <thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
-<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center, 45 Terminal Read, Logistics Park, Rotterdam, 3008 AB, Netherlands</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>EuroHub Logistics Center, 45 Terminal Read, Logistics Park, Rotterdam, 3008 AB, Netherlands</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>EuroHub Logistics Center
 45 Terminal Read, Logistics Park Rotterdam
 3008 AB, Netherlands
-Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center
+Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>EuroHub Logistics Center
 45 Terminal Read, Logistics Park Rotterdam
 3008 AB, Netherlands
-Attn: Receiving Dept / Dock 7</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td></tr>
+Attn: Receiving Dept / Dock 7</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td></tr>
 </table>
 </div>
 </article>
@@ -844,13 +844,13 @@ Attn: Receiving Dept / Dock 7</td></tr><tr><td class=dis-model>local</td><td cla
 <div class=scroll>
 <table class=dis-table>
 <thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
-<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd., 100 Industrial Parkway, Sector 4, London, E14 5AA, United Kingdom</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom REF PO: #NX-99023-2026</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom REF PO: #NX-99023-2026</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd.
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Apex Industrial Supply Ltd., 100 Industrial Parkway, Sector 4, London, E14 5AA, United Kingdom</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom REF PO: #NX-99023-2026</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom REF PO: #NX-99023-2026</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Apex Industrial Supply Ltd.
 100 Industrial Parkway, Sector 4
 London, E14 5AA, United Kingdom
-REF PO: #NX-99023-2026</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd.
+REF PO: #NX-99023-2026</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Apex Industrial Supply Ltd.
 100 Industrial Parkway, Sector 4
 London, E14 5AA, United Kingdom
-REF PO: #NX-99023-2026</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td></tr>
+REF PO: #NX-99023-2026</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td></tr>
 </table>
 </div>
 </article>
