@@ -19,9 +19,15 @@ from typing import Any
 
 from .agreement import agreement, agreement_summary
 from .answers import AnswerKey
+from .merge import JOINED_RUNS_CAVEAT
 from .prices import PriceTable
 from .providers import PROVIDERS
-from .score import score_records, score_summary
+from .score import (
+    accuracy_by_model,
+    annotate_agreement,
+    score_records,
+    score_summary,
+)
 
 # Stated wherever the two halves are compared on price. They are not
 # feature-equivalent, and a comparison that omits this is the most misleading
@@ -99,8 +105,32 @@ def summarise(
         1 for r in records if r.get("usage") and r.get("calls", 1) != 1
     )
 
+    # A key-derived schema gives each document its own field count, and that is
+    # EXPECTED within a single accuracy run. What matters is whether the report
+    # holds BOTH kinds of run, because a shared-schema call and a key-derived
+    # call on the same document are asked for different things and their token
+    # counts cannot be compared. Keyed on `schemaSource`, never on the field
+    # count itself — the earlier field-count version fired on every ordinary
+    # multi-document accuracy run, since the bundled key spans 1 to 6 fields.
+    schema_sources = {r.get("schemaSource") for r in records if r.get("schemaSource")}
+    mixed_schemas = len(schema_sources) > 1
+
+    # When both are present each band takes only the records it is entitled to,
+    # rather than the report refusing to hold both. The cost band needs one
+    # shared schema to attribute a payload difference to the document; the
+    # accuracy band needs the key's own fields to score anything. Blending them
+    # produced a per-model "constant" describing neither run, which is why the
+    # old advice was to run them separately — the partition is what makes one
+    # artifact carrying cost AND accuracy honest rather than convenient.
+    if mixed_schemas:
+        cost_records = [r for r in records if r.get("schemaSource") == "shared"]
+        scoring_records = [r for r in records if r.get("schemaSource") == "answer-key"]
+    else:
+        cost_records = records
+        scoring_records = records
+
     pairs: dict[tuple[str, str], dict[bool, dict[str, Any]]] = {}
-    for r in records:
+    for r in cost_records:
         if not measurable(r):
             continue
         pairs.setdefault((r["docId"], r["providerId"]), {})[
@@ -164,6 +194,11 @@ def summarise(
                     if provider_id in PROVIDERS
                     else provider_id
                 ),
+                # The band's claim is that the constant is per MODEL, and two of
+                # the labels above name a vendor or a place rather than one. A
+                # per-model figure has to travel with the model that produced it,
+                # or two runs of different local weights render identical cards.
+                "model": model_for(provider_id),
                 "documents": len(rows),
                 "sdkInputTokens": sum(r["sdkInputTokens"] for r in rows),
                 "directInputTokens": sum(r["directInputTokens"] for r in rows),
@@ -208,22 +243,13 @@ def summarise(
             }
         )
 
-    scored = score_records(records, key) if key else []
+    scored = score_records(scoring_records, key) if key else []
     accuracy = score_summary(scored) if scored else []
-    agreement_rows = agreement(records)
+    # Annotated AFTER the rows are built, never during: `agreement_summary`
+    # below counts states off these rows, and the annotation must be additive so
+    # that adding a column to a table cannot move the published agreement rate.
+    agreement_rows = annotate_agreement(agreement(scoring_records), key)
 
-    # A key-derived schema gives each document its own field count, and that is
-    # EXPECTED and correct within a single accuracy run — one document's key
-    # entry may cover one field, another six, and that must never warn. What
-    # must warn is a report that genuinely mixes a shared cost-mode schema
-    # with key-derived schemas in the same set of records, because THAT mix is
-    # what makes token counts incomparable. So the warning is keyed on
-    # `schemaSource` ("shared" vs "answer-key"), never on the field count
-    # itself — the earlier, field-count-based version of this check fired on
-    # every ordinary multi-document accuracy run, since the bundled corpus's
-    # key entries alone span 1 to 6 fields.
-    schema_sources = {r.get("schemaSource") for r in records if r.get("schemaSource")}
-    mixed_schemas = len(schema_sources) > 1
 
     return {
         "checkedOn": table.checked_on,
@@ -234,14 +260,43 @@ def summarise(
         "unmeasurable": unmeasurable,
         "retried": retried,
         "accuracy": accuracy,
+        # The same numbers as `accuracy`, regrouped one row per model and
+        # ordered frontier to self-hosted. Kept alongside rather than replacing
+        # it: the appendix still lists the halves separately, and a consumer
+        # reading `accuracy` should not have to learn a new shape.
+        "accuracyByModel": accuracy_by_model(
+            accuracy,
+            PROVIDERS,
+            # Resolved per provider rather than passed through raw, so a row
+            # names the weights even when the run recorded no explicit model.
+            {r["providerId"]: model_for(r["providerId"]) for r in accuracy},
+        ),
         "agreement": agreement_rows,
         "agreementSummary": agreement_summary(agreement_rows),
         "mixedSchemas": mixed_schemas,
+        # True when the bands were computed from different records. Named
+        # separately from `mixedSchemas` because they are different facts: one
+        # says the report holds two kinds of run, the other says what was done
+        # about it. A consumer reading only `mixedSchemas` would still conclude
+        # the token counts are compromised, which after partitioning they are
+        # not.
+        "partitioned": mixed_schemas,
+        # Stated, never implied. Narrowing the cost band to a subset of the
+        # documents and saying nothing reads as "covered everything".
+        "costDocumentCount": len({r["docId"] for r in cost_records}),
+        "accuracyDocumentCount": len({r["docId"] for r in scoring_records}),
         "caveats": [
             COORDINATES_CAVEAT,
             OUTPUT_CAVEAT,
             TOKENIZER_CAVEAT,
             THINKING_CAVEAT,
+            # Only when it applies. A caveat present on every report is one
+            # every reader learns to skip, which costs the ones that matter.
+            *(
+                [JOINED_RUNS_CAVEAT]
+                if len((provenance or {}).get("sourceRuns", [])) > 1
+                else []
+            ),
         ],
     }
 
@@ -392,12 +447,14 @@ def render_terminal(summary: dict[str, Any]) -> str:
             shown = ", ".join(f"{k}={v!r}" for k, v in sorted(row["values"].items()))
             lines.append(f"  {row['docId']}.{row['field']}: {shown}")
 
-    if summary["mixedSchemas"]:
+    if summary.get("partitioned"):
         lines.append("")
         lines.append(
-            "These records mix a shared cost-mode schema with answer-key-derived "
-            "schemas, so their token counts are not comparable. Run cost and "
-            "accuracy separately."
+            f"Cost and accuracy above are computed from different documents: "
+            f"cost from {summary['costDocumentCount']} asked for one shared "
+            f"schema, accuracy from {summary['accuracyDocumentCount']} asked "
+            f"for their answer key's fields. Their token counts are not "
+            f"comparable with each other and nothing here compares them."
         )
 
     lines.append("")

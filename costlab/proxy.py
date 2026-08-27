@@ -39,6 +39,7 @@ class RecordingProxy:
         out_dir: Path,
         capture_bodies: bool = True,
         timeout: float = 600.0,
+        drop_request_keys: frozenset[str] = frozenset(),
     ):
         self.upstream_base = upstream_base.rstrip("/")
         self.out_dir = Path(out_dir)
@@ -48,6 +49,17 @@ class RecordingProxy:
         # error to read. A local VLM legitimately takes minutes per document,
         # so this is sized for the slowest honest case, not the typical one.
         self.timeout = timeout
+        # Top-level request keys removed before forwarding. Empty for every
+        # hosted provider; a local runtime needs `logprobs`/`top_logprobs`
+        # gone, because LM Studio drops the grammar-forced tokens from
+        # `content` when logprobs are requested alongside a json_schema and
+        # the SDK always asks for both. The SDK then reports SUCCESS carrying
+        # mangled text -- `"totalAmount": 201.45` for a document reading
+        # $4,201.45, a corrupted value rather than a visible failure. With the
+        # two keys removed the same call returns correct values, source blocks
+        # and bounding boxes. Neither key contributes to prompt tokens, so the
+        # measurement this tool exists to make is unaffected.
+        self.drop_request_keys = frozenset(drop_request_keys)
         self.records: list[dict[str, Any]] = []
         # The most recent outbound request body, IN MEMORY ONLY. The runner needs
         # it to build the no-Nutrient call from the same extracted document text
@@ -82,6 +94,7 @@ class RecordingProxy:
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_POST(self):  # noqa: N802 - http.server's required name
                 raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                raw = proxy._drop_keys(raw)
                 headers = {
                     k: v for k, v in self.headers.items() if k.lower() not in _DROP
                 }
@@ -138,6 +151,27 @@ class RecordingProxy:
             # accumulate for the length of the run.
             self._server.server_close()
             self._server = None
+
+    def _drop_keys(self, raw: bytes) -> bytes:
+        """The outbound body with `drop_request_keys` removed.
+
+        Rewrites rather than rejects, and only at the top level: a key named
+        `logprobs` nested inside the schema is part of what the caller asked
+        the model for, not a request parameter. A body that is not JSON is
+        passed through untouched -- guessing at a payload we cannot parse
+        would corrupt it.
+        """
+        if not self.drop_request_keys:
+            return raw
+        try:
+            body = json.loads(raw)
+        except (ValueError, UnicodeDecodeError):
+            return raw
+        if not isinstance(body, dict) or not (self.drop_request_keys & body.keys()):
+            return raw
+        return json.dumps(
+            {k: v for k, v in body.items() if k not in self.drop_request_keys}
+        ).encode()
 
     def _record(self, path, raw, body, status, latency_ms, headers) -> None:
         def decode(data: bytes) -> Any:

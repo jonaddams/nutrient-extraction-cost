@@ -61,7 +61,10 @@ Three things the scoring deliberately does:
   deliberately high.
 
 Accuracy mode gives each document its own schema, taken from the answer key, so its token counts
-are **not** comparable with a cost run's. Run them separately.
+are **not** comparable with a cost run's. Run each mode separately, then put both in one report with
+[`--join`](#joining-runs): a joined report computes the cost band from the shared-schema records and
+the accuracy band from the answer-key records, so the two are never compared, and it states on the
+page how many documents each band covers.
 
 ## Install and run
 
@@ -82,6 +85,69 @@ skip the prompt in a script.
 Output lands in `out/`: `records.json` (one record per document per cell), `report.html`,
 `report.json`, and the captured request bodies.
 
+### Just run it
+
+`costlab` with no arguments asks a few questions and then waits for an explicit
+yes:
+
+```
+Providers detected:
+  anthropic    Claude Sonnet 5              ANTHROPIC_API_KEY is set
+  bedrock      Qwen3-VL 235B (Bedrock)      BEDROCK_API_KEY is set
+  local        Local runtime                no credential needed
+
+Which providers? comma-separated, or blank for all [anthropic, bedrock, local]:
+Documents folder? blank for the bundled corpus [costlab/corpus]:
+
+  cost       token cost, one shared schema across every document
+  accuracy   scored against an answer key, each document's own fields
+  both       two runs, joined into one report — costs the sum of the two
+Measure cost, accuracy, or both? blank for cost [cost, accuracy, both]:
+Answer key to score against? blank for the bundled one, or a path to JSON or CSV:
+
+This is two runs, one after the other, joined into one report — so it costs the sum of both.
+  cost run       17 document(s) x 6 call(s) each = 102 call(s)
+  accuracy run   17 document(s) x 6 call(s) each = 102 call(s)
+  total          204 call(s)
+Each provider below will be billed for its share of those calls:
+  Claude Sonnet 5              $3.00 per million input tokens
+  Qwen3-VL 235B (Bedrock)      $0.53 per million input tokens
+  Local runtime                runs on your own hardware — no per-token charge
+
+List prices checked 2026-08-14.
+What this actually costs depends on how long your documents are, which is not
+known until each provider has read and tokenised them, so no total is quoted here.
+
+Proceed and spend against these providers? [y/N]
+```
+
+The call count is exact. **No total is quoted**, because spend depends on how long
+your documents are and nothing knows that until each provider has tokenised them —
+a confident figure printed immediately before money is spent is the one most
+likely to be trusted and least able to be supported. A provider with no rate in
+the table is named as unquotable rather than as free, and a self-hosted runtime is
+distinguished from it: one is billing money we cannot quote, the other is not
+billing at all.
+
+**Cost, accuracy, or both.** Blank is `cost`, the cheaper run. `both` is what
+produces the report in `examples/` — the one carrying a cost band and a scored
+accuracy band together — and it is asked rather than assumed because it is two
+runs, so it costs the sum of the two. It runs a cost run, then an accuracy run,
+then `--join`s them; each is an ordinary command you could have typed yourself,
+and the two runs land in `out/cost` and `out/accuracy` with the joined report
+above them in `out/`.
+
+An accuracy run is only as large as the documents your answer key covers, because
+a document the key has no entry for is skipped rather than asked about — so its
+call count is quoted over those documents, not over the whole corpus, and you are
+told when the two differ. A corpus the key cannot score at all is refused at the
+question rather than after the yes.
+
+Anything other than `y`/`yes` calls nothing, and so does Ctrl-C. On `yes` it runs
+and then opens the report in your browser; if there is no browser to open, the run
+still succeeds and prints the path. A `both` run opens the joined report only —
+three commands, one tab.
+
 ### Options
 
 | | |
@@ -91,9 +157,52 @@ Output lands in `out/`: `records.json` (one record per document per cell), `repo
 | `--prices FILE` | Use your negotiated rates instead of the bundled list prices. |
 | `--mode cost\|accuracy` | `cost` (default): one shared schema for every document. `accuracy`: each document's own answer-key fields — see [Accuracy](#accuracy). |
 | `--answers PATH` | Score against this answer key instead of the bundled one. JSON or CSV (`docId,field,value,source`). Rescopes every document's request to that key's fields **regardless of `--mode`** — a cost-mode run supplying `--answers` still asks each document only for the key's fields, so its token counts are no longer comparable with an ordinary cost run's. |
+| `--join DIR,DIR` | Combine previous runs into one report instead of calling anything. See [Joining runs](#joining-runs). |
+| `--open` | Open the finished report in a browser. Off by default so a scripted or CI run launches nothing; the wizard turns it on. If no browser is available the run still succeeds and prints the path. |
 | `--no-capture-bodies` | Do not write request or response bodies to disk. |
 | `--out DIR` | Where to write results. Defaults to `out/`. |
 | `--yes` | Skip the confirmation prompt. |
+
+### Joining runs
+
+One report can be built from several previous runs, calling nothing and spending
+nothing:
+
+```bash
+costlab --join out/frontier-run,out/local-run --out out/joined
+```
+
+This exists because the accuracy comparison a buyer wants — frontier models down
+to a self-hosted one — is not something one invocation can produce. The frontier
+models need three hosted credentials; a self-hosted model needs a runtime you
+control, serving one model at a time. Joining lets each run happen when it can
+and still be read together.
+
+The joined report **says that it is joined**: the provenance grid lists every
+run's date, and a caveat states that figures gathered at different times are
+close to like-for-like rather than exactly so.
+
+It **refuses** a merge where one provider id covers different models. A provider
+id is a route, not a model — every local runtime in this project reports as
+`local` — so combining two local runs would sum two different sets of weights
+into one row and label it with whichever run's provenance came last. If a run did
+not record which model it used, that counts as unconfirmed and is refused too:
+
+```
+cannot join these runs: 'local' ran 'qwen/qwen3-vl-8b' in run 'a' and
+'qwen/qwen3-vl-30b' in run 'b'. Merging would present two models as one row.
+```
+
+**Joining a cost run to an accuracy run is how one report carries both.** When a
+report holds both kinds of record, each band takes only what it is entitled to:
+the cost band the shared-schema records, so a payload difference stays
+attributable to the document, and the accuracy band the answer-key records, which
+are the only ones that were actually asked the key's fields. Nothing is blended,
+and the page states how many documents each band covers — narrowing a band to a
+subset and saying nothing would read as covering everything.
+
+`examples/example-report.html` is exactly this: three runs joined, cost measured
+over 17 documents in cost mode and accuracy scored over 17 in accuracy mode.
 
 ## Your documents and where they go
 
@@ -117,7 +226,7 @@ One, and a reason for it:
 
 | | |
 |---|---|
-| `nutrient-sdk` | The thing being measured. |
+| `nutrient-sdk>=1.0.11` | The thing being measured. The floor is not housekeeping — see [the local runtime section](#local-runtimes) for the defect an older SDK reintroduces silently. |
 
 Everything else is the Python standard library — `http.server` for the proxy, `urllib.request` for
 outbound calls. No web framework, no provider SDKs, no HTTP client library. The dependency list is
@@ -139,16 +248,16 @@ extractions. This is why the with-Nutrient cell for a document runs before its d
 ## Provider support
 
 All four providers honour the SDK's endpoint override and return a usage block the proxy can read,
-so all four are measurable. The three cloud providers also **extract** correctly; LM Studio's
-with-Nutrient cells return zero fields for a reason that is not the SDK's or this tool's, described
-under [Local runtimes](#local-runtimes).
+so all four are measurable, and all four **extract** correctly. A local runtime needs two request
+keys stripped before it will, for a reason that is not this tool's, described under
+[Local runtimes](#local-runtimes).
 
 | Provider | Credential | Wire protocol | Priced in the bundled table | Extraction verified |
 |---|---|---|---|---|
 | Anthropic | `ANTHROPIC_API_KEY` | `POST /v1/messages` | yes | yes |
 | OpenAI | `OPENAI_API_KEY` | `POST /v1/chat/completions` | no — see below | yes |
 | Bedrock | `BEDROCK_API_KEY` | `POST /v1/chat/completions` | yes | yes |
-| Local runtime | none | `POST /v1/chat/completions` | no — no per-token price exists | **no — tokens only, see below** |
+| Local runtime | none | `POST /v1/chat/completions` | no — no per-token price exists | yes — with two request keys stripped, see below |
 
 A provider missing from the price table reports its token counts and **"not priced"** rather than
 `$0.00`. A zero would assert the calls were free, which is a different claim from not knowing what
@@ -163,22 +272,41 @@ export LOCAL_BASE=http://localhost:11434
 export LOCAL_MODEL=your-model-id
 ```
 
-**The with-Nutrient cells do not currently work against LM Studio, and the failure is silent.**
-Measured 2026-08-17 against LM Studio serving `qwen/qwen3-vl-8b` and `qwen/qwen3-vl-30b`: the SDK
-requests structured output (`response_format: json_schema`) together with `logprobs`, and LM Studio
-then omits the grammar-forced tokens from the assembled `content` string. What comes back is the
-model's own words with every schema-determined span deleted —
+**The with-Nutrient cells work against LM Studio. They used to need a workaround; as of
+`nutrient-sdk` 1.0.11 they do not, and this section is the history of why the floor in
+`pyproject.toml` is where it is.** Measured 2026-08-17 against LM Studio serving `qwen/qwen3-vl-8b` and
+`qwen/qwen3-vl-30b`: the SDK requests structured output (`response_format: json_schema`) together
+with `logprobs`, and LM Studio then omits the grammar-forced tokens from the assembled `content`
+string. What comes back is the model's own words with every schema-determined span deleted —
 
 ```
  "Progress Invoice - Riverside Mixed-Use Development — Phase 2"},b2", "b3", "b4"]
 ```
 
-— which is not parseable, so the SDK reports a successful call that extracted **zero fields**. Same
-request minus `logprobs` returns well-formed JSON from the same model, and Bedrock answers the
-identical `logprobs` + `json_schema` pair correctly, so this is LM Studio's assembly of `content`
-rather than the pair being unsupportable. Until it is fixed, a local run measures **tokens only**:
-the input-token delta is still exact, and the direct cells still return values, but treat any
-accuracy or agreement number from a local run as meaningless rather than as a poor score.
+— which is not parseable, and the SDK reports a **successful** call anyway. Across a corpus run that
+surfaced as zero extracted fields; on a single document printing `TOTAL $4,201.45` it surfaced as an
+extracted total of `201.45`. A wrong number that looks right is a different class of problem from a
+visible failure, which is why this is worth the workaround rather than a caveat.
+
+The proxy used to remove `logprobs` and `top_logprobs` from a local runtime's requests before
+forwarding them. **Neither key contributes to prompt tokens, so the measurement this tool exists to
+make was unaffected either way** — and with them gone the same model returned correct values, source
+blocks and bounding boxes, verified across a 17-document corpus run on 2026-08-20. Bedrock answers
+the identical `logprobs` + `json_schema` pair correctly, so the dropped tokens were LM Studio's
+assembly of `content` rather than the pair being unsupportable.
+
+**Fixed upstream in `nutrient-sdk` 1.0.11, and the strip was retired on 2026-08-25** after a real
+local run confirmed it — not on the strength of release notes, because the defect's whole character
+was that it failed silently and reported success. What that run showed: 1.0.11 **still sends**
+`logprobs` (36 of 53 captured request bodies carried it), and with the strip removed the SDK half
+came back 34 of 34 readable, scoring 50/57 direct and 51/58 SDK — identical to the run that had the
+strip, with zero unscoreable cells. So the fix repaired the SDK's handling rather than suppressing
+the parameter, which is what makes the strip genuinely redundant rather than merely unexercised.
+
+`pyproject.toml` therefore requires `nutrient-sdk>=1.0.11`. That floor is load-bearing: on an older
+SDK nothing now stands between this defect and your report, and it would show up as extracted values
+that are silently wrong rather than visibly missing. pip refusing to install is the only loud
+failure available.
 
 **On macOS, a local runtime on another host needs Local Network permission — and there is usually
 no checkbox to grant it.** If the runtime is plainly up and reachable in a browser but the tool

@@ -153,3 +153,107 @@ def test_summary_counts_unverified_fields_separately_from_unscoreable_records():
     assert row2["unverifiedFields"] == 1
     assert row2["verified"] == 0
     assert row2["accuracy"] is None
+import json
+
+
+
+# --- Expected values and per-configuration verdicts on a disagreement row ---
+#
+# Appendix C could only ever print what each configuration returned. Looking at
+# eight different strings, a reader cannot tell which is right — which is the
+# exact sentence the appendix's own preamble uses to justify the grounded half.
+# The answer key holds the value, and `score_records` already computes a verdict
+# per field; neither reached the page. These carry both onto the row.
+
+
+def _key_of(documents):
+    from costlab.answers import AnswerKey
+
+    return AnswerKey(checked_on="2026-08-26", documents=documents)
+
+
+def _rec(doc, provider, sdk, extracted):
+    return {
+        "docId": doc,
+        "providerId": provider,
+        "withNutrient": sdk,
+        "extracted": extracted,
+        "usage": {"inputTokens": 1, "outputTokens": 1},
+        "status": 200,
+    }
+
+
+def test_a_row_carries_the_answer_key_value_it_should_be_read_against():
+    from costlab.score import annotate_agreement
+
+    key = _key_of({"inv": {"total": {"value": "345015", "source": "Amount Due"}}})
+    rows = [{"docId": "inv", "field": "total", "values": {"a:direct": "345015"},
+             "state": "agreed", "agree": True, "distinct": 1}]
+    out = annotate_agreement(rows, key)
+    assert out[0]["expected"] == "345015"
+
+
+def test_a_field_the_key_does_not_cover_has_no_expected_value():
+    """The agreement band is usable with no key at all — it measures agreement,
+    not accuracy. An invented expected value would turn that into a correctness
+    claim the report cannot support."""
+    from costlab.score import annotate_agreement
+
+    key = _key_of({"inv": {"total": {"value": "1", "source": "x"}}})
+    rows = [{"docId": "inv", "field": "documentTitle", "values": {"a:direct": "Untitled"},
+             "state": "disagreed", "agree": False, "distinct": 1}]
+    out = annotate_agreement(rows, key)
+    assert out[0]["expected"] is None
+    assert out[0]["verdicts"] == {}, "no key entry means no verdict, not a mismatch"
+
+
+def test_no_key_at_all_leaves_every_row_unannotated_rather_than_wrong():
+    from costlab.score import annotate_agreement
+
+    rows = [{"docId": "inv", "field": "total", "values": {"a:direct": "1"},
+             "state": "agreed", "agree": True, "distinct": 1}]
+    out = annotate_agreement(rows, None)
+    assert out[0]["expected"] is None
+    assert out[0]["verdicts"] == {}
+
+
+def test_each_configuration_gets_its_own_verdict():
+    from costlab.score import annotate_agreement
+
+    key = _key_of({"inv": {"total": {"value": "345015", "source": "Amount Due"}}})
+    rows = [{
+        "docId": "inv", "field": "total",
+        "values": {"a:direct": "383350", "a:sdk": "345015"},
+        "state": "disagreed", "agree": False, "distinct": 2,
+    }]
+    out = annotate_agreement(rows, key)
+    v = out[0]["verdicts"]
+    assert v["a:sdk"] == "match", "the grounded half read the page correctly"
+    assert v["a:direct"] == "mismatch", "the ungrounded half was out by 38,335"
+
+
+def test_an_ambiguous_comparison_is_unverified_not_a_mismatch():
+    """A slash date the comparator will not guess at must not be marked wrong.
+    This is the distinction the accuracy band already keeps, and a tick/cross
+    column would erase it by having only two states."""
+    from costlab.score import annotate_agreement
+
+    key = _key_of({"inv": {"when": {"value": "4/1/2026", "source": "Date"}}})
+    rows = [{"docId": "inv", "field": "when",
+             "values": {"a:direct": "1/4/2026"},
+             "state": "disagreed", "agree": False, "distinct": 1}]
+    out = annotate_agreement(rows, key)
+    assert out[0]["verdicts"]["a:direct"] == "unverified"
+
+
+def test_annotation_never_alters_the_row_it_was_given():
+    """The agreement rate is computed off these rows. A mutated `state` would
+    change a published number as a side effect of adding a column."""
+    from costlab.score import annotate_agreement
+
+    key = _key_of({"inv": {"total": {"value": "1", "source": "x"}}})
+    rows = [{"docId": "inv", "field": "total", "values": {"a:direct": "2"},
+             "state": "disagreed", "agree": False, "distinct": 1}]
+    before = json.dumps(rows, sort_keys=True)
+    annotate_agreement(rows, key)
+    assert json.dumps(rows, sort_keys=True) == before

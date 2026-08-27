@@ -13,6 +13,8 @@ import re
 from typing import Any
 
 from costlab import agreement, brand
+from costlab.providers import PROVIDERS
+from costlab.score import _RUNG_ORDER, rung
 from costlab.report import (
     COORDINATES_CAVEAT,
     OUTPUT_CAVEAT,
@@ -74,6 +76,49 @@ def _plural(n: int, one: str, many: str | None = None, *, spell: bool = False) -
     return f"{count} {one}" if n == 1 else f"{count} {many or one + 's'}"
 
 
+def _scope(rows: list[dict[str, Any]]) -> tuple[list[str], int, int]:
+    """The shape of what was compared: distinct fields, documents, rows.
+
+    `agreementSummary["fields"]` counts ROWS, and a row is one field on one
+    document. Seventeen rows can be seventeen fields on one document or one
+    field on seventeen documents, and the summary alone cannot tell them
+    apart. The distinction is not cosmetic: a reader shown "seventeen fields,
+    seven disagreements" over a list where every disagreement names the same
+    field concludes the providers agreed on the OTHER sixteen, when in truth
+    there were no others and the ten agreements are that same field too.
+    """
+    return (
+        sorted({r["field"] for r in rows}),
+        len({r["docId"] for r in rows}),
+        len(rows),
+    )
+
+
+def _scope_sentence(rows: list[dict[str, Any]]) -> str:
+    """What the rate was computed over, said plainly enough to prevent the
+    misreading. Names the fields while they can be named — a reader can only
+    judge whether a field set is representative if they can see it."""
+    fields, documents, instances = _scope(rows)
+    if not fields:
+        return ""
+    spell = _spellable(len(fields), documents, instances)
+    docs = _plural(documents, "document", spell=spell)
+    if len(fields) == 1:
+        return (
+            f"Every comparison here is of the same single field, {fields[0]}, "
+            f"once per document across {docs}. It is the only field this run "
+            f"requested, so the rate describes that field and no other — the "
+            f"agreements are that field too."
+        )
+    named = ", ".join(fields)
+    if len(fields) > 8:
+        named = ", ".join(fields[:8]) + f", and {_count(len(fields) - 8)} more"
+    return (
+        f"{_plural(instances, 'comparison', spell=spell)} across {docs}, "
+        f"covering {_plural(len(fields), 'distinct field', spell=spell)}: {named}."
+    )
+
+
 def _money_at_scale(value: float | None) -> str:
     """Like `_money`, but 2dp at $1 or more.
 
@@ -115,6 +160,155 @@ def _distinct(row: dict[str, Any]) -> int:
     """
     return row["distinct"]
 
+
+
+_escape = html_mod.escape
+
+
+# Four states, not two. A tick and a cross cannot express the two outcomes that
+# are neither: a comparison the comparator declined to make (an ambiguous slash
+# date, an unparseable number) and a field the answer key never covered. Marking
+# either of those wrong would accuse a provider of an error that is ours or
+# nobody's -- the same distinction the accuracy band already keeps in its "not
+# scoreable" and "not confidently compared" columns.
+#
+# Each mark carries a WORD as well as a glyph. A bare tick is nothing to a screen
+# reader and ambiguous in print, and this page is meant to be printable.
+_MARKS = {
+    "match": ("match", "\u2713", "matches the key"),
+    "mismatch": ("mismatch", "\u2717", "does not match the key"),
+    "unverified": ("unverified", "~", "not compared confidently"),
+    "unscored": ("unscored", "\u2014", "not in the answer key"),
+    "absent": ("unscored", "\u2014", "no answer"),
+}
+
+
+def _mark(state: str) -> str:
+    """The glyph, with its words in an attribute rather than beside it.
+
+    The tick or cross IS the statement -- printing "matches the key" next to
+    every value triples the width of a column whose whole job is to be scanned.
+    But a glyph alone is nothing to a screen reader, so the words travel as an
+    aria-label on an image-role span. Not as visible text, and not as a
+    visually-hidden sibling either: the hidden-sibling version leaked onto the
+    screen the moment a print rule landed outside its @media block.
+    """
+    kind, glyph, words = _MARKS[state]
+    return (
+        f"<span class='mark mark-{kind}' role=img "
+        f'aria-label="{_escape(words, quote=True)}">{glyph}</span>'
+    )
+
+
+def _half_cell(value: Any, normalised: Any, verdict: str | None, scored: bool) -> str:
+    """One half as TWO cells: its mark, then its value.
+
+    Separate columns rather than one cell, so every mark on the page sits at the
+    same two x-positions and the table can be read straight down them without
+    taking in a single value. `normalised` decides absence, never the raw value:
+    the comparator treats None, "" and a punctuation-only placeholder as the
+    same "no answer", and a cell showing an empty box for one and a dash for
+    another would be describing our parsing rather than the model's behaviour.
+    """
+    if agreement.is_absent(normalised):
+        return (
+            f"<td class=dis-mark>{_mark('absent')}</td>"
+            "<td class=dis-v><span class=dis-none>no answer</span></td>"
+        )
+    state = (verdict or "unscored") if scored else "unscored"
+    return (
+        f"<td class=dis-mark>{_mark(state)}</td>"
+        f"<td class=dis-v>{_escape(str(value))}</td>"
+    )
+
+
+def _disagreement_table(row: dict[str, Any]) -> str:
+    """One field's disagreement: the key's value, then a row per model.
+
+    The two halves of a model sit on ONE row because direct-against-SDK is the
+    question this whole report exists to answer; splitting them into two rows
+    would leave a reader matching them up by eye. Models run frontier to
+    self-hosted, the same order the accuracy band uses, so nobody has to learn
+    a second ordering.
+    """
+    normalised = agreement.normalise_values(row["values"])
+    verdicts = row.get("verdicts") or {}
+    scored = row.get("expected") is not None or bool(verdicts)
+
+    def order(entry):
+        provider = entry[0]
+        spec = PROVIDERS.get(provider)
+        return (_RUNG_ORDER.get(rung(spec), 9) if spec else 9, provider)
+
+    body = ""
+    for provider, direct, sdk in sorted(_by_provider_half(row), key=order):
+        body += (
+            f"<tr><td class=dis-model>{_escape(provider)}</td>"
+            + _half_cell(
+                direct,
+                normalised.get(f"{provider}:direct", agreement.ABSENT),
+                verdicts.get(f"{provider}:direct"),
+                scored,
+            )
+            + _half_cell(
+                sdk,
+                normalised.get(f"{provider}:sdk", agreement.ABSENT),
+                verdicts.get(f"{provider}:sdk"),
+                scored,
+            )
+            + "</tr>"
+        )
+
+    if scored:
+        source = row.get("expectedSource")
+        cite = f"<span class=dis-src>read from: {_escape(str(source))}</span>" if source else ""
+        why = ""
+        if row.get("expectedReconstructed"):
+            # Said here rather than left to the mark column. The key itself
+            # declared this value a human reading of the page, so nothing below
+            # can be right or wrong against it -- and a reader owed that
+            # sentence should not have to infer it from a row of tildes.
+            reason = row.get("expectedReconstructedWhy") or (
+                "The answer key records this value as a human reading of the "
+                "page rather than a line the page prints."
+            )
+            why = (
+                "<p class=dis-why>Not scoreable: "
+                f"{_escape(str(reason))} Every answer below is shown without a "
+                "correctness mark, and this field is excluded from the accuracy "
+                "figures rather than counted against any model.</p>"
+            )
+        expected = (
+            f"<div class=dis-expected><span class=dis-label>Expected</span>"
+            f"<span class=dis-v>{_escape(str(row['expected']))}</span>{cite}</div>"
+            f"{why}"
+        )
+    else:
+        # Said once per table rather than repeated in every cell: without it a
+        # column of dashes looks like missing data instead of a question that
+        # was never asked.
+        expected = (
+            "<div class=dis-expected><span class=dis-label>Expected</span>"
+            "<span class=dis-none>not in the answer key \u2014 the answers below "
+            "are shown without a correctness mark</span></div>"
+        )
+
+    return f"""
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>{_escape(row['docId'])}</span>
+<span class=pill>{_escape(row['field'])}</span>
+<span class=figure-note>{_distinct(row)} distinct answers</span>
+</div>
+{expected}
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+{body}
+</table>
+</div>
+</article>
+"""
 
 def _by_provider_half(row: dict[str, Any]) -> list[tuple[str, str | None, str | None]]:
     """One entry per provider: (providerId, direct value, sdk value).
@@ -209,6 +403,24 @@ NO_DELTA_NOTE = (
 )
 
 
+def _model_sub(row: dict[str, Any], e) -> str:
+    """The resolved model id under a label, wherever a per-model figure is shown.
+
+    Both bands need it for the same reason: `PROVIDERS["openai"].label` is
+    "OpenAI" and `local`'s is "Local runtime", a vendor and a place, so a figure
+    described as per-model can otherwise appear without naming a model. Fixing
+    the labels instead is not available — a local runtime's model comes from
+    LOCAL_MODEL at run time, which is why that label is generic.
+
+    Omitted when it would only repeat the label, so a provider whose label
+    already IS its model does not print the same string twice.
+    """
+    model = row.get("model")
+    if not model or model == row.get("label"):
+        return ""
+    return f"<span class=row-sub>{e(model)}</span>"
+
+
 def _cost_band(summary: dict[str, Any], e) -> str:
     rows = summary["byProvider"]
     if not rows:
@@ -221,7 +433,8 @@ def _cost_band(summary: dict[str, Any], e) -> str:
 """
 
     cards = "\n".join(
-        f"<div class=card><span class=card-model>{e(r['label'])}</span>"
+        f"<div class=card><span class=card-model>{e(r['label'])}"
+        f"{_model_sub(r, e)}</span>"
         f"<div class=card-figure><span class=figure-lg>"
         f"{round(r['deltaInputTokens'] / max(r['documents'], 1)):+,}</span>"
         f"<span class=figure-note>input tokens per document</span></div>"
@@ -287,9 +500,79 @@ def representative_disagreements(
     return ordered[:limit], max(len(ordered) - limit, 0)
 
 
+# What each rung concedes, spelled out. "frontier" and "self-hosted" alone are
+# jargon; the reader needs to see that moving down the table trades a hosted API
+# for weights you run, because that trade IS the argument.
+_RUNG_LABELS = {
+    "frontier": "frontier · hosted API",
+    "hosted": "open weights · hosted",
+    "self-hosted": "open weights · self-hosted",
+}
+
+
+def _half_figure(half: dict[str, Any] | None) -> str:
+    """One half's score, with its own denominator.
+
+    Three outcomes that must stay visibly different: the half never ran (em
+    dash), it ran and nothing was scoreable (`not scoreable`), or it has a
+    figure. Rendering either of the first two as `0%` would say the model got
+    everything wrong, which is a different and much worse claim than not
+    knowing.
+    """
+    if half is None:
+        return "—"
+    if half["accuracy"] is None:
+        return "not scoreable"
+    return f"{half['matched']}/{half['verified']} ({half['accuracy']:.0%})"
+
+
+def _accuracy_rungs(rows: list[dict[str, Any]], e) -> str:
+    """One row per model, frontier to self-hosted.
+
+    Organised by model rather than by provider-and-half because the comparison a
+    buyer is making is between models, and the on-prem rung is the argument:
+    a self-hosted model landing near a frontier one is the finding. Grouped by
+    provider-and-half, the reader has to join those rows themselves.
+
+    Each half keeps its own denominator on purpose — the two are routinely
+    computed over different document counts, and one shared denominator would
+    hide that while inviting a like-for-like reading.
+    """
+    if not rows:
+        return ""
+    body = "".join(
+        f"<tr><td>{e(r['label'])}{_model_sub(r, e)}</td>"
+        f"<td><span class=pill>{e(_RUNG_LABELS.get(r['rung'], r['rung']))}</span></td>"
+        f"<td class=n>{e(_half_figure(r['direct']))}</td>"
+        f"<td class=n>{e(_half_figure(r['sdk']))}</td></tr>"
+        for r in rows
+    )
+    return f"""
+<div class=scroll id="accuracy-by-model">
+<table>
+<thead><tr><th>model</th><th>runs on</th><th class=n>direct call</th>
+    <th class=n>with Nutrient SDK</th></tr></thead>
+{body}
+</table>
+</div>
+<p class=standfirst>Scored against the answer key: a field the key does not
+cover is never counted against a model, and a cell the harness could not read
+counts as <em>not scoreable</em> rather than as a zero. The two halves of a row
+may be computed over <strong>different document counts</strong>, so each carries
+its own denominator — read a difference between them alongside those, not as a
+like-for-like comparison. Full per-half detail, including what was excluded as
+not confidently compared, is in
+<a href="#appendix-accuracy">the accuracy panel</a>.</p>
+"""
+
+
 def _accuracy_band(summary: dict[str, Any], e) -> str:
     a = summary["agreementSummary"]
-    if not a["fields"]:
+    rungs = _accuracy_rungs(summary.get("accuracyByModel", []), e)
+    # Either half of this band can be empty: a cost-mode run has nothing scored,
+    # and a single-configuration run has nothing to compare. The band is only
+    # absent when both are.
+    if not a["fields"] and not rungs:
         return ""
     judged = a["agreed"] + a["disagreed"]
     if "rate" in a:
@@ -306,7 +589,18 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         (len(r["values"]) for r in summary["agreement"]), default=0
     )
 
-    spell_h2 = _spellable(configurations, a["fields"], a["disagreed"])
+    scope_fields, scope_documents, _ = _scope(summary["agreement"])
+    scope_sentence = _scope_sentence(summary["agreement"])
+    spell_h2 = _spellable(
+        configurations, len(scope_fields), scope_documents, a["disagreed"]
+    )
+    # "seventeen fields" for one field seen on seventeen documents is the
+    # misreading this whole disclosure exists to stop, so the headline counts
+    # the fields and the documents separately rather than counting rows.
+    headline_scope = (
+        f"{_plural(len(scope_fields), 'field', spell=spell_h2)} across "
+        f"{_plural(scope_documents, 'document', spell=spell_h2)}"
+    )
     # "No disagreements" reads as a clean bill of health -- true when
     # everything was judged and agreed, false and misleading when nothing
     # could be judged at all (every row ambiguous or unanswered). The two
@@ -335,10 +629,14 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         cells = ""
         for provider, direct, sdk in _by_provider_half(row):
             cells += f"<div class=p>{e(provider)}</div>"
-            direct_norm = normalised.get(f"{provider}:direct", agreement._ABSENT)
-            sdk_norm = normalised.get(f"{provider}:sdk", agreement._ABSENT)
-            direct_shown = "—" if direct_norm is agreement._ABSENT else str(direct)
-            sdk_shown = "—" if sdk_norm is agreement._ABSENT else str(sdk)
+            # Defaulted to the marker, not to None: a provider/half missing from
+            # the row entirely means the same thing as one that answered nothing,
+            # and the two must compare EQUAL below or the page accuses providers
+            # of disagreeing when neither answered.
+            direct_norm = normalised.get(f"{provider}:direct", agreement.ABSENT)
+            sdk_norm = normalised.get(f"{provider}:sdk", agreement.ABSENT)
+            direct_shown = "—" if agreement.is_absent(direct_norm) else str(direct)
+            sdk_shown = "—" if agreement.is_absent(sdk_norm) else str(sdk)
             if direct_norm == sdk_norm:
                 # One box across both columns rather than the same string
                 # printed twice — the reader should see agreement, not repetition.
@@ -409,10 +707,18 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
 <a href="#appendix-c">Appendix C</a>.</p>
 """
 
-    return f"""
-<section class=band id="agreement">
-<p class=eyebrow>02 — Accuracy</p>
-<h2>{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, {_plural(a['fields'], 'field', spell=spell_h2)}, {headline_tail}</h2>
+    # The agreement sentence carries the scope disclosure that stops "one field
+    # on seventeen documents" reading as "seventeen fields". It is the h2 when
+    # agreement is all this band has, and a standfirst under the accuracy
+    # headline when it is not -- but it is never dropped.
+    agreement_sentence = (
+        f"{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, "
+        f"{headline_scope}, {headline_tail}"
+    )
+    agreement_block = ""
+    if a["fields"]:
+        agreement_block = f"""
+<p class=standfirst>{e(scope_sentence)}</p>
 <p class=standfirst>{e(AGREEMENT_FRAMING)}</p>
 <div class=cards>
 <div class='card accent'><span class=figure-xl>{e(rate)}</span>
@@ -424,6 +730,42 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
 </div>
 {in_full}
 {all_ranked}
+"""
+
+    if rungs:
+        # Scored accuracy leads. Agreement is context for it, not a substitute:
+        # two models can agree and both be wrong, so a page that opens on an
+        # agreement rate has buried the figure a buyer is actually buying.
+        scored = summary["accuracyByModel"]
+        heading = (
+            f"{_plural(len(scored), 'model', spell=_spellable(len(scored))).capitalize()} "
+            "scored against the answer key"
+        )
+        eyebrow = "02 — Accuracy"
+        lead = rungs
+        follow = (
+            f"<p class=eyebrow>Where the configurations disagree</p>"
+            f"<p class=standfirst>{e(agreement_sentence)}</p>{agreement_block}"
+            if agreement_block
+            else ""
+        )
+    else:
+        # Nothing was scored, so the band cannot claim accuracy. Saying
+        # "Accuracy" over an agreement rate is the mislabel this restructure
+        # exists to remove -- it must not survive in the keyless case either.
+        heading = agreement_sentence
+        eyebrow = "02 — Agreement"
+        lead = ""
+        follow = agreement_block
+
+    # Joined rather than interpolated on their own lines: either slot can be
+    # empty, and two empty slots left three blank lines in the shipped page.
+    body = "\n".join(part for part in (lead, follow) if part.strip())
+    return f"""
+<section class=band id="accuracy">
+<p class=eyebrow>{eyebrow}</p>
+<h2>{heading}</h2>
+{body}
 </section>
 """
 
@@ -462,11 +804,17 @@ def _caveats_band(summary: dict[str, Any], e) -> str:
             f"measurable and are excluded from every total on this page."
             f"{retried}</p>"
         )
-    if summary["mixedSchemas"]:
+    if summary.get("partitioned"):
         notices += (
-            "<p class=warn>These records mix a shared cost-mode schema with "
-            "answer-key schemas, so their token counts are not comparable with "
-            "each other.</p>"
+            "<p class=warn>Cost and accuracy on this page are "
+            "<strong>computed from different documents</strong>, because the two "
+            "need different requests: the cost figures come from "
+            f"{summary['costDocumentCount']} document(s) asked for one shared "
+            "schema, so a payload difference is attributable to the document, "
+            f"and the accuracy figures from {summary['accuracyDocumentCount']} "
+            "document(s) asked for their answer key's own fields, which is what "
+            "makes them scoreable. Neither set's token counts are comparable "
+            "with the other's, and nothing on this page compares them.</p>"
         )
 
     return f"""
@@ -550,7 +898,8 @@ def _appendix(summary: dict[str, Any], e) -> str:
         doc_groups = _doc_table(summary["byDocument"])
 
     prov_rows = "\n".join(
-        f"<tr><td>{e(r['label'])}</td><td class=n>{r['documents']}</td>"
+        f"<tr><td>{e(r['label'])}{_model_sub(r, e)}</td>"
+        f"<td class=n>{r['documents']}</td>"
         f"<td class='n d'>{r['deltaInputTokens']:+,}</td>"
         f"<td class=n>{r['deltaOutputTokens']:+,}</td>"
         f"<td class=n>{e(_spread(r['deltaMin'], r['deltaMax']))}</td>"
@@ -560,10 +909,11 @@ def _appendix(summary: dict[str, Any], e) -> str:
     )
 
     mixed_note = (
-        "<p class=warn>These records mix a shared cost-mode schema with "
-        "answer-key-derived schemas, so their token counts are not comparable. "
-        "Run cost and accuracy separately.</p>"
-        if summary["mixedSchemas"]
+        "<p class=warn>Scored from the answer-key documents in this report "
+        "only. The shared-schema documents were never asked the key's fields, "
+        "so scoring them would manufacture a mismatch for a question nobody "
+        "put to the model.</p>"
+        if summary.get("partitioned")
         else ""
     )
 
@@ -626,8 +976,7 @@ alongside it rather than as a like-for-like comparison.</p>
         # fabricate a disagreement in the exact artifact this feature exists to
         # produce.
         disagreement_rows = "\n".join(
-            f"<tr><td>{e(row['docId'])}</td><td>{e(row['field'])}</td>"
-            f"<td>{e(', '.join(f'{k}={v!r}' for k, v in sorted(row['values'].items())))}</td></tr>"
+            _disagreement_table(row)
             for row in summary["agreement"]
             if row["state"] == "disagreed"
         )
@@ -640,12 +989,8 @@ alongside it rather than as a like-for-like comparison.</p>
 {a['ambiguous']} field(s) the comparator could not confidently judge, and
 {a.get('unanswered', 0)} that no provider answered at all — nobody answered, so there is
 nothing to agree about. {a['fields']} field(s) were considered in total.</p>
-<div class=scroll>
-<table>
-  <tr><th>document</th><th>field</th><th>values</th></tr>
+<p class=sub>{e(_scope_sentence(summary['agreement']))}</p>
 {disagreement_rows}
-</table>
-</div>
 </details>
 """
 

@@ -223,6 +223,16 @@ section.band {
   letter-spacing: 0.24px;
   color: var(--text-neutral-tertiary);
 }
+/* A model id under a table row's label. Mono and not uppercased: it is an
+   identifier a reader may need to copy, not a caption. */
+.row-sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-neutral-tertiary);
+  margin-top: 3px;
+}
+
 .card-figure { display: flex; flex-direction: column; gap: 2px; }
 .card-figure.split { padding-top: 14px; border-top: 1px solid var(--border-neutral-default-primary); }
 .figure-lg {
@@ -405,6 +415,64 @@ details.group > summary { display: list-item; list-style-position: outside; marg
 .group-id { font-family: var(--font-mono); font-size: 14px; margin-right: 10px; }
 .group-meta { font-size: 13px; color: var(--text-neutral-tertiary); }
 
+/* Appendix C: one disagreement per block, one row per model, halves paired.
+   The mark column is the whole point -- a reader should be able to scan down it
+   without reading a single value. */
+.dis {
+  border: 1px solid var(--border-neutral-default-primary);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin: 18px 0;
+}
+.dis-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.dis-doc { font-family: var(--font-mono); font-size: 15px; }
+.dis-expected {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
+  margin: 12px 0 4px;
+  padding: 8px 12px;
+  background: var(--bg-neutral-default-secondary);
+  border-radius: 8px;
+}
+.dis-label {
+  font-family: var(--font-semi-mono);
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-neutral-tertiary);
+}
+.dis-src { font-size: 12px; color: var(--text-neutral-tertiary); }
+.dis-none { font-size: 13px; color: var(--text-neutral-tertiary); }
+.dis-why {
+  font-size: 12px; color: var(--text-neutral-tertiary);
+  margin: 6px 0 0; max-width: 680px;
+}
+.dis-table { font-size: 13px; margin: 4px 0 0; }
+.dis-table th { white-space: nowrap; }
+.dis-table td { vertical-align: top; }
+.dis-model { font-family: var(--font-mono); white-space: nowrap; }
+/* The mark's own column, kept narrow and non-shrinking so every glyph on the
+   page lands at the same x-position and the table reads straight down. */
+.dis-mark { width: 1.6em; padding-right: 0; text-align: center; }
+/* Half the remaining width each, so a long value in one half cannot squeeze
+   its counterpart into a column of single words. */
+.dis-table td.dis-v, .dis-table th:nth-child(3), .dis-table th:nth-child(5) {
+  width: 45%;
+}
+/* Wraps rather than truncates: a value that differs only in its tail -- an
+   extra "TRAILER NO: ..." -- is exactly the difference being shown, and an
+   ellipsis would hide the evidence. */
+.dis-v { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.mark { display: inline-block; font-weight: 600; }
+.mark-match { color: var(--text-state-success); }
+.mark-mismatch { color: var(--text-state-error); }
+.mark-unverified { color: var(--text-neutral-tertiary); }
+.mark-unscored { color: var(--text-neutral-tertiary); }
+/* Every mark's words, for screen readers and for print where colour may not
+   survive. Not display:none -- that would hide it from assistive tech too. */
+.sr {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 /* costlab/brand/print.css
    A printed copy must be complete: the appendix cannot stay collapsed.
    The rule doing that work is `details::details-content` below: modern
@@ -425,7 +493,7 @@ details.group > summary { display: list-item; list-style-position: outside; marg
   /* White for print. Browsers suppress backgrounds by default, but a reader who
      enables them should not spend a cartridge tinting every page warm. */
   body { padding: 0; font-size: 11pt; background: #fff; }
-  .card, .caveat, .cmp, details.group, .prov-cell, table { break-inside: avoid; }
+  .card, .caveat, .cmp, .dis, details.group, .prov-cell, table { break-inside: avoid; }
   h2 { break-after: avoid; }
   a[href^="#"] { text-decoration: none; color: inherit; }
 }
@@ -440,13 +508,13 @@ details.group > summary { display: list-item; list-style-position: outside; marg
 <header>
 <p class=eyebrow>Extraction cost and accuracy · measured run</p>
 <h1>What document extraction costs, with and without the Nutrient SDK</h1>
-<p class=standfirst>Seventeen documents, three models, each run twice: once through the Nutrient SDK and once as a direct model call. The SDK&#x27;s token overhead is a constant per call, and the two halves do not return the same thing.</p>
+<p class=standfirst>Seventeen documents, four models, each run twice: once through the Nutrient SDK and once as a direct model call. The SDK&#x27;s token overhead is a constant per call, and the two halves do not return the same thing.</p>
 </header>
 <div class=prov-grid><div class='prov-cell'><span class=prov-k>Documents run</span><span class='prov-v'>17 from Nutrient sample corpus</span></div>
-<div class='prov-cell'><span class=prov-k>Run</span><span class='prov-v mono'>2026-08-17T13:07:00-04:00</span></div>
+<div class='prov-cell'><span class=prov-k>Run</span><span class='prov-v mono'>2026-08-25T14:46:46-04:00 · 2026-08-25T14:55:00-04:00</span></div>
 <div class='prov-cell'><span class=prov-k>Price table checked</span><span class='prov-v mono'>2026-08-14</span></div>
 <div class='prov-cell'><span class=prov-k>Tool version</span><span class='prov-v mono'>nutrient-extraction-cost 0.1.0</span></div>
-<div class='prov-cell wide'><span class=prov-k>Models compared</span><span class='prov-v mono'>anthropic / claude-sonnet-5 · bedrock / qwen.qwen3-vl-235b-a22b-instruct · openai / gpt-5.4</span></div>
+<div class='prov-cell wide'><span class=prov-k>Models compared</span><span class='prov-v mono'>anthropic / claude-sonnet-5 · bedrock / qwen.qwen3-vl-235b-a22b-instruct · local / qwen/qwen3-vl-8b · openai / gpt-5.4</span></div>
 <div class='prov-cell wide'><span class=prov-k>Credentials used</span><span class='prov-v mono'>ANTHROPIC_API_KEY (set) · OPENAI_API_KEY (set) · BEDROCK_API_KEY (set)</span></div></div>
 
 
@@ -456,11 +524,12 @@ details.group > summary { display: list-item; list-style-position: outside; marg
 <p class=standfirst>The overhead is the same on the smallest document and the
 largest. It is a constant per model, not a percentage of the document, so it
 matters most on short documents and fades on long ones. Per-call spread across
-this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) exactly +468 on every call, OpenAI exactly +748 on every call.</p>
+this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) exactly +468 on every call, Local runtime exactly +468 on every call, OpenAI exactly +748 on every call.</p>
 <div class=cards>
-<div class=card><span class=card-model>Claude Sonnet 5</span><div class=card-figure><span class=figure-lg>+1,226</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$367.80</span><span class=figure-note>per 100k documents</span></div></div>
-<div class=card><span class=card-model>Qwen3-VL 235B (Bedrock)</span><div class=card-figure><span class=figure-lg>+468</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$24.80</span><span class=figure-note>per 100k documents</span></div></div>
-<div class=card><span class=card-model>OpenAI</span><div class=card-figure><span class=figure-lg>+748</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>not priced</span><span class=figure-note>no list price confirmed</span></div></div>
+<div class=card><span class=card-model>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></span><div class=card-figure><span class=figure-lg>+1,226</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$367.80</span><span class=figure-note>per 100k documents</span></div></div>
+<div class=card><span class=card-model>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></span><div class=card-figure><span class=figure-lg>+468</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>$24.80</span><span class=figure-note>per 100k documents</span></div></div>
+<div class=card><span class=card-model>Local runtime<span class=row-sub>qwen/qwen3-vl-8b</span></span><div class=card-figure><span class=figure-lg>+468</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>not priced</span><span class=figure-note>no list price confirmed</span></div></div>
+<div class=card><span class=card-model>OpenAI<span class=row-sub>gpt-5.4</span></span><div class=card-figure><span class=figure-lg>+748</span><span class=figure-note>input tokens per document</span></div><div class='card-figure split'><span class=figure-md>not priced</span><span class=figure-note>no list price confirmed</span></div></div>
 </div>
 <p class=standfirst>The overhead is a constant per call, and the constant is per model — not per vendor, and not per tokenizer generation. A different model, including a sibling from the same family, is a new measurement: the figures above do not transfer to it. Per-document detail is in
 <a href="#appendix-a">Appendix A</a>; provider totals in
@@ -468,14 +537,33 @@ this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) 
 </section>
 
 
-<section class=band id="agreement">
+<section class=band id="accuracy">
 <p class=eyebrow>02 — Accuracy</p>
-<h2>Six configurations, seventeen fields, seven disagreements</h2>
+<h2>Four models scored against the answer key</h2>
+
+<div class=scroll id="accuracy-by-model">
+<table>
+<thead><tr><th>model</th><th>runs on</th><th class=n>direct call</th>
+    <th class=n>with Nutrient SDK</th></tr></thead>
+<tr><td>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></td><td><span class=pill>frontier · hosted API</span></td><td class=n>51/57 (89%)</td><td class=n>52/57 (91%)</td></tr><tr><td>OpenAI<span class=row-sub>gpt-5.4</span></td><td><span class=pill>frontier · hosted API</span></td><td class=n>53/57 (93%)</td><td class=n>53/57 (93%)</td></tr><tr><td>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></td><td><span class=pill>open weights · hosted</span></td><td class=n>49/57 (86%)</td><td class=n>51/57 (89%)</td></tr><tr><td>Local runtime<span class=row-sub>qwen/qwen3-vl-8b</span></td><td><span class=pill>open weights · self-hosted</span></td><td class=n>50/56 (89%)</td><td class=n>52/57 (91%)</td></tr>
+</table>
+</div>
+<p class=standfirst>Scored against the answer key: a field the key does not
+cover is never counted against a model, and a cell the harness could not read
+counts as <em>not scoreable</em> rather than as a zero. The two halves of a row
+may be computed over <strong>different document counts</strong>, so each carries
+its own denominator — read a difference between them alongside those, not as a
+like-for-like comparison. Full per-half detail, including what was excluded as
+not confidently compared, is in
+<a href="#appendix-accuracy">the accuracy panel</a>.</p>
+
+<p class=eyebrow>Where the configurations disagree</p><p class=standfirst>8 configurations, 37 fields across 17 documents, 10 disagreements</p>
+<p class=standfirst>58 comparisons across 17 documents, covering 37 distinct fields: admissionDate, applicationNumber, billOfLadingNumber, carrier, claimNumber, consignee, contractSumToDate, currentPaymentDue, and 29 more.</p>
 <p class=standfirst>Looking at two values, you cannot tell which is right without a citation back to the page — and a citation is exactly what the grounded half returns and the direct half does not. Agreement is agreement, not correctness: two models can agree and both be wrong.</p>
 <div class=cards>
-<div class='card accent'><span class=figure-xl>59%</span>
-<span class=figure-note>of judged fields agreed — 10 of 17</span></div>
-<div class=card><span class=figure-xl>7</span>
+<div class='card accent'><span class=figure-xl>83%</span>
+<span class=figure-note>of judged fields agreed — 48 of 58</span></div>
+<div class=card><span class=figure-xl>10</span>
 <span class=figure-note>fields where configurations differed</span></div>
 <div class=card><span class=figure-xl>0</span>
 <span class=figure-note>fields excluded as unjudgeable or unanswered</span></div>
@@ -486,30 +574,34 @@ this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) 
 <div class=cmp-head>
 <span class=cmp-doc>heavenly-hamburgers-recipe</span>
 <span class=pill>documentTitle</span>
-<span class=figure-note>6 distinct answers across 6 configurations</span>
+<span class=figure-note>5 distinct answers across 8 configurations</span>
 </div>
 <div class=cmp-grid>
 <div class=h></div><div class=h>Direct call</div><div class=h>With Nutrient SDK</div>
-<div class=p>anthropic</div><div class='val diff'>Recipe from the kitchen of:</div><div class='val diff'>From. Lola to</div><div class=p>bedrock</div><div class='val diff'>From. Lola to Grand m te ~ Hons Hea what Ven if vw gers Recipe from the kilehyn of: Orig bola na : &gt; - _ - Bak of F fre for Ahour ee Fg 4</div><div class='val diff'>From. Lola to Grand m te</div><div class=p>openai</div><div class='val diff'>From Lola to Grandmother ~ Heaven knows what</div><div class='val diff'>From. Lola to ~ Hea Ven Hons vw what</div>
+<div class=p>anthropic</div><div class='val diff'>Heavenly Meatloaf Recipe from Grandma&#x27;s Kitchen</div><div class='val diff'>From Lola to Grandma</div><div class=p>bedrock</div><div class='val agree'>From. Lola to Grand m te ~ Hons Hea what Ven if vw gers<span class=same-note>both halves identical</span></div><div class=p>local</div><div class='val agree'>Recipe from the kitchen of: Orig bola na<span class=same-note>both halves identical</span></div><div class=p>openai</div><div class='val agree'>From. Lola to ~ Hea Ven Hons vw what<span class=same-note>both halves identical</span></div>
 </div>
 </article>
 
 
-<p class=eyebrow>All seven, by spread</p>
+<p class=eyebrow>All ten, by spread</p>
 <div class=spread>
 <table>
 <thead><tr><th>document</th><th>field</th><th>distinct answers</th></tr></thead>
-<tr><td class=doc>heavenly-hamburgers-recipe</td><td class=field>documentTitle</td><td class=count><strong>6 of 6</strong> configurations differed</td></tr>
-<tr><td class=doc>invoice-ac-2025-1047</td><td class=field>documentTitle</td><td class=count><strong>4</strong> distinct answers</td></tr>
-<tr><td class=doc>meridian-balance-sheet</td><td class=field>documentTitle</td><td class=count><strong>4</strong> distinct answers</td></tr>
-<tr><td class=doc>meridian-income-statement</td><td class=field>documentTitle</td><td class=count><strong>3</strong> distinct answers</td></tr>
-<tr><td class=doc>lumen-invoice</td><td class=field>documentTitle</td><td class=count><strong>2</strong> distinct answers</td></tr>
-<tr><td class=doc>northgate-auto-claim-fnol</td><td class=field>documentTitle</td><td class=count><strong>2</strong> distinct answers</td></tr>
-<tr><td class=doc>happy-tooth-invoice-excel</td><td class=field>documentTitle</td><td class=count><strong>2</strong> distinct answers</td></tr>
+<tr><td class=doc>heavenly-hamburgers-recipe</td><td class=field>documentTitle</td><td class=count><strong>5</strong> distinct answers</td></tr>
+<tr><td class=doc>bill-of-lading</td><td class=field>consignee</td><td class=count><strong>2</strong> distinct answers</td></tr>
+<tr><td class=doc>bill-of-lading</td><td class=field>shipper</td><td class=count><strong>2</strong> distinct answers</td></tr>
+<tr><td class=doc>employment-application</td><td class=field>documentTitle</td><td class=count><strong>3</strong> distinct answers</td></tr>
+<tr><td class=doc>dear-magnus-thank-you-note</td><td class=field>documentTitle</td><td class=count><strong>3</strong> distinct answers</td></tr>
+<tr><td class=doc>emergency-dept-billing-worksheet</td><td class=field>admissionDate</td><td class=count><strong>3</strong> distinct answers</td></tr>
+<tr><td class=doc>lumen-invoice</td><td class=field>issueDate</td><td class=count><strong>3</strong> distinct answers</td></tr>
+<tr><td class=doc>bill-of-lading</td><td class=field>carrier</td><td class=count><strong>2</strong> distinct answers</td></tr>
+<tr><td class=doc>construction-pay-application</td><td class=field>applicationNumber</td><td class=count><strong>2</strong> distinct answers</td></tr>
+<tr><td class=doc>lumen-invoice</td><td class=field>invoiceNumber</td><td class=count><strong>2</strong> distinct answers</td></tr>
 </table>
 </div>
 <p class=standfirst>Every value each configuration returned is in
 <a href="#appendix-c">Appendix C</a>.</p>
+
 
 </section>
 
@@ -517,11 +609,11 @@ this run: Claude Sonnet 5 exactly +1,226 on every call, Qwen3-VL 235B (Bedrock) 
 <section class=band id="caveats">
 <p class=eyebrow>03 — Caveats</p>
 <h2>Reading this honestly</h2>
-<p class=standfirst>Four things that would make
+<p class=standfirst>Five things that would make
 the numbers say something they do not say.</p>
-
+<p class=warn>1 cell(s) are not measurable and are excluded from every total on this page.</p><p class=warn>Cost and accuracy on this page are <strong>computed from different documents</strong>, because the two need different requests: the cost figures come from 17 document(s) asked for one shared schema, so a payload difference is attributable to the document, and the accuracy figures from 17 document(s) asked for their answer key's own fields, which is what makes them scoreable. Neither set's token counts are comparable with the other's, and nothing on this page compares them.</p>
 <div class=cards>
-<div class=caveat><span class=caveat-n>01</span><h3>The delta is not waste</h3><p>The “without Nutrient” calls return no reliable page coordinates. They are cheaper because they do less: no grounded source locations, no confidence components. Do not read the delta as waste.</p></div><div class=caveat><span class=caveat-n>02</span><h3>Output tokens are not comparable</h3><p>Output tokens are not comparable between the two halves. The SDK asks for grounded metadata the direct call does not, and a direct call is free to be verbose — in one measured run a single document&#x27;s direct call emitted about 7,500 more output tokens than its SDK counterpart, which alone was enough to flip the aggregate and make the SDK look cheaper overall. The headline figure is therefore priced from input tokens, which measure the same document on both sides. The total including output is shown separately and should not be read as a like-for-like saving.</p></div><div class=caveat><span class=caveat-n>03</span><h3>Tokens do not compare across providers</h3><p>Token counts are not comparable across providers — each tokenises the same document differently, so a cross-provider token column compares tokenizers rather than efficiency. Compare tokens within a provider, and cost across them.</p></div><div class=caveat><span class=caveat-n>04</span><h3>Thinking tokens are billed as output</h3><p>Anthropic bills thinking tokens inside output tokens, itemised separately in its usage block. Output cost is not proportional to returned text.</p></div>
+<div class=caveat><span class=caveat-n>01</span><h3>The delta is not waste</h3><p>The “without Nutrient” calls return no reliable page coordinates. They are cheaper because they do less: no grounded source locations, no confidence components. Do not read the delta as waste.</p></div><div class=caveat><span class=caveat-n>02</span><h3>Output tokens are not comparable</h3><p>Output tokens are not comparable between the two halves. The SDK asks for grounded metadata the direct call does not, and a direct call is free to be verbose — in one measured run a single document&#x27;s direct call emitted about 7,500 more output tokens than its SDK counterpart, which alone was enough to flip the aggregate and make the SDK look cheaper overall. The headline figure is therefore priced from input tokens, which measure the same document on both sides. The total including output is shown separately and should not be read as a like-for-like saving.</p></div><div class=caveat><span class=caveat-n>03</span><h3>Tokens do not compare across providers</h3><p>Token counts are not comparable across providers — each tokenises the same document differently, so a cross-provider token column compares tokenizers rather than efficiency. Compare tokens within a provider, and cost across them.</p></div><div class=caveat><span class=caveat-n>04</span><h3>Thinking tokens are billed as output</h3><p>Anthropic bills thinking tokens inside output tokens, itemised separately in its usage block. Output cost is not proportional to returned text.</p></div><div class=caveat><span class=caveat-n>05</span><h3>Read this before quoting a figure</h3><p>This report combines measurements from more than one separate run, listed under Run above. Each figure is exact for the run it came from, but the runs happened at different times and may have used different credentials or a different machine, so treat a comparison ACROSS models as close to like-for-like rather than exactly so.</p></div>
 </div>
 <div class=price-note>
 <p class=eyebrow>On the prices used</p>
@@ -542,25 +634,25 @@ the numbers say something they do not say.</p>
       <th class=n>direct input</th><th class=n>delta</th>
       <th class=n>delta $ (input)</th>
       <th class=n>delta $ incl. output (not like-for-like)</th></tr>
-<tr><td>apricot-cake-recipe</td><td>anthropic</td><td class=n>1,563</td><td class=n>337</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
+<tr><td>apricot-cake-recipe</td><td>anthropic</td><td class=n>1,563</td><td class=n>337</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
 <tr><td>bill-of-lading</td><td>anthropic</td><td class=n>2,603</td><td class=n>1,377</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
 <tr><td>construction-pay-application</td><td>anthropic</td><td class=n>3,133</td><td class=n>1,907</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>dear-magnus-thank-you-note</td><td>anthropic</td><td class=n>1,811</td><td class=n>585</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0054</td></tr>
+<tr><td>dear-magnus-thank-you-note</td><td>anthropic</td><td class=n>1,811</td><td class=n>585</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0050</td></tr>
 <tr><td>emergency-dept-billing-worksheet</td><td>anthropic</td><td class=n>2,624</td><td class=n>1,398</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>employment-application</td><td>anthropic</td><td class=n>2,116</td><td class=n>890</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>employment-application</td><td>anthropic</td><td class=n>2,116</td><td class=n>890</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
 <tr><td>happy-tooth-invoice-excel</td><td>anthropic</td><td class=n>2,718</td><td class=n>1,492</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0042</td></tr>
-<tr><td>heavenly-hamburgers-recipe</td><td>anthropic</td><td class=n>1,844</td><td class=n>618</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0072</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>anthropic</td><td class=n>1,841</td><td class=n>615</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0053</td></tr>
 <tr><td>invoice-ac-2025-1047</td><td>anthropic</td><td class=n>5,167</td><td class=n>3,941</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
-<tr><td>lumen-invoice</td><td>anthropic</td><td class=n>2,992</td><td class=n>1,766</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>lumen-invoice</td><td>anthropic</td><td class=n>2,992</td><td class=n>1,766</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0060</td></tr>
 <tr><td>meridian-annual-report</td><td>anthropic</td><td class=n>18,723</td><td class=n>17,497</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>meridian-balance-sheet</td><td>anthropic</td><td class=n>2,607</td><td class=n>1,381</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0019</td></tr>
+<tr><td>meridian-balance-sheet</td><td>anthropic</td><td class=n>2,607</td><td class=n>1,381</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0040</td></tr>
 <tr><td>meridian-income-statement</td><td>anthropic</td><td class=n>2,214</td><td class=n>988</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
-<tr><td>northgate-auto-claim-fnol</td><td>anthropic</td><td class=n>2,650</td><td class=n>1,424</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>anthropic</td><td class=n>2,650</td><td class=n>1,424</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0065</td></tr>
 <tr><td>northgate-claim-file</td><td>anthropic</td><td class=n>9,117</td><td class=n>7,891</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
 <tr><td>regional-health-record</td><td>anthropic</td><td class=n>31,188</td><td class=n>29,962</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
 <tr><td>scanned-invoice</td><td>anthropic</td><td class=n>3,163</td><td class=n>1,937</td><td class='n d'>+1,226</td><td class='n d'>$0.0037</td><td class=n>$0.0041</td></tr>
 </table>
-</div></details><details class=group><summary><span class=group-id>bedrock</span><span class=group-meta>Qwen3-VL 235B (Bedrock) · 17 documents · +468 input tokens each</span></summary><div class=scroll>
+</div></details><details class=group><summary><span class=group-id>bedrock</span><span class=group-meta>Qwen3-VL 235B (Bedrock) · 16 documents · +468 input tokens each</span></summary><div class=scroll>
 <table>
   <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
       <th class=n>direct input</th><th class=n>delta</th>
@@ -570,19 +662,42 @@ the numbers say something they do not say.</p>
 <tr><td>bill-of-lading</td><td>bedrock</td><td class=n>1,349</td><td class=n>881</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>construction-pay-application</td><td>bedrock</td><td class=n>1,796</td><td class=n>1,328</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>dear-magnus-thank-you-note</td><td>bedrock</td><td class=n>790</td><td class=n>322</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
-<tr><td>emergency-dept-billing-worksheet</td><td>bedrock</td><td class=n>1,316</td><td class=n>848</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
-<tr><td>employment-application</td><td>bedrock</td><td class=n>1,058</td><td class=n>590</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>employment-application</td><td>bedrock</td><td class=n>1,058</td><td class=n>590</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0004</td></tr>
 <tr><td>happy-tooth-invoice-excel</td><td>bedrock</td><td class=n>1,519</td><td class=n>1,051</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
-<tr><td>heavenly-hamburgers-recipe</td><td>bedrock</td><td class=n>855</td><td class=n>387</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0002</td></tr>
-<tr><td>invoice-ac-2025-1047</td><td>bedrock</td><td class=n>3,612</td><td class=n>3,144</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0007</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>bedrock</td><td class=n>851</td><td class=n>383</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0002</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>bedrock</td><td class=n>3,612</td><td class=n>3,144</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$-0.0027</td></tr>
 <tr><td>lumen-invoice</td><td>bedrock</td><td class=n>1,743</td><td class=n>1,275</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>meridian-annual-report</td><td>bedrock</td><td class=n>12,933</td><td class=n>12,465</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
-<tr><td>meridian-balance-sheet</td><td>bedrock</td><td class=n>1,466</td><td class=n>998</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0004</td></tr>
-<tr><td>meridian-income-statement</td><td>bedrock</td><td class=n>1,155</td><td class=n>687</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0004</td></tr>
+<tr><td>meridian-balance-sheet</td><td>bedrock</td><td class=n>1,466</td><td class=n>998</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+<tr><td>meridian-income-statement</td><td>bedrock</td><td class=n>1,155</td><td class=n>687</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>northgate-auto-claim-fnol</td><td>bedrock</td><td class=n>1,442</td><td class=n>974</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>northgate-claim-file</td><td>bedrock</td><td class=n>5,918</td><td class=n>5,450</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>regional-health-record</td><td>bedrock</td><td class=n>21,830</td><td class=n>21,362</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
 <tr><td>scanned-invoice</td><td>bedrock</td><td class=n>1,891</td><td class=n>1,423</td><td class='n d'>+468</td><td class='n d'>$0.0002</td><td class=n>$0.0003</td></tr>
+</table>
+</div></details><details class=group><summary><span class=group-id>local</span><span class=group-meta>Local runtime · 17 documents · +468 input tokens each · not priced</span></summary><div class=scroll>
+<table>
+  <tr><th>document</th><th>provider</th><th class=n>SDK input</th>
+      <th class=n>direct input</th><th class=n>delta</th>
+      <th class=n>delta $ (input)</th>
+      <th class=n>delta $ incl. output (not like-for-like)</th></tr>
+<tr><td>apricot-cake-recipe</td><td>local</td><td class=n>640</td><td class=n>172</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>bill-of-lading</td><td>local</td><td class=n>1,349</td><td class=n>881</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>construction-pay-application</td><td>local</td><td class=n>1,796</td><td class=n>1,328</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>dear-magnus-thank-you-note</td><td>local</td><td class=n>790</td><td class=n>322</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>emergency-dept-billing-worksheet</td><td>local</td><td class=n>1,316</td><td class=n>848</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>employment-application</td><td>local</td><td class=n>1,049</td><td class=n>581</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>happy-tooth-invoice-excel</td><td>local</td><td class=n>1,519</td><td class=n>1,051</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>local</td><td class=n>850</td><td class=n>382</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>invoice-ac-2025-1047</td><td>local</td><td class=n>3,612</td><td class=n>3,144</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>lumen-invoice</td><td>local</td><td class=n>1,743</td><td class=n>1,275</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>meridian-annual-report</td><td>local</td><td class=n>12,933</td><td class=n>12,465</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>meridian-balance-sheet</td><td>local</td><td class=n>1,466</td><td class=n>998</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>meridian-income-statement</td><td>local</td><td class=n>1,155</td><td class=n>687</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>northgate-auto-claim-fnol</td><td>local</td><td class=n>1,442</td><td class=n>974</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>northgate-claim-file</td><td>local</td><td class=n>5,918</td><td class=n>5,450</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>regional-health-record</td><td>local</td><td class=n>21,830</td><td class=n>21,362</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>scanned-invoice</td><td>local</td><td class=n>1,891</td><td class=n>1,423</td><td class='n d'>+468</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 </table>
 </div></details><details class=group><summary><span class=group-id>openai</span><span class=group-meta>OpenAI · 17 documents · +748 input tokens each · not priced</span></summary><div class=scroll>
 <table>
@@ -595,9 +710,9 @@ the numbers say something they do not say.</p>
 <tr><td>construction-pay-application</td><td>openai</td><td class=n>1,974</td><td class=n>1,226</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>dear-magnus-thank-you-note</td><td>openai</td><td class=n>1,088</td><td class=n>340</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>emergency-dept-billing-worksheet</td><td>openai</td><td class=n>1,578</td><td class=n>830</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>employment-application</td><td>openai</td><td class=n>1,338</td><td class=n>590</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>employment-application</td><td>openai</td><td class=n>1,346</td><td class=n>598</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>happy-tooth-invoice-excel</td><td>openai</td><td class=n>1,745</td><td class=n>997</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
-<tr><td>heavenly-hamburgers-recipe</td><td>openai</td><td class=n>1,154</td><td class=n>406</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>heavenly-hamburgers-recipe</td><td>openai</td><td class=n>1,157</td><td class=n>409</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>invoice-ac-2025-1047</td><td>openai</td><td class=n>3,496</td><td class=n>2,748</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>lumen-invoice</td><td>openai</td><td class=n>1,938</td><td class=n>1,190</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 <tr><td>meridian-annual-report</td><td>openai</td><td class=n>12,141</td><td class=n>11,393</td><td class='n d'>+748</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
@@ -623,9 +738,10 @@ for different things, and output is priced several times higher than input.</p>
       <th class=n>delta output</th><th class=n>per-call spread</th>
       <th class=n>$ / 100k docs (input)</th>
       <th class=n>$ / 100k incl. output</th></tr>
-<tr><td>Claude Sonnet 5</td><td class=n>17</td><td class='n d'>+20,842</td><td class=n>+596</td><td class=n>exactly +1,226 on every call</td><td class='n d'>$367.80</td><td class=n>$420.39</td></tr>
-<tr><td>Qwen3-VL 235B (Bedrock)</td><td class=n>17</td><td class='n d'>+7,956</td><td class=n>+594</td><td class=n>exactly +468 on every call</td><td class='n d'>$24.80</td><td class=n>$34.10</td></tr>
-<tr><td>OpenAI</td><td class=n>17</td><td class='n d'>+12,716</td><td class=n>+378</td><td class=n>exactly +748 on every call</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>Claude Sonnet 5<span class=row-sub>claude-sonnet-5</span></td><td class=n>17</td><td class='n d'>+20,842</td><td class=n>+883</td><td class=n>exactly +1,226 on every call</td><td class='n d'>$367.80</td><td class=n>$445.71</td></tr>
+<tr><td>Qwen3-VL 235B (Bedrock)<span class=row-sub>qwen.qwen3-vl-235b-a22b-instruct</span></td><td class=n>16</td><td class='n d'>+7,488</td><td class=n>-691</td><td class=n>exactly +468 on every call</td><td class='n d'>$24.80</td><td class=n>$13.32</td></tr>
+<tr><td>Local runtime<span class=row-sub>qwen/qwen3-vl-8b</span></td><td class=n>17</td><td class='n d'>+7,956</td><td class=n>+283</td><td class=n>exactly +468 on every call</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
+<tr><td>OpenAI<span class=row-sub>gpt-5.4</span></td><td class=n>17</td><td class='n d'>+12,716</td><td class=n>+370</td><td class=n>exactly +748 on every call</td><td class='n d'>not priced</td><td class=n>not priced</td></tr>
 </table>
 </div>
 <p class=sub>A narrow per-call spread is the point: the SDK's overhead behaves as
@@ -636,27 +752,221 @@ meaningful while that spread stays narrow — if it widens, read the per-documen
 rows instead.</p>
 </details>
 
+<details class=panel id="appendix-accuracy">
+<summary>Accuracy, scored against the answer key</summary>
+<p class=warn>Scored from the answer-key documents in this report only. The shared-schema documents were never asked the key's fields, so scoring them would manufacture a mismatch for a question nobody put to the model.</p>
+<p class=sub>Scored against the answer key. A field the key does not cover is
+never counted against a provider, and a cell the harness could not read
+counts as "not scoreable" rather than as a zero. A field the key DOES cover,
+but whose comparison could not be made confidently — an ambiguous date or
+number format — is excluded from the accuracy figure and counted separately
+below, not treated as a mismatch and not treated as missing from the key.</p>
+<p class=sub>The two halves of a provider are listed side by side but may be
+computed over <strong>different document counts</strong>: the harness skips a
+direct cell whenever its SDK cell failed, and either half can be unscoreable on
+a given document. The <em>not scoreable</em> column shows how many cells
+contributed nothing, so a difference between the two halves should be read
+alongside it rather than as a like-for-like comparison.</p>
+<div class=scroll>
+<table>
+  <tr><th>provider</th><th>half</th><th class=n>accuracy</th>
+      <th class=n>not scoreable</th><th class=n>not confidently compared</th></tr>
+<tr><td>anthropic</td><td>direct</td><td class=n>51/57 (89%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>anthropic</td><td>with Nutrient</td><td class=n>52/57 (91%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>bedrock</td><td>direct</td><td class=n>49/57 (86%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>bedrock</td><td>with Nutrient</td><td class=n>51/57 (89%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>local</td><td>direct</td><td class=n>50/56 (89%)</td><td class=n>0</td><td class=n>2</td></tr>
+<tr><td>local</td><td>with Nutrient</td><td class=n>52/57 (91%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>openai</td><td>direct</td><td class=n>53/57 (93%)</td><td class=n>0</td><td class=n>1</td></tr>
+<tr><td>openai</td><td>with Nutrient</td><td class=n>53/57 (93%)</td><td class=n>0</td><td class=n>1</td></tr>
+</table>
+</div>
+</details>
+
 
 <details class=panel id="appendix-c">
 <summary>C · Every disagreement, in full</summary>
 <p class=sub>Each row is a field where two configurations returned different answers. This is the part worth dwelling on: looking at two different values, you cannot tell which is right without a citation back to the page to check — and a citation is exactly what the grounded half returns and the direct half does not.</p>
-<p class=sub>10/17 judged fields agreed
-(59%) — 7 disagreement(s) below. Excluded from that rate:
+<p class=sub>48/58 judged fields agreed
+(83%) — 10 disagreement(s) below. Excluded from that rate:
 0 field(s) the comparator could not confidently judge, and
 0 that no provider answered at all — nobody answered, so there is
-nothing to agree about. 17 field(s) were considered in total.</p>
+nothing to agree about. 58 field(s) were considered in total.</p>
+<p class=sub>58 comparisons across 17 documents, covering 37 distinct fields: admissionDate, applicationNumber, billOfLadingNumber, carrier, claimNumber, consignee, contractSumToDate, currentPaymentDue, and 29 more.</p>
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>bill-of-lading</span>
+<span class=pill>carrier</span>
+<span class=figure-note>2 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>Inter-Continental Freight Carriers Inc.</span><span class=dis-src>read from: CARRIER: Inter-Continental Freight Carriers Inc.</span></div>
 <div class=scroll>
-<table>
-  <tr><th>document</th><th>field</th><th>values</th></tr>
-<tr><td>happy-tooth-invoice-excel</td><td>documentTitle</td><td>anthropic:direct=&#x27;Invoice #5465&#x27;, anthropic:sdk=&#x27;THE HAPPY TOOTH&#x27;, bedrock:direct=&#x27;THE HAPPY TOOTH&#x27;, bedrock:sdk=&#x27;THE HAPPY TOOTH&#x27;, openai:direct=&#x27;THE HAPPY TOOTH&#x27;, openai:sdk=&#x27;THE HAPPY TOOTH&#x27;</td></tr>
-<tr><td>heavenly-hamburgers-recipe</td><td>documentTitle</td><td>anthropic:direct=&#x27;Recipe from the kitchen of:&#x27;, anthropic:sdk=&#x27;From. Lola to&#x27;, bedrock:direct=&#x27;From. Lola to Grand m te ~ Hons Hea what Ven if vw gers Recipe from the kilehyn of: Orig bola na : &gt; - _ - Bak of F fre for Ahour ee Fg 4&#x27;, bedrock:sdk=&#x27;From. Lola to Grand m te&#x27;, openai:direct=&#x27;From Lola to Grandmother ~ Heaven knows what&#x27;, openai:sdk=&#x27;From. Lola to ~ Hea Ven Hons vw what&#x27;</td></tr>
-<tr><td>invoice-ac-2025-1047</td><td>documentTitle</td><td>anthropic:direct=&#x27;PROGRESS INVOICE&#x27;, anthropic:sdk=&#x27;PROGRESS INVOICE&#x27;, bedrock:direct=&#x27;PROGRESS INVOICE - Riverside Mixed-Use Development — Phase 2&#x27;, bedrock:sdk=&#x27;PROGRESS INVOICE: Riverside Mixed-Use Development — Phase 2 (Contract #RMD-2024-003, Permit #BLD-2024-78945, Invoice Date March 1, 2025, Due March 31, 2025, Period Feb 1 – Feb 28, 2025, Invoice No. 1047, Status: On Schedule, Retainage 10%)&#x27;, openai:direct=&#x27;PROGRESS INVOICE&#x27;, openai:sdk=&#x27;ATLAS CONSTRUCTION PROGRESS INVOICE&#x27;</td></tr>
-<tr><td>lumen-invoice</td><td>documentTitle</td><td>anthropic:direct=&#x27;Invoice&#x27;, anthropic:sdk=&#x27;Invoice&#x27;, bedrock:direct=&#x27;Invoice of CenturyLink Communications, LLC.&#x27;, bedrock:sdk=&#x27;Invoice of CenturyLink Communications, LLC.&#x27;, openai:direct=&#x27;Invoice&#x27;, openai:sdk=&#x27;Invoice&#x27;</td></tr>
-<tr><td>meridian-balance-sheet</td><td>documentTitle</td><td>anthropic:direct=&#x27;Meridian Components Inc.&#x27;, anthropic:sdk=&#x27;Meridian Components Inc.&#x27;, bedrock:direct=&#x27;Statement of Financial Position · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, bedrock:sdk=&#x27;Meridian Components Inc. Statement of Financial Position · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, openai:direct=&#x27;Statement of Financial Position&#x27;, openai:sdk=&#x27;Meridian Components Inc.&#x27;</td></tr>
-<tr><td>meridian-income-statement</td><td>documentTitle</td><td>anthropic:direct=&#x27;Meridian Components Inc.&#x27;, anthropic:sdk=&#x27;Meridian Components Inc.&#x27;, bedrock:direct=&#x27;Meridian Components Inc. Statement of Operations · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, bedrock:sdk=&#x27;Meridian Components Inc. Statement of Operations · Period Ending December 31, 2025 · Reporting Currency: USD&#x27;, openai:direct=&#x27;INCOME STATEMENT&#x27;, openai:sdk=&#x27;INCOME STATEMENT&#x27;</td></tr>
-<tr><td>northgate-auto-claim-fnol</td><td>documentTitle</td><td>anthropic:direct=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, anthropic:sdk=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, bedrock:direct=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, bedrock:sdk=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, openai:direct=&#x27;Automobile First Notice of Loss · Form FNOL-AUTO-04&#x27;, openai:sdk=&#x27;Northgate Mutual Insurance Company&#x27;</td></tr>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Inter-Continental Freight Carriers Inc.</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Inter-Continental Freight Carriers Inc.</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Inter-Continental Freight Carriers Inc.</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Inter-Continental Freight Carriers Inc.</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Inter-Continental Freight Carriers Inc.
+TRAILER NO: TR-8841-EU</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Inter-Continental Freight Carriers Inc.
+TRAILER NO: TR-8841-EU</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Inter-Continental Freight Carriers Inc.</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Inter-Continental Freight Carriers Inc.</td></tr>
 </table>
 </div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>bill-of-lading</span>
+<span class=pill>consignee</span>
+<span class=figure-note>2 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>EuroHub Logistics Center</span><span class=dis-src>read from: CONSIGNEE (TO): EuroHub Logistics Center</span></div>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center, 45 Terminal Read, Logistics Park, Rotterdam, 3008 AB, Netherlands</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center
+45 Terminal Read, Logistics Park Rotterdam
+3008 AB, Netherlands
+Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center
+45 Terminal Read, Logistics Park Rotterdam
+3008 AB, Netherlands
+Attn: Receiving Dept / Dock 7</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, 3008 AB, Netherlands Attn: Receiving Dept / Dock 7</td></tr>
+</table>
+</div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>bill-of-lading</span>
+<span class=pill>shipper</span>
+<span class=figure-note>2 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>Apex Industrial Supply Ltd.</span><span class=dis-src>read from: SHIPPER (FROM): Apex Industrial Supply Ltd.</span></div>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd., 100 Industrial Parkway, Sector 4, London, E14 5AA, United Kingdom</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom REF PO: #NX-99023-2026</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom REF PO: #NX-99023-2026</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd.
+100 Industrial Parkway, Sector 4
+London, E14 5AA, United Kingdom
+REF PO: #NX-99023-2026</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd.
+100 Industrial Parkway, Sector 4
+London, E14 5AA, United Kingdom
+REF PO: #NX-99023-2026</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Apex Industrial Supply Ltd. 100 Industrial Parkway, Sector 4 London, E14 5AA, United Kingdom</td></tr>
+</table>
+</div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>construction-pay-application</span>
+<span class=pill>applicationNumber</span>
+<span class=figure-note>2 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>14</span><span class=dis-src>read from: APPLICATION NO. 14</span></div>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>14</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>14</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>14</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>14</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-unscored' role=img aria-label="no answer">—</span></td><td class=dis-v><span class=dis-none>no answer</span></td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>14</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>14</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>14</td></tr>
+</table>
+</div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>dear-magnus-thank-you-note</span>
+<span class=pill>documentTitle</span>
+<span class=figure-note>3 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>NOTES</span><span class=dis-src>read from: NOTES</span></div>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Dear Magnus, - Thank You Note</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Dear Magnus,</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>NOTES</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>NOTES</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>NOTES</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>NOTES</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>NOTES</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>NOTES</td></tr>
+</table>
+</div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>emergency-dept-billing-worksheet</span>
+<span class=pill>admissionDate</span>
+<span class=figure-note>3 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>12/04/2016</span><span class=dis-src>read from: Date of Admission: 12/04/2016</span></div>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-unscored' role=img aria-label="no answer">—</span></td><td class=dis-v><span class=dis-none>no answer</span></td><td class=dis-mark><span class='mark mark-unscored' role=img aria-label="no answer">—</span></td><td class=dis-v><span class=dis-none>no answer</span></td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-unscored' role=img aria-label="no answer">—</span></td><td class=dis-v><span class=dis-none>no answer</span></td><td class=dis-mark><span class='mark mark-unscored' role=img aria-label="no answer">—</span></td><td class=dis-v><span class=dis-none>no answer</span></td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-unscored' role=img aria-label="no answer">—</span></td><td class=dis-v><span class=dis-none>no answer</span></td><td class=dis-mark><span class='mark mark-unscored' role=img aria-label="no answer">—</span></td><td class=dis-v><span class=dis-none>no answer</span></td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>unknown</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Not specified</td></tr>
+</table>
+</div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>employment-application</span>
+<span class=pill>documentTitle</span>
+<span class=figure-note>3 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>Employment Application</span><span class=dis-src>read from: Employment Application</span></div>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Employment Application</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Employment Application</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Employment Application</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Employment Application</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Employment Application Ory] Application information</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>Employment Application Ory]</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Employment Application</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>Employment Application</td></tr>
+</table>
+</div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>heavenly-hamburgers-recipe</span>
+<span class=pill>documentTitle</span>
+<span class=figure-note>5 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>Heavenly Hamburgers</span><span class=dis-src>read from: Heavenly Here&#x27;s what&#x27;s cookin&#x27;: Hamburgers</span></div><p class=dis-why>Not scoreable: The title is interleaved with a graphic: the page prints &quot;Heavenly Here&#x27;s what&#x27;s cookin&#x27;: Hamburgers&quot;. &quot;Heavenly Hamburgers&quot; is a human reading of that, not a line the page carries, so no extraction can be scored against it. Every provider was marked wrong on this field before the flag existed. Every answer below is shown without a correctness mark, and this field is excluded from the accuracy figures rather than counted against any model.</p>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-unverified' role=img aria-label="not compared confidently">~</span></td><td class=dis-v>Heavenly Meatloaf Recipe from Grandma&#x27;s Kitchen</td><td class=dis-mark><span class='mark mark-unverified' role=img aria-label="not compared confidently">~</span></td><td class=dis-v>From Lola to Grandma</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-unverified' role=img aria-label="not compared confidently">~</span></td><td class=dis-v>From. Lola to ~ Hea Ven Hons vw what</td><td class=dis-mark><span class='mark mark-unverified' role=img aria-label="not compared confidently">~</span></td><td class=dis-v>From. Lola to ~ Hea Ven Hons vw what</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-unverified' role=img aria-label="not compared confidently">~</span></td><td class=dis-v>From. Lola to Grand m te ~ Hons Hea what Ven if vw gers</td><td class=dis-mark><span class='mark mark-unverified' role=img aria-label="not compared confidently">~</span></td><td class=dis-v>From. Lola to Grand m te ~ Hons Hea what Ven if vw gers</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-unverified' role=img aria-label="not compared confidently">~</span></td><td class=dis-v>Recipe from the kitchen of: Orig bola na</td><td class=dis-mark><span class='mark mark-unverified' role=img aria-label="not compared confidently">~</span></td><td class=dis-v>Recipe from the kitchen of: Orig bola na</td></tr>
+</table>
+</div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>lumen-invoice</span>
+<span class=pill>invoiceNumber</span>
+<span class=figure-note>2 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>616770524</span><span class=dis-src>read from: Invoice Number 616770524</span></div>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>616770524</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>616770524</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>616770524</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>616770524</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>616770524</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>616770524</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>06167705240</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>616770524</td></tr>
+</table>
+</div>
+</article>
+
+
+<article class=dis>
+<div class=dis-head>
+<span class=dis-doc>lumen-invoice</span>
+<span class=pill>issueDate</span>
+<span class=figure-note>3 distinct answers</span>
+</div>
+<div class=dis-expected><span class=dis-label>Expected</span><span class=dis-v>November 16, 2022</span><span class=dis-src>read from: Invoice Date November 16, 2022</span></div>
+<div class=scroll>
+<table class=dis-table>
+<thead><tr><th>model</th><th class=dis-mark><span class=sr>match</span></th><th>direct</th><th class=dis-mark><span class=sr>match</span></th><th>with Nutrient SDK</th></tr></thead>
+<tr><td class=dis-model>anthropic</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>December 16, 2022</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>November 16, 2022</td></tr><tr><td class=dis-model>openai</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>November 16, 2022</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>November 16, 2022</td></tr><tr><td class=dis-model>bedrock</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>December 16, 2022</td><td class=dis-mark><span class='mark mark-match' role=img aria-label="matches the key">✓</span></td><td class=dis-v>November 16, 2022</td></tr><tr><td class=dis-model>local</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>2022-12-16</td><td class=dis-mark><span class='mark mark-mismatch' role=img aria-label="does not match the key">✗</span></td><td class=dis-v>December 16, 2022</td></tr>
+</table>
+</div>
+</article>
+
 </details>
 
 

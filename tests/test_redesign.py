@@ -55,6 +55,84 @@ def _two_doc_summary():
     )
 
 
+# --- the scope disclosure: what the rate was computed OVER -----------------
+
+
+def _one_field_many_docs():
+    """One field, four documents -- the shape of every run to date."""
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = []
+    for doc, a, b in [
+        ("alpha", "Acme", "Acme"),
+        ("beta", "Beta Co", "Beta Co"),
+        ("gamma", "Invoice #1", "GAMMA LTD"),
+        ("delta", "Delta", "Delta"),
+    ]:
+        records.append(_rec(doc, "bedrock", True, 1000, extracted={"documentTitle": a}))
+        records.append(_rec(doc, "openai", True, 1000, extracted={"documentTitle": b}))
+    return report.summarise(records, table)
+
+
+def _many_fields():
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = []
+    fields = {"invoiceNumber": "1", "issueDate": "2026-01-01", "totalAmount": "10"}
+    for pid in ("bedrock", "openai"):
+        # requestedFields, not just extracted: agreement() builds one row per
+        # REQUESTED field, so a fixture that sets only `extracted` describes a
+        # run the comparator cannot produce -- and would quietly test nothing.
+        records.append(
+            {**_rec("alpha", pid, True, 1000, extracted=dict(fields)),
+             "requestedFields": list(fields)}
+        )
+    return report.summarise(records, table)
+
+
+def test_one_field_over_many_documents_is_not_reported_as_many_fields():
+    """The twelfth defect: `agreementSummary["fields"]` counts ROWS, and a row
+    is one field on one document. Rendering that count as "four fields" over a
+    run that asked for ONE field on four documents tells the reader the
+    providers agreed on three other fields. There were no other fields.
+    """
+    html = render_html.render(_one_field_many_docs())
+    head = html[html.index('id="accuracy"'):]
+    headline = head[head.index("<h2>"):head.index("</h2>")]
+
+    assert "four fields" not in headline.lower(), (
+        "four rows of one field is not four fields"
+    )
+    assert "one field" in headline.lower()
+    assert "four documents" in headline.lower()
+
+
+def test_the_scope_disclosure_names_the_field_when_only_one_was_asked():
+    """Naming it is the whole point: a reader who cannot see WHICH field was
+    compared cannot judge whether the field set is representative, and
+    documentTitle -- the most subjective field in any schema -- flatters
+    nobody when it stands in for a whole extraction.
+    """
+    html = render_html.render(_one_field_many_docs())
+    assert "documentTitle" in html
+    assert "only field this run requested" in html
+
+
+def test_the_scope_disclosure_lists_every_field_when_several_were_asked():
+    html = render_html.render(_many_fields())
+    for field in ("invoiceNumber", "issueDate", "totalAmount"):
+        assert field in html, f"{field} was compared and must be disclosed"
+    assert "distinct fields" in html
+
+
+def test_the_scope_disclosure_is_computed_not_asserted():
+    """Same renderer, two runs, two different disclosures. A static sentence
+    would satisfy the tests above and still lie about one of these runs.
+    """
+    one = render_html.render(_one_field_many_docs())
+    many = render_html.render(_many_fields())
+    assert "only field this run requested" in one
+    assert "only field this run requested" not in many
+
+
 # --- the anti-hardcode guard, which is the whole point ---------------------
 
 
@@ -542,7 +620,7 @@ def test_nothing_judged_says_so_plainly():
 
     assert "no disagreements" not in headline
     assert "nothing could be judged" in headline
-    accuracy = out[out.index('id="agreement"'):]
+    accuracy = out[out.index('id="accuracy"'):]
     card = accuracy[: accuracy.index("card accent") + 400]
     assert "0 of 0" not in card
     assert "nothing could be judged" in card
@@ -615,7 +693,7 @@ def test_the_flagship_card_does_not_print_four_decimals_over_a_dollar():
     ]
     summary = report.summarise(records, table, models={"bedrock": "qwen3-vl"})
     out = render_html.render(summary)
-    cost = out[out.index('id="cost"'): out.index('id="agreement"')]
+    cost = out[out.index('id="cost"'): out.index('id="accuracy"')]
     assert "$4000.0000" not in cost
     assert re.search(r"\$[\d,]+\.\d{2}<", cost)
 

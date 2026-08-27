@@ -1,4 +1,5 @@
 import json
+import tempfile
 import threading
 import urllib.request
 from pathlib import Path
@@ -189,3 +190,83 @@ def test_proxy_keeps_the_last_response_body_in_memory(tmp_path: Path):
     assert proxy.last_response_body is not None
     assert proxy.last_response_body["usage"]["prompt_tokens"] == 1234
     assert "responseBody" not in proxy.records[0]
+
+
+def test_the_proxy_strips_only_the_keys_it_was_given():
+    """A local runtime answers WRONG rather than erroring when the SDK asks
+    for logprobs alongside a json_schema: the grammar-forced tokens vanish
+    from `content` and a $4,201.45 total came back as 201.45. The proxy is the
+    only place the tool can intervene, because the SDK offers no setting that
+    avoids it -- all eight combinations of include_confidence,
+    include_source_locations and strict_structured_output were probed.
+    """
+    from costlab.proxy import RecordingProxy
+    import json as _json
+
+    proxy = RecordingProxy(
+        upstream_base="http://127.0.0.1:1",
+        out_dir=Path(tempfile.mkdtemp()),
+        drop_request_keys=frozenset({"logprobs", "top_logprobs"}),
+    )
+    body = {
+        "model": "m",
+        "logprobs": True,
+        "top_logprobs": 5,
+        "messages": [{"role": "user", "content": "hi"}],
+        "response_format": {"json_schema": {"schema": {"logprobs": "keep me"}}},
+    }
+    out = _json.loads(proxy._drop_keys(_json.dumps(body).encode()))
+    assert "logprobs" not in out and "top_logprobs" not in out
+    assert out["messages"] == body["messages"], "the prompt must be untouched"
+    # Only the TOP level is rewritten. A key of the same name inside the
+    # schema is part of what the caller asked the model for.
+    assert out["response_format"]["json_schema"]["schema"]["logprobs"] == "keep me"
+
+
+def test_a_proxy_with_no_drop_keys_forwards_bytes_unchanged():
+    """Every hosted provider must be byte-identical to before this existed."""
+    from costlab.proxy import RecordingProxy
+    import json as _json
+
+    proxy = RecordingProxy(upstream_base="http://127.0.0.1:1", out_dir=Path(tempfile.mkdtemp()))
+    raw = _json.dumps({"logprobs": True, "model": "m"}).encode()
+    assert proxy._drop_keys(raw) is raw
+
+
+def test_an_unparseable_body_is_passed_through_rather_than_guessed_at():
+    from costlab.proxy import RecordingProxy
+
+    proxy = RecordingProxy(
+        upstream_base="http://127.0.0.1:1",
+        out_dir=Path(tempfile.mkdtemp()),
+        drop_request_keys=frozenset({"logprobs"}),
+    )
+    raw = b"\x00not json"
+    assert proxy._drop_keys(raw) is raw
+
+
+def test_no_provider_drops_request_keys_any_more():
+    """The logprobs strip is retired. NAVI-39 is fixed in nutrient-sdk 1.0.11,
+    which `pyproject.toml` now requires, so nothing needs compensating for.
+
+    Verified against a real local run before removal, never on release notes --
+    that defect failed silently and reported success. 1.0.11 STILL SENDS
+    logprobs (36 of 53 captured request bodies carried it), and the SDK half
+    came back 34/34 readable with accuracy identical to the run that had the
+    strip: 50/57 direct, 51/58 SDK, zero unscoreable. So the fix repaired the
+    handling rather than suppressing the parameter, and the strip is genuinely
+    redundant rather than merely unexercised.
+
+    The mechanism itself stays -- `_drop_keys` is tested above and is provider
+    agnostic. Only its one user is gone. If a future upstream needs the same
+    treatment, declare it on that provider; do not strip for everyone, because
+    a hosted provider's confidence scores are a real feature and stripping
+    logprobs globally would silently degrade them.
+    """
+    from costlab.providers import PROVIDERS
+
+    for pid, provider in PROVIDERS.items():
+        assert provider.drop_request_keys == (), (
+            f"{pid} still strips {provider.drop_request_keys}; if that is "
+            f"deliberate, this test is the place to say why"
+        )

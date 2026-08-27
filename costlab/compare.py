@@ -163,8 +163,38 @@ def _to_ymd(value: str) -> tuple[int, int, int] | None:
     return None
 
 
+def is_reconstruction(verified: dict) -> bool:
+    """True when a key entry says its own value is not printed on the page.
+
+    Declared by the key with `"reconstructed": true`, never inferred. Inferring
+    it -- by testing whether the value appears inside its own `source` -- was
+    tried and is actively dangerous: it holds only for a key whose sources are
+    full verbatim quotes. The bundled key's are, but an abbreviated source like
+    "Invoice No: ..." or a descriptive one like "read from the header" would make
+    EVERY string field in a prospect's key look reconstructed, and every one of
+    them would then silently stop being scored. A guess that quietly removes
+    fields from a measurement is the exact failure this tool exists to prevent.
+
+    The one bundled entry that carries the flag is
+    heavenly-hamburgers-recipe.documentTitle: "Heavenly Hamburgers" read from a
+    page printing "Heavenly Here's what's cookin': Hamburgers", the title
+    interleaved with a graphic. A reasonable human reading, and still not
+    something an extraction can be judged against -- a model returning what the
+    page literally prints is not wrong, and one returning the reconstruction is
+    not right for a reason we can evidence.
+    """
+    return bool(verified.get("reconstructed"))
+
+
 def compare_field(extracted: Any, verified: dict | None, type_: str) -> Verdict:
     if verified is None:
+        return "unverified"
+    # Declined before anything else is looked at, INCLUDING before the empty
+    # check below. If we cannot establish what the right answer was, we cannot
+    # establish that a blank is the wrong one either -- and "unverified" is
+    # already excluded from the accuracy denominator, so the field stops being
+    # counted rather than counting against every provider at once.
+    if is_reconstruction(verified):
         return "unverified"
     if extracted is None or extracted == "":
         return "mismatch"

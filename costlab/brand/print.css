@@ -18,7 +18,7 @@
   /* White for print. Browsers suppress backgrounds by default, but a reader who
      enables them should not spend a cartridge tinting every page warm. */
   body { padding: 0; font-size: 11pt; background: #fff; }
-  .card, .caveat, .cmp, details.group, .prov-cell, table { break-inside: avoid; }
+  .card, .caveat, .cmp, .dis, details.group, .prov-cell, table { break-inside: avoid; }
   h2 { break-after: avoid; }
   a[href^="#"] { text-decoration: none; color: inherit; }
 }

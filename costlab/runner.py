@@ -30,8 +30,9 @@ from pathlib import Path
 from typing import Any
 
 import costlab
-from . import prices, provenance, report
+from . import prices, provenance, report, wizard
 from .answers import AnswerKey, load_answers, load_answers_csv, schema_for
+from .merge import merge_runs
 from .providers import PROVIDERS, Provider, available, direct_request
 from .proxy import RecordingProxy
 
@@ -427,6 +428,7 @@ def run(
             upstream_base=provider.upstream_base,
             out_dir=out_dir / provider_id,
             capture_bodies=capture_bodies,
+            drop_request_keys=frozenset(provider.drop_request_keys),
         )
         port = proxy.start()
         try:
@@ -522,11 +524,81 @@ def run(
     return results
 
 
-def main(argv: list[str] | None = None) -> int:
-    # Stamped before the run, not after: a report that claims it started when
-    # it finished is a false statement about a long run.
-    run_started = datetime.now().astimezone().isoformat(timespec="seconds")
+def _join(args) -> int:
+    """Build one report from previous runs. Calls nothing, spends nothing.
 
+    Reads each directory's `records.json` and the `provenance` block of its
+    `report.json`, because provenance is where the models are recorded and the
+    models are what makes a merge safe or refusable.
+    """
+    dirs = [Path(d.strip()) for d in args.join.split(",") if d.strip()]
+    if len(dirs) < 2:
+        print("--join needs at least two run directories", file=sys.stderr)
+        return 2
+
+    runs = []
+    for d in dirs:
+        records_path = d / "records.json"
+        if not records_path.exists():
+            print(f"{records_path} not found", file=sys.stderr)
+            return 2
+        report_path = d / "report.json"
+        prov = None
+        if report_path.exists():
+            prov = json.loads(report_path.read_text()).get("provenance")
+        runs.append({
+            "name": d.name,
+            "records": json.loads(records_path.read_text()),
+            "provenance": prov,
+        })
+
+    try:
+        records, prov = merge_runs(runs)
+    except ValueError as err:
+        print(f"cannot join these runs: {err}", file=sys.stderr)
+        return 2
+
+    # A key is needed to score, and every joined report so far is an accuracy
+    # comparison. Without one the bands still render; they just carry agreement
+    # rather than accuracy, which the band already says honestly.
+    key = None
+    if args.answers:
+        key = (
+            load_answers_csv(args.answers)
+            if str(args.answers).lower().endswith(".csv")
+            else load_answers(args.answers)
+        )
+    elif any(r.get("schemaSource") == "answer-key" for r in records):
+        key = load_answers()
+
+    table = prices.load(args.prices)
+    summary = report.summarise(
+        records,
+        table,
+        models={m["providerId"]: m["model"] for m in prov["models"]},
+        key=key,
+        provenance=prov,
+    )
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "records.json").write_text(json.dumps(records, indent=2))
+    (out_dir / "report.json").write_text(report.render_json(summary))
+    (out_dir / "report.html").write_text(report.render_html(summary))
+    print(f"joined {len(runs)} run(s), {len(records)} record(s):")
+    for run in prov["sourceRuns"]:
+        print(f"  {run['name']:28} {run['runDate']:26} {', '.join(run['providers'])}")
+    print()
+    print(report.render_terminal(summary))
+    print(f"\nreport -> {out_dir / 'report.html'}")
+    if args.open:
+        _open_report(out_dir / "report.html", print)
+    return 0
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """The one place a flag is defined, so the wizard and a scripted run
+    cannot drift into two different sets of options.
+    """
     parser = argparse.ArgumentParser(
         prog="costlab",
         description=(
@@ -572,7 +644,151 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="answer key to score against: JSON, or CSV with docId,field,value,source",
     )
+    parser.add_argument(
+        "--join",
+        default=None,
+        help=(
+            "comma-separated directories of PREVIOUS runs to combine into one "
+            "report, e.g. out/acc-frontier,out/acc-local. Calls nothing and "
+            "spends nothing. Refuses if one provider id covers different "
+            "models across the runs, since that would present two "
+            "measurements as one row."
+        ),
+    )
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help=(
+            "open the finished report in a browser. Off by default so a "
+            "scripted or CI run launches nothing; the wizard turns it on."
+        ),
+    )
+    return parser
+
+
+def _wizard_argvs(chosen: dict[str, Any]) -> list[list[str]]:
+    """The wizard's answers as commands, in the order they must run.
+
+    Re-entering through the same parser a typed command uses is what stops the
+    wizard becoming a second, differently-behaved way to start a run — so its
+    output is argv, not a bag of keyword arguments. "Both" is therefore not a
+    new path through this module either: it is a cost run, an accuracy run, and
+    a --join of the two, each of them a command someone could have typed.
+
+    Returns a list because of that: one command for a single mode, three for
+    both. The caller runs them in order and stops on the first failure.
+    """
+    base = [
+        "--providers", ",".join(chosen["providers"]),
+        "--corpus", str(chosen["corpus"]),
+        "--yes",
+    ]
+    mode = chosen["mode"]
+    answers = chosen.get("answers")
+    out = str(chosen.get("out") or "out")
+
+    # Spec B's last clause: the wizard runs, then opens the report. Only ever
+    # the LAST command below carries --open — three commands must not open
+    # three tabs, and the report worth opening is the last one written.
+    if mode != "both":
+        argv = base + ["--mode", mode, "--out", out]
+        # Left off when blank: --mode accuracy already defaults to the bundled
+        # key, and naming its path here would put a second copy of it here.
+        if answers:
+            argv += ["--answers", answers]
+        return [argv + ["--open"]]
+
+    # Separate directories, because a shared --out would have the accuracy run
+    # overwrite the cost run's records.json and the join would then be one run
+    # joined with itself. The joined report lands in `out` itself, above both.
+    cost_out, acc_out = f"{out}/cost", f"{out}/accuracy"
+    cost = base + ["--mode", "cost", "--out", cost_out]
+    accuracy = base + ["--mode", "accuracy", "--out", acc_out]
+    join = ["--join", f"{cost_out},{acc_out}", "--out", out]
+    if answers:
+        # Both the run and the join: the joined report is the one someone reads,
+        # and scoring it against the bundled key when the run used another would
+        # print the wrong numbers as the answer.
+        accuracy += ["--answers", answers]
+        join += ["--answers", answers]
+    return [cost, accuracy, join + ["--open"]]
+
+
+def _scoreable(corpus_dir: Path, answers_path: str | None) -> int:
+    """How many of a corpus's documents an answer key can score.
+
+    The wizard needs this to price an accuracy run, because `rescope_to_key`
+    drops every document the key has no entry for — so the run is as large as
+    the overlap, not as large as the corpus. Reading the corpus a second time
+    is local disk and cheap, and it keeps the wizard from having to know what a
+    Doc is.
+    """
+    # load_answers(None) is the bundled key, which is what a blank answer means.
+    key = (
+        load_answers_csv(answers_path)
+        if answers_path and str(answers_path).lower().endswith(".csv")
+        else load_answers(answers_path)
+    )
+    return sum(1 for doc in load_corpus(corpus_dir) if schema_for(key, doc.id))
+
+
+def _open_report(path: Path, emit, opener=None) -> None:
+    """Show the finished report, or say where it is.
+
+    The file on disk is the deliverable and the calls behind it are already paid
+    for, so nothing here may raise: a locked-down desktop, a headless box or an
+    SSH session must not turn a completed run into a failure. `webbrowser.open`
+    signals "no browser" by returning False rather than raising, which is easy to
+    read as success, so both outcomes are handled.
+    """
+    if opener is None:
+        import webbrowser
+
+        opener = webbrowser.open
+    # as_uri() percent-encodes, so a folder called "Q3 Claims" survives.
+    url = path.resolve().as_uri()
+    try:
+        opened = opener(url)
+    except Exception as err:  # noqa: BLE001 - a convenience must not be fatal
+        emit(f"Could not open a browser ({err}). The report is at {path}")
+        return
+    if opened is False:
+        emit(f"No browser available. The report is at {path}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Stamped before the run, not after: a report that claims it started when
+    # it finished is a false statement about a long run.
+    run_started = datetime.now().astimezone().isoformat(timespec="seconds")
+
+    # Bare `costlab`, with nothing after it, is the wizard. Checked against the
+    # real argv rather than against defaults, because every flag has a default
+    # and a parsed namespace cannot tell "unset" from "set to the default".
+    if not (argv if argv is not None else sys.argv[1:]):
+        chosen = wizard.run(
+            ask=input,
+            emit=print,
+            env=dict(os.environ),
+            table=prices.load(None),
+            load_corpus=load_corpus,
+            scoreable=_scoreable,
+        )
+        if chosen is None:
+            return 1
+        # Stops on the first failure rather than pressing on: joining a
+        # directory a failed run never wrote would present a partial
+        # measurement as a complete one.
+        for wizard_argv in _wizard_argvs(chosen):
+            code = main(wizard_argv)
+            if code != 0:
+                return code
+        return 0
+
+    parser = _build_parser()
     args = parser.parse_args(argv)
+
+    if args.join:
+        return _join(args)
 
     chosen = available()
     if args.providers:
@@ -711,6 +927,8 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print(report.render_terminal(summary))
     print(f"\nreport -> {out_dir / 'report.html'}")
+    if args.open:
+        _open_report(out_dir / "report.html", print)
     return 0
 
 

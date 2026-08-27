@@ -10,3 +10,17 @@ __pycache__/
 # itself lives in Claude Design; theme.css carries the values we use.
 branded-report/
 branded-report.zip
+
+# The internal paper trail: handoff note, specs, plans, execution ledgers,
+# SDK defect write-ups and captured run bodies. Kept local on purpose. This
+# repo goes to a named prospect under the Reference-Use licence, and the
+# pre-publication audit greps tracked files for internal ticket ids and
+# absolute paths, all of which live in here.
+.internal/
+
+# Credentials. This repo is handed to a named prospect under the Reference-Use
+# licence, so a key committed here travels to them. The pre-publication audit
+# greps tracked files; ignoring .env keeps it from ever becoming one.
+.env
+.env.*
+!.env.example
