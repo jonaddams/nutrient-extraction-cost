@@ -726,3 +726,81 @@ def test_the_standfirst_count_survives_a_run_with_no_cost_rows_at_all():
     html = render_html.render(summary)
     head = html[:html.index('id="cost"')]
     assert "four models" in head
+
+
+# --- The price-table date must name the table that priced the figures -------
+#
+# A re-render of saved records with a NEWER price table put two different dates
+# for the same fact on one page: the provenance grid said "Price table checked
+# 2026-08-14", frozen into the saved run, while the caveat under the figures said
+# 2026-08-27 and the dollar amounts were computed from the 2026-08-27 table. A
+# reader would attribute the money to a table that did not produce it.
+#
+# Found by opening the committed example in a browser -- the two dates are 8000
+# pixels apart, so no amount of reading the HTML was going to surface it.
+
+
+def test_the_price_date_names_the_table_that_priced_the_run():
+    """`summarise` applies the prices, so it owns the date. A caller passing
+    stale provenance -- which every --join does, because it merges the saved
+    runs' own provenance -- must not be able to misdate the figures."""
+    table = PriceTable(checked_on="2026-08-27", rates={})
+    summary = report.summarise(
+        [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)],
+        table,
+        models={"bedrock": "qwen3-vl"},
+        provenance={
+            "corpusName": "acme",
+            "documentCount": 1,
+            "models": [{"providerId": "bedrock", "model": "qwen3-vl"}],
+            "keySources": ["BEDROCK_API_KEY (set)"],
+            "runDate": "2026-08-25T14:46:46-04:00",
+            # The stale value a joined run carries forward.
+            "priceTableDate": "2026-08-14",
+            "toolVersion": "0.1.0",
+        },
+    )
+    assert summary["provenance"]["priceTableDate"] == "2026-08-27"
+    assert summary["checkedOn"] == "2026-08-27"
+
+
+def test_summarise_does_not_mutate_the_provenance_it_was_given():
+    """The caller's dict is often a merged block reused elsewhere; correcting a
+    date must not reach back into it."""
+    table = PriceTable(checked_on="2026-08-27", rates={})
+    prov = {
+        "corpusName": "acme",
+        "documentCount": 1,
+        "models": [{"providerId": "bedrock", "model": "qwen3-vl"}],
+        "keySources": [],
+        "runDate": "2026-08-25T14:46:46-04:00",
+        "priceTableDate": "2026-08-14",
+        "toolVersion": "0.1.0",
+    }
+    report.summarise(
+        [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)],
+        table, models={"bedrock": "qwen3-vl"}, provenance=prov,
+    )
+    assert prov["priceTableDate"] == "2026-08-14", "caller's block was mutated"
+
+
+def test_the_page_states_one_price_date_not_two():
+    """The rendered symptom, asserted on the page itself: every price date in
+    the HTML must agree."""
+    import re
+
+    table = PriceTable(checked_on="2026-08-27", rates={})
+    summary = report.summarise(
+        [_rec("a", "bedrock", True, 1000), _rec("a", "bedrock", False, 600)],
+        table,
+        models={"bedrock": "qwen3-vl"},
+        provenance={
+            "corpusName": "acme", "documentCount": 1,
+            "models": [{"providerId": "bedrock", "model": "qwen3-vl"}],
+            "keySources": [], "runDate": "2026-08-25T14:46:46-04:00",
+            "priceTableDate": "2026-08-14", "toolVersion": "0.1.0",
+        },
+    )
+    html = render_html.render(summary)
+    dates = set(re.findall(r"20\d\d-\d\d-\d\d", html))
+    assert "2026-08-14" not in dates, f"stale price date still on the page: {dates}"

@@ -251,6 +251,21 @@ def summarise(
     agreement_rows = annotate_agreement(agreement(scoring_records), key)
 
 
+    # The price date belongs to the table that produced these figures, not to
+    # whatever a caller's provenance block remembers. `--join` merges the SAVED
+    # runs' provenance, so re-rendering old records with a newer table put two
+    # different dates for the same fact on one page: the grid said the table was
+    # checked 2026-08-14 while the money came from the 2026-08-27 one. Corrected
+    # here because this function is what applies the prices. Copied, never
+    # mutated -- a joined block is reused by the caller.
+    # Corrected only when the block actually CLAIMS a price date. A block that
+    # makes no claim gets no field invented for it -- `summarise` passes a
+    # provenance block through, and both real producers (`provenance.build` and
+    # `merge_runs`) always set the key, so the narrow rule still covers the bug.
+    if provenance and "priceTableDate" in provenance:
+        if provenance["priceTableDate"] != table.checked_on:
+            provenance = {**provenance, "priceTableDate": table.checked_on}
+
     return {
         "checkedOn": table.checked_on,
         "provenance": provenance,
