@@ -648,6 +648,19 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         )
         accent_note = f"of judged fields agreed — {a['agreed']} of {judged}"
 
+    # No ground truth, no rate. Agreement cannot tell a disagreement that matters
+    # from one that does not, so the prominent tile carries a COUNT instead. A
+    # real unkeyed first run put "33%" here off two disagreements that were both
+    # defensible readings of a document's title.
+    keyed = a.get("keyed", True)
+    if not keyed:
+        rate = f"{a['disagreed']} of {judged}"
+        accent_note = "fields drew different answers"
+        headline_tail = (
+            "no disagreements" if not a["disagreed"]
+            else _plural(a["disagreed"], "disagreement", spell=spell_h2)
+        )
+
     in_full = ""
     if shown:
         row = shown[0]
@@ -748,11 +761,24 @@ def _accuracy_band(summary: dict[str, Any], e) -> str:
         f"{_plural(configurations, 'configuration', spell=spell_h2).capitalize()}, "
         f"{headline_scope}, {headline_tail}"
     )
+    no_rate_note = ""
+    if not keyed and a["fields"]:
+        no_rate_note = (
+            "<p class=standfirst><strong>No agreement rate is shown, because a "
+            "rate needs an answer key.</strong> Without one nothing above is "
+            "known to be right, so a percentage cannot separate a disagreement "
+            "that matters from two defensible readings of the same field — and "
+            "it would invite reading agreement as accuracy. The differing "
+            "answers are listed in full below, which is the part that tells you "
+            "something. Supply a key with <code>--answers</code> to score.</p>"
+        )
+
     agreement_block = ""
     if a["fields"]:
         agreement_block = f"""
 <p class=standfirst>{e(scope_sentence)}</p>
 <p class=standfirst>{e(AGREEMENT_FRAMING)}</p>
+{no_rate_note}
 <div class=cards>
 <div class='card accent'><span class=figure-xl>{e(rate)}</span>
 <span class=figure-note>{accent_note}</span></div>

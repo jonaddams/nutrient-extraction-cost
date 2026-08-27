@@ -804,3 +804,121 @@ def test_the_page_states_one_price_date_not_two():
     html = render_html.render(summary)
     dates = set(re.findall(r"20\d\d-\d\d-\d\d", html))
     assert "2026-08-14" not in dates, f"stale price date still on the page: {dates}"
+
+
+# --- No answer key, no agreement RATE --------------------------------------
+#
+# A prospect's first run points --corpus at their own folder with no key and no
+# manifest, so every document gets DEFAULT_SCHEMA -- `documentTitle` alone. A
+# real 18-call run of exactly that on 2026-08-27 reported:
+#
+#     Agreement: 1/3 fields judged (33%) - 2 disagreement(s)
+#
+# and the two "disagreements" were `Invoice` against
+# `Invoice of CenturyLink Communications, LLC.`, and `Meridian Components Inc.`
+# against `Statement of Financial Position`. Nobody was wrong in either: they are
+# defensible readings of a question with no single right answer. The disclosure
+# naming the single field was present and correct, and 33% is still what a reader
+# takes away.
+#
+# Without a key nothing here is known to be right, so a percentage invites
+# reading agreement as accuracy. The disagreements THEMSELVES stay -- as the two
+# above show, they are the informative part.
+
+
+def _unkeyed_summary(titles):
+    """A cost-mode run: no key, so DEFAULT_SCHEMA's single field is all there is."""
+    table = PriceTable(checked_on="2026-08-27", rates={})
+    records = []
+    for doc, per_config in titles.items():
+        for (pid, sdk), title in per_config.items():
+            records.append({
+                "docId": doc, "providerId": pid, "withNutrient": sdk,
+                "usage": {"inputTokens": 900 if sdk else 500,
+                          "outputTokens": 10, "cachedInputTokens": 0},
+                "status": 200, "calls": 1, "attempts": 1, "latencyMs": 1.0,
+                "extracted": {"documentTitle": title},
+                "requestedFields": ["documentTitle"],
+            })
+    return report.summarise(
+        records, table,
+        models={pid: "m" for per in titles.values() for pid, _ in per},
+    )
+
+
+_TITLES = {
+    "acme-invoice-0042": {
+        ("anthropic", False): "Invoice",
+        ("anthropic", True): "Invoice",
+        ("bedrock", False): "Invoice of CenturyLink Communications, LLC.",
+        ("bedrock", True): "Invoice of CenturyLink Communications, LLC.",
+    },
+}
+
+
+def test_an_unkeyed_run_is_marked_as_unkeyed():
+    summary = _unkeyed_summary(_TITLES)
+    assert summary["agreementSummary"]["keyed"] is False
+
+
+def test_no_percentage_appears_in_an_unkeyed_agreement_band():
+    import re
+
+    summary = _unkeyed_summary(_TITLES)
+    html = render_html.render(summary)
+    band = html[html.index('id="accuracy"'):]
+    band = band[:band.index("</section>")]
+    assert not re.search(r"\d+%", band), (
+        "a rate was printed for a run with no answer key:\n" + band[:600]
+    )
+
+
+def test_the_unkeyed_band_says_why_there_is_no_rate():
+    summary = _unkeyed_summary(_TITLES)
+    html = render_html.render(summary)
+    assert "needs an answer key" in html
+
+
+def test_the_disagreements_themselves_survive():
+    """Suppressing the rate must not suppress the evidence — the differing
+    answers are the useful part of an unkeyed run."""
+    summary = _unkeyed_summary(_TITLES)
+    html = render_html.render(summary)
+    assert "Invoice of CenturyLink Communications, LLC." in html
+    assert "fields where configurations differed" in html
+
+
+def test_a_keyed_run_still_shows_its_rate():
+    """The suppression must be narrow. A run with a key has ground truth, so the
+    rate means something and stays."""
+    import re
+
+    from costlab.answers import AnswerKey
+
+    table = PriceTable(checked_on="2026-08-27", rates={})
+    records = []
+    for pid, sdk, value in (("anthropic", False, "345015"),
+                            ("anthropic", True, "345015")):
+        records.append({
+            "docId": "inv", "providerId": pid, "withNutrient": sdk,
+            "usage": {"inputTokens": 900, "outputTokens": 10, "cachedInputTokens": 0},
+            "status": 200, "calls": 1, "attempts": 1, "latencyMs": 1.0,
+            "extracted": {"totalAmount": value},
+            "requestedFields": ["totalAmount"], "schemaSource": "answer-key",
+        })
+    summary = report.summarise(
+        records, table, models={"anthropic": "m"},
+        key=AnswerKey(checked_on="2026-08-27", documents={
+            "inv": {"totalAmount": {"value": "345015", "source": "Amount Due"}}}),
+    )
+    assert summary["agreementSummary"]["keyed"] is True
+    html = render_html.render(summary)
+    assert re.search(r"\d+%", html), "a keyed run must still report its rate"
+
+
+def test_the_terminal_render_also_drops_the_rate():
+    summary = _unkeyed_summary(_TITLES)
+    text = report.render_terminal(summary)
+    line = next(l for l in text.splitlines() if l.startswith("Agreement"))
+    assert "%" not in line, line
+    assert "differed" in line or "different" in line, line

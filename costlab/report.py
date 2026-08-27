@@ -287,7 +287,17 @@ def summarise(
             {r["providerId"]: model_for(r["providerId"]) for r in accuracy},
         ),
         "agreement": agreement_rows,
-        "agreementSummary": agreement_summary(agreement_rows),
+        # `keyed` says whether ground truth governed this run, and the renderers
+        # suppress the agreement RATE when it did not. Agreement without a key
+        # cannot distinguish a disagreement that matters from one that does not:
+        # a real first run on a prospect's own folder reported "1/3 fields judged
+        # (33%)" where the two disagreements were `Invoice` against `Invoice of
+        # CenturyLink Communications, LLC.` and a company name against a
+        # statement type -- nobody wrong in either. A percentage there invites
+        # reading agreement as accuracy, which is the conflation this band was
+        # rebuilt to prevent. The disagreements themselves are kept; they are the
+        # informative part.
+        "agreementSummary": {**agreement_summary(agreement_rows), "keyed": key is not None},
         "mixedSchemas": mixed_schemas,
         # True when the bands were computed from different records. Named
         # separately from `mixedSchemas` because they are different facts: one
@@ -432,10 +442,24 @@ def render_terminal(summary: dict[str, Any]) -> str:
         # one that flatters. Excluded rows are named on their own line rather
         # than folded into either number.
         judged = a["agreed"] + a["disagreed"]
-        lines.append(
-            f"Agreement: {a['agreed']}/{judged} fields judged "
-            f"({rate_shown}) — {a['disagreed']} disagreement(s)"
-        )
+        if not a.get("keyed", True):
+            # No ground truth: a count, never a rate. One disagreement out of one
+            # field rendered as "0/1 fields judged (0%)", which reads as total
+            # failure and measures nothing.
+            lines.append(
+                f"Agreement: {a['disagreed']} of {judged} field(s) drew "
+                f"different answers across configurations"
+            )
+            lines.append(
+                "  No rate is shown: a rate needs an answer key. Without one "
+                "nothing here is known to be right, so a percentage would "
+                "invite reading agreement as accuracy. Pass --answers to score."
+            )
+        else:
+            lines.append(
+                f"Agreement: {a['agreed']}/{judged} fields judged "
+                f"({rate_shown}) — {a['disagreed']} disagreement(s)"
+            )
         excluded = []
         if a["ambiguous"]:
             excluded.append(
