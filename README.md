@@ -68,9 +68,23 @@ page how many documents each band covers.
 
 ## Install and run
 
-Requires Python 3.10 or newer.
+**Requires Python 3.10 or newer, and `python3` is often older than that.** macOS
+has shipped 3.9 as `python3` for years, so check before anything else — this is
+the one step that bites:
 
 ```bash
+python3 --version
+```
+
+If that prints 3.9 or lower, name a newer interpreter explicitly in the next
+command (`python3.12`, `python3.13`, whichever you have; `brew install python@3.12`
+if you have none). Installing into a virtual environment rather than system Python
+keeps the SDK's 140 MB native library out of your global site-packages:
+
+```bash
+python3.12 -m venv .venv          # or python3 if it is already 3.10+
+source .venv/bin/activate
+
 pip install -e .
 
 export BEDROCK_API_KEY=...          # or ANTHROPIC_API_KEY / OPENAI_API_KEY
@@ -78,6 +92,10 @@ export NUTRIENT_LICENSE_KEY=...     # required for the with-Nutrient cells only
 
 costlab --corpus costlab/corpus --providers bedrock
 ```
+
+`pip install -e .` pulls one dependency, `nutrient-sdk>=1.0.11`. If pip reports
+`requires a different Python`, the interpreter above is too old — that is the
+error this section exists to prevent, and it is the whole of it.
 
 It prints the plan and the number of calls, then asks before spending anything. Add `--yes` to
 skip the prompt in a script.
