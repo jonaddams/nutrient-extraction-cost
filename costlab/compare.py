@@ -186,6 +186,42 @@ def is_reconstruction(verified: dict) -> bool:
     return bool(verified.get("reconstructed"))
 
 
+def accepts_enclosing_block(verified: dict) -> bool:
+    """True when the key says returning the box around this value is also right.
+
+    Declared with `"acceptsEnclosingBlock": true`, never inferred. `consignee`
+    and `shipper` on bill-of-lading are printed BOXES holding an entity's name
+    and its address; the key records only the name, and all eight configurations
+    returned the whole box, so all eight were marked wrong and none of them was.
+    The key is narrower than the field it names.
+
+    The key is not WIDENED to fix that, because its own note promises every value
+    was read off the document by a human and never derived from a model's output
+    -- and here the only evidence of a fuller value is model output. So what is
+    recorded is a judgement about the FIELD, not a new ground truth.
+
+    **Never inferred, and the corpus says why.** Treating "the answer contains
+    the key's value" as a match everywhere would bless three real errors in this
+    same corpus:
+
+        bill-of-lading.carrier      "...Inc." + "TRAILER NO: TR-8841-EU"
+                                    -- a DIFFERENT field appended
+        employment-application      "Employment Application" + "Ory]"
+          .documentTitle            -- OCR noise
+        lumen-invoice               key 616770524, model 06167705240
+          .invoiceNumber            -- a WRONG identifier that "contains" the
+                                    right one purely as an artifact of digits
+
+    That last one is the argument on its own: a containment rule cannot tell a
+    generous extraction from a wrong number, so a human has to say which is
+    which, per entry.
+
+    Applies to strings only. An enclosing box is a text idea; a number that
+    contains another number is simply a different number.
+    """
+    return bool(verified.get("acceptsEnclosingBlock"))
+
+
 def compare_field(extracted: Any, verified: dict | None, type_: str) -> Verdict:
     if verified is None:
         return "unverified"
@@ -242,6 +278,15 @@ def compare_field(extracted: Any, verified: dict | None, type_: str) -> Verdict:
     # handling is a permanent Python-only divergence, documented below.
     if _normalise_text(a_text) == _normalise_text(b_text):
         return "match"
+
+    # A value that names an entity inside a printed BOX, where returning the
+    # whole box is also a correct extraction. Declared per entry with
+    # `acceptsEnclosingBlock`; see `accepts_enclosing_block` for why this is
+    # never inferred.
+    if accepts_enclosing_block(verified):
+        want = _normalise_text(b_text)
+        if want and want in _normalise_text(a_text):
+            return "match"
 
     # Dates first: "2025-03-01" and "March 1, 2025" are the same answer and a
     # string comparison would call that a mismatch. Only when BOTH sides resolve

@@ -87,11 +87,15 @@
       },
       "shipper": {
         "value": "Apex Industrial Supply Ltd.",
-        "source": "SHIPPER (FROM): Apex Industrial Supply Ltd."
+        "source": "SHIPPER (FROM): Apex Industrial Supply Ltd.",
+        "acceptsEnclosingBlock": true,
+        "acceptsEnclosingBlockWhy": "Same as consignee: the shipper field is a printed BOX holding the entity's name and its address. The key records the name from the SHIPPER (FROM): line; every configuration returned the whole box."
       },
       "consignee": {
         "value": "EuroHub Logistics Center",
-        "source": "CONSIGNEE (TO): EuroHub Logistics Center"
+        "source": "CONSIGNEE (TO): EuroHub Logistics Center",
+        "acceptsEnclosingBlock": true,
+        "acceptsEnclosingBlockWhy": "On a bill of lading the consignee is a printed BOX holding the entity's name and its delivery address, not the name alone. The key records only the name because that is what a human read off the CONSIGNEE (TO): line; all eight configurations returned the whole box, so all eight scored wrong and none of them was. The value is left as read -- widening it would mean taking ground truth from model output -- and this flag records the judgement about the field instead."
       },
       "carrier": {
         "value": "Inter-Continental Freight Carriers Inc.",

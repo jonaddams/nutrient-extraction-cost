@@ -278,3 +278,109 @@ def test_the_flagged_entry_explains_itself_in_the_key():
     entry = load_answers().documents["heavenly-hamburgers-recipe"]["documentTitle"]
     assert entry.get("reconstructed") is True
     assert "graphic" in entry.get("reconstructedWhy", "")
+
+
+# --- A value that names an entity inside a form box ------------------------
+#
+# bill-of-lading's `consignee` and `shipper` were marked WRONG for all eight
+# configurations, and none of them was wrong. The key records the entity's name
+# ("EuroHub Logistics Center"); on a bill of lading that field is a printed BOX
+# containing the name and its address, and every model returned the whole box.
+# Not one returned the bare name.
+#
+# The key is narrower than the field it names. It is NOT widened, because the
+# key's own note promises every value was read off the document by a human and
+# never derived from a model's output -- and the only evidence for a fuller value
+# here IS model output. So the judgement recorded is about the FIELD, not a new
+# ground truth: `"acceptsEnclosingBlock": true` means "returning the box that
+# encloses this value is also correct".
+#
+# Confined to entries a human has blessed, on purpose. Treating containment as a
+# match everywhere would have blessed three real errors in the same corpus:
+# carrier returning a DIFFERENT field's value appended (TRAILER NO), a
+# documentTitle with "Ory]" OCR noise attached, and -- worst -- an invoiceNumber
+# where the key reads 616770524 and the model returned 06167705240, a wrong
+# identifier that "contains" the right one only as an artifact of digits.
+
+
+def _boxed(value, source):
+    return {"value": value, "source": source, "acceptsEnclosingBlock": True}
+
+
+def test_the_enclosing_block_is_a_match_when_the_key_allows_it():
+    from costlab.compare import compare_field
+
+    entry = _boxed("EuroHub Logistics Center", "CONSIGNEE (TO): EuroHub Logistics Center")
+    got = ("EuroHub Logistics Center 45 Terminal Read, Logistics Park Rotterdam, "
+           "3008 AB, Netherlands")
+    assert compare_field(got, entry, "string") == "match"
+
+
+def test_the_bare_value_still_matches_when_the_flag_is_set():
+    """The flag widens what counts, it must not narrow it -- a model returning
+    exactly what the key records cannot become wrong by adding the allowance."""
+    from costlab.compare import compare_field
+
+    entry = _boxed("EuroHub Logistics Center", "CONSIGNEE (TO): EuroHub Logistics Center")
+    assert compare_field("EuroHub Logistics Center", entry, "string") == "match"
+
+
+def test_a_different_answer_is_still_a_mismatch_under_the_flag():
+    from costlab.compare import compare_field
+
+    entry = _boxed("EuroHub Logistics Center", "CONSIGNEE (TO): EuroHub Logistics Center")
+    assert compare_field("Apex Industrial Supply Ltd.", entry, "string") == "mismatch"
+
+
+def test_containment_is_not_a_match_without_the_flag():
+    """The whole safety of this feature. Unflagged entries keep scoring exactly
+    as before."""
+    from costlab.compare import compare_field
+
+    entry = {"value": "Employment Application", "source": "Employment Application"}
+    assert compare_field("Employment Application Ory]", entry, "string") == "mismatch"
+
+
+def test_a_wrong_identifier_that_contains_the_right_one_stays_a_mismatch():
+    """The case that rules out inferring this instead of declaring it: the key
+    reads 616770524 and a model returned 06167705240. Containment holds as a
+    digit artifact; the number is wrong."""
+    from costlab.compare import compare_field
+
+    entry = {"value": "616770524", "source": "Invoice Number 616770524"}
+    assert compare_field("06167705240", entry, "string") == "mismatch"
+
+
+def test_the_flag_is_ignored_for_non_string_fields():
+    """An enclosing box is a text idea. A number that contains another number is
+    a different number, and 345015 must not match 1345015."""
+    from costlab.compare import compare_field
+
+    entry = {"value": 345015, "source": "Amount Due $345,015.00",
+             "acceptsEnclosingBlock": True}
+    assert compare_field(1345015, entry, "number") == "mismatch"
+    assert compare_field(345015, entry, "number") == "match"
+
+
+def test_only_the_two_bill_of_lading_entries_carry_the_flag():
+    """A guard on the corpus. The flag makes a field easier to pass, so adding
+    one must be deliberate and visible."""
+    from costlab.answers import load_answers
+
+    key = load_answers()
+    found = sorted(
+        f"{doc}.{name}"
+        for doc, fields in key.documents.items()
+        for name, entry in fields.items()
+        if entry.get("acceptsEnclosingBlock")
+    )
+    assert found == ["bill-of-lading.consignee", "bill-of-lading.shipper"], found
+
+
+def test_the_flagged_entries_explain_themselves():
+    from costlab.answers import load_answers
+
+    fields = load_answers().documents["bill-of-lading"]
+    for name in ("consignee", "shipper"):
+        why = fields[name].get("acceptsEnclosingBlockWhy", "")
+        assert "box" in why or "address" in why, f"{name}: {why!r}"
