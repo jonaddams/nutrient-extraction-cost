@@ -33,7 +33,7 @@ class Provider:
     # answers WRONG rather than complaining when it receives them.
     #
     # Empty for every provider as of 2026-08-25. The one user was the local
-    # runtime, compensating for NAVI-39 -- the SDK's logprobs handling
+    # runtime, compensating for an upstream SDK defect -- its logprobs handling
     # corrupting a local answer -- which nutrient-sdk 1.0.11 fixes, and which
     # `pyproject.toml` now requires. The mechanism is kept because it is the
     # honest shape for this class of upstream defect: declare it on the ONE
@@ -150,7 +150,8 @@ PROVIDERS: dict[str, Provider] = {
         sdk_provider="local",
         supports_nutrient_cell=True,
         # No drop_request_keys. It carried ("logprobs", "top_logprobs") until
-        # 2026-08-25 to work around NAVI-39; nutrient-sdk 1.0.11 fixes that and
+        # 2026-08-25 to work around an upstream SDK defect; nutrient-sdk 1.0.11
+        # fixes it and
         # is now the required floor. If a local SDK half ever comes back
         # unreadable again, that strip is the first thing to reinstate.
     ),

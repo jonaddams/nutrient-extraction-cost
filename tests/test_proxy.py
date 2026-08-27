@@ -246,7 +246,8 @@ def test_an_unparseable_body_is_passed_through_rather_than_guessed_at():
 
 
 def test_no_provider_drops_request_keys_any_more():
-    """The logprobs strip is retired. NAVI-39 is fixed in nutrient-sdk 1.0.11,
+    """The logprobs strip is retired. The upstream SDK defect it worked around
+    is fixed in nutrient-sdk 1.0.11,
     which `pyproject.toml` now requires, so nothing needs compensating for.
 
     Verified against a real local run before removal, never on release notes --

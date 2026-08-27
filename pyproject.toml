@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 # list a prospect audits before running this fits on one line.
 #
 # The floor is not housekeeping. Up to 1.0.10.1 the SDK's logprobs handling
-# corrupted a local runtime's answer (NAVI-39), and this tool carried a proxy
+# corrupted a local runtime's answer, and this tool carried a proxy
 # strip to compensate. 1.0.11 fixes it and the strip is gone -- so on an older
 # SDK there is now nothing standing between that defect and the report, and the
 # defect's whole character was that it failed SILENTLY and reported success.
