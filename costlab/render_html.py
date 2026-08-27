@@ -341,7 +341,17 @@ def _header(summary: dict[str, Any], e) -> str:
     # all seven keys, so a present block answering for a missing one would be
     # a real bug worth a KeyError, not something to paper over with `.get`.
     documents = block["documentCount"] if block else None
-    models = summary["byProvider"]
+    # The models the RUN used, from provenance — not `byProvider`, which holds
+    # only the models with a measurable per-call delta. A live 272-call run on
+    # 2026-08-27 opened with "three models" and then said "Four models scored
+    # against the answer key" two sections later: both counts were correctly
+    # derived, and the sentence was still false, because it called `byProvider`
+    # "models". The missing one was the local rung, whose every SDK cell retried
+    # (see `measurable` in report.py), so it had no per-call figure to show.
+    #
+    # Falls back to `byProvider` only when provenance carries no models, which
+    # is a hand-built summary rather than anything `summarise()` produces.
+    models = block.get("models") or summary["byProvider"]
 
     # Every figure in the standfirst is this run's. The design's own copy said
     # "Seventeen documents, three models" — true of the run it was drawn from,
@@ -451,6 +461,29 @@ def _cost_band(summary: dict[str, Any], e) -> str:
         for r in rows
         if r["deltaMin"] is not None
     )
+
+    # A model the run used that has NO card here, and why. On a live 272-call run
+    # the self-hosted rung vanished from this band -- every one of its SDK cells
+    # retried, so none carried a per-call figure -- and the page said nothing,
+    # leaving a reader to notice by diffing this band against the accuracy one.
+    # An absence a report does not explain reads as an omission, or worse as a
+    # model that costs nothing.
+    priced_ids = {r["providerId"] for r in rows}
+    block = summary.get("provenance") or {}
+    missing = [
+        m for m in block.get("models", []) if m["providerId"] not in priced_ids
+    ]
+    missing_note = ""
+    if missing:
+        named = ", ".join(f"{m['providerId']} / {m['model']}" for m in missing)
+        missing_note = (
+            f"<p class=standfirst><strong>No per-call figure for {_escape(named)}"
+            "</strong> in this run. A cell the SDK retried carries the tokens of "
+            "several calls, so its difference is not a per-call delta and is left "
+            "out rather than shown as one; where every cell of a model retried, "
+            "that model has no card above. It is still scored below \u2014 this is a "
+            "gap in what can be PRICED, not in what was measured.</p>"
+        )
     return f"""
 <section class=band id="cost">
 <p class=eyebrow>01 — Cost</p>
@@ -462,6 +495,7 @@ this run: {e(spread or "not measurable")}.</p>
 <div class=cards>
 {cards}
 </div>
+{missing_note}
 <p class=standfirst>{e(PER_MODEL_NOTE)} Per-document detail is in
 <a href="#appendix-a">Appendix A</a>; provider totals in
 <a href="#appendix-b">Appendix B</a>.</p>

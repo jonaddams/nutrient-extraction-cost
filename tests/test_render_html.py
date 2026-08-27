@@ -630,3 +630,99 @@ def test_a_reconstructed_expected_value_explains_its_own_tildes():
     # And not a single cross: nothing here was judged.
     assert "mark-mismatch" not in section
     assert "mark-unverified" in section
+
+
+# --- The standfirst's model count, and the models missing from the cost band ---
+#
+# A real 272-call run on 2026-08-27 opened with "Seventeen documents, three
+# models" and then, two sections later, "Four models scored against the answer
+# key". Both numbers were correctly derived and the sentence was still false: it
+# counted `byProvider`, which holds only models with a MEASURABLE per-call delta,
+# while calling them "models".
+#
+# The local rung was the one missing, and not because it is unpriced: all 17 of
+# its SDK cost cells retried, and a retried cell is excluded from cost figures
+# because its tokens are the sum of several attempts and the delta is therefore
+# not a per-call figure. So the self-hosted rung vanished from the cost band with
+# nothing on the page saying so.
+
+
+def _four_provider_summary(local_retries: int = 2):
+    """Four providers where the local one's SDK cells all retried, so it has no
+    measurable cost row -- the shape the live run actually produced."""
+    table = PriceTable(checked_on="2026-08-14", rates={})
+    records = []
+    for pid in ("anthropic", "bedrock", "openai", "local"):
+        for doc in ("a", "b"):
+            for sdk in (True, False):
+                records.append({
+                    "docId": doc,
+                    "providerId": pid,
+                    "withNutrient": sdk,
+                    "usage": {"inputTokens": 1000 if sdk else 600,
+                              "outputTokens": 10, "cachedInputTokens": 0},
+                    "status": 200,
+                    # `measurable()` reads `calls`, not `attempts`: a cell the
+                    # SDK retried carries a MULTIPLE of one call's tokens, so its
+                    # delta is not a per-call figure and the cost band drops it.
+                    "calls": local_retries if (pid == "local" and sdk) else 1,
+                    "attempts": local_retries if (pid == "local" and sdk) else 1,
+                    "latencyMs": 1000.0,
+                    "extracted": {"documentTitle": "Invoice"},
+                    "requestedFields": ["documentTitle"],
+                })
+    return report.summarise(
+        records, table,
+        models={"anthropic": "claude-sonnet-5", "bedrock": "qwen3-vl-235b",
+                "openai": "gpt-5.4", "local": "qwen/qwen3-vl-8b"},
+        provenance={
+            "corpusName": "acme", "documentCount": 2,
+            "models": [{"providerId": p, "model": m} for p, m in (
+                ("anthropic", "claude-sonnet-5"), ("bedrock", "qwen3-vl-235b"),
+                ("openai", "gpt-5.4"), ("local", "qwen/qwen3-vl-8b"))],
+            "keySources": ["ANTHROPIC_API_KEY (set)"],
+            "runDate": "2026-08-27T10:36:12-04:00",
+            "priceTableDate": "2026-08-14", "toolVersion": "0.1.0",
+        },
+    )
+
+
+def test_the_standfirst_counts_the_models_in_the_run():
+    """Not the models with a measurable delta. A reader takes "four models" to
+    mean the run used four, which is what provenance records."""
+    summary = _four_provider_summary()
+    assert len(summary["byProvider"]) < 4, "fixture must reproduce the gap"
+    html = render_html.render(summary)
+    head = html[:html.index('id="cost"')]
+    assert "four models" in head, head[-400:]
+    assert "three models" not in head
+
+
+def test_the_cost_band_names_a_model_it_could_not_price():
+    """The self-hosted rung disappeared from the cost band and the page said
+    nothing. A reader must not have to diff two sections to notice."""
+    summary = _four_provider_summary()
+    html = render_html.render(summary)
+    band = html[html.index('id="cost"'):html.index('id="accuracy"')] \
+        if 'id="accuracy"' in html else html[html.index('id="cost"'):]
+    assert "qwen/qwen3-vl-8b" in band, "name the model that has no card"
+    assert "retried" in band.lower()
+
+
+def test_no_missing_model_note_when_every_model_is_priced():
+    """The note must not appear on a clean run and imply something went wrong."""
+    summary = _four_provider_summary(local_retries=1)
+    assert len(summary["byProvider"]) == 4, "fixture must have no gap"
+    html = render_html.render(summary)
+    band = html[html.index('id="cost"'):]
+    assert "no measurable per-call delta" not in band
+
+
+def test_the_standfirst_count_survives_a_run_with_no_cost_rows_at_all():
+    """Every cell retried. `byProvider` is empty, and the standfirst must still
+    describe the run rather than falling back to prose that drops the counts."""
+    summary = _four_provider_summary(local_retries=2)
+    summary["byProvider"] = []
+    html = render_html.render(summary)
+    head = html[:html.index('id="cost"')]
+    assert "four models" in head
