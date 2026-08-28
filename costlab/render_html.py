@@ -16,6 +16,7 @@ from costlab import agreement, brand
 from costlab.providers import PROVIDERS
 from costlab.score import _RUNG_ORDER, rung
 from costlab.report import (
+    BENCHMARK_CAVEAT,
     COORDINATES_CAVEAT,
     OUTPUT_CAVEAT,
     THINKING_CAVEAT,
@@ -37,6 +38,7 @@ PER_MODEL_NOTE = (
 
 
 CAVEAT_TITLES = {
+    BENCHMARK_CAVEAT: "An evaluation aid, not a benchmark",
     COORDINATES_CAVEAT: "The delta is not waste",
     OUTPUT_CAVEAT: "Output tokens are not comparable",
     TOKENIZER_CAVEAT: "Tokens do not compare across providers",

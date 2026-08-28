@@ -50,6 +50,26 @@ THINKING_CAVEAT = (
     "in its usage block. Output cost is not proportional to returned text."
 )
 
+# What the model comparison IS, which every other caveat here assumes rather
+# than states. The cost figures are arithmetic on observed tokens and defensible
+# anywhere; a table reading "96%, 95%, 89%" across three vendors is a different
+# kind of claim, and nothing on the page told a reader it was not meant as a
+# ranking. Included only when more than one model was scored -- with one model
+# there is no ranking to misread, and a caveat on every report is one readers
+# learn to skip.
+BENCHMARK_CAVEAT = (
+    "These accuracy figures are an evaluation aid, not a benchmark. They "
+    "describe the documents named in the provenance block above, scored "
+    "against this run's answer key, on the date shown — and each model was run "
+    "once, so a few percentage points between two models is within the "
+    "variation a second run produces. The fields asked for follow the answer "
+    "key rather than what any vendor optimises for. Treat the ordering as a "
+    "starting point for your own evaluation, not as a general statement about "
+    "which model is better: the reason this tool takes --corpus is that the "
+    "only comparison that settles the question is the one run on your "
+    "documents."
+)
+
 # The reason the headline projection is priced from INPUT tokens only.
 OUTPUT_CAVEAT = (
     "Output tokens are not comparable between the two halves. The SDK asks for "
@@ -320,6 +340,12 @@ def summarise(
             *(
                 [JOINED_RUNS_CAVEAT]
                 if len((provenance or {}).get("sourceRuns", [])) > 1
+                else []
+            ),
+            # Only when there is actually a cross-model ordering on the page.
+            *(
+                [BENCHMARK_CAVEAT]
+                if len({r["providerId"] for r in accuracy}) > 1
                 else []
             ),
         ],

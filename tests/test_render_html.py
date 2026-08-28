@@ -939,3 +939,91 @@ def test_the_terminal_render_also_drops_the_rate():
     line = next(l for l in text.splitlines() if l.startswith("Agreement"))
     assert "%" not in line, line
     assert "differed" in line or "different" in line, line
+
+
+# --- What the model comparison IS ------------------------------------------
+#
+# Every other caveat on the page explains how to read a number correctly; none
+# said what the document is. A table reading "96%, 95%, 89%" across three
+# vendors, over seventeen synthetic documents and one run per model, reads as a
+# ranking, and nothing told a reader it was not meant as one. The cost figures
+# are arithmetic on observed tokens and defensible anywhere; the accuracy
+# ordering is a different kind of claim.
+
+
+def _scored_summary(providers):
+    """A keyed run over `providers`, so an accuracy ordering exists."""
+    from costlab.answers import AnswerKey
+
+    table = PriceTable(checked_on="2026-08-27", rates={})
+    records = []
+    for pid in providers:
+        for sdk in (True, False):
+            records.append({
+                "docId": "inv", "providerId": pid, "withNutrient": sdk,
+                "usage": {"inputTokens": 900 if sdk else 500,
+                          "outputTokens": 10, "cachedInputTokens": 0},
+                "status": 200, "calls": 1, "attempts": 1, "latencyMs": 1.0,
+                "extracted": {"totalAmount": "345015"},
+                "requestedFields": ["totalAmount"], "schemaSource": "answer-key",
+            })
+    return report.summarise(
+        records, table, models={p: "m" for p in providers},
+        key=AnswerKey(checked_on="2026-08-27", documents={
+            "inv": {"totalAmount": {"value": "345015", "source": "Amount Due"}}}),
+    )
+
+
+def test_a_multi_model_report_says_it_is_not_a_benchmark():
+    summary = _scored_summary(["anthropic", "openai", "bedrock"])
+    html = render_html.render(summary)
+    assert "an evaluation aid, not a benchmark" in html.lower()
+    assert "An evaluation aid, not a benchmark" in html, "needs its own heading"
+
+
+def test_it_names_the_three_things_that_undercut_a_ranking():
+    """Sample, single run, and whose schema — a reader can weigh the ordering
+    only if they know what limits it."""
+    summary = _scored_summary(["anthropic", "openai"])
+    html = render_html.render(summary).lower()
+    assert "provenance block above" in html, "which documents"
+    assert "run once" in html, "single-sample variance"
+    assert "rather than what any vendor optimises for" in html, "whose schema"
+
+
+def test_a_single_model_report_does_not_carry_it():
+    """No ordering, nothing to misread. A caveat on every report is one readers
+    learn to skip, which costs the ones that matter — the same reason the
+    joined-runs caveat is conditional."""
+    summary = _scored_summary(["anthropic"])
+    html = render_html.render(summary)
+    assert "not a benchmark" not in html.lower()
+
+
+def test_an_unscored_report_does_not_carry_it():
+    """A cost-only run has no accuracy figures at all, so there is no ordering
+    to disclaim."""
+    table = PriceTable(checked_on="2026-08-27", rates={})
+    records = [{
+        "docId": "a", "providerId": pid, "withNutrient": sdk,
+        "usage": {"inputTokens": 900 if sdk else 500, "outputTokens": 10,
+                  "cachedInputTokens": 0},
+        "status": 200, "calls": 1, "attempts": 1, "latencyMs": 1.0,
+        "extracted": {"documentTitle": "Invoice"},
+        "requestedFields": ["documentTitle"],
+    } for pid in ("anthropic", "openai") for sdk in (True, False)]
+    summary = report.summarise(records, table,
+                               models={"anthropic": "m", "openai": "m"})
+    assert summary["accuracy"] == []
+    assert "not a benchmark" not in render_html.render(summary).lower()
+
+
+def test_the_caveat_states_no_measured_figure():
+    """It appears on every multi-model run, including a prospect's own, so it
+    must not carry numbers from ours — the rule PER_MODEL_NOTE already follows.
+    """
+    import re
+
+    from costlab.report import BENCHMARK_CAVEAT
+
+    assert not re.search(r"\d", BENCHMARK_CAVEAT), BENCHMARK_CAVEAT
