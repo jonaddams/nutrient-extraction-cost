@@ -71,10 +71,10 @@ Product. Before deploying any application in production, whether or not it incor
 is derived from the Sample Code, Recipient must obtain a separate paid commercial license
 from Nutrient covering the applicable Nutrient Product(s).
 
-This sample uses the Nutrient Web SDK (in-browser viewing, annotation, and signature
-capture) and the Nutrient DWS API (server-side digital signatures), each of which requires
-its own paid credential for production use. A commercial license or credential held by
-Recipient for any other Nutrient Product does not satisfy this requirement.
+This sample uses the Nutrient Python SDK (in-process document loading and Vision
+structured data extraction), which requires a paid credential for production use. A
+commercial license or credential held by Recipient for any other Nutrient Product does not
+satisfy this requirement.
 
 Please contact sales@nutrient.io for details. Nothing in this License grants any right to
 use Nutrient SDKs, APIs, cloud services, or other Nutrient intellectual property beyond
@@ -93,13 +93,12 @@ of the restrictions in Section 3 or the obligations in Sections 4 and 11.
 
 7. Third-Party Components
 
-The Sample Code includes or depends on third-party software components (including, for
-example, PostgreSQL and Next.js) that are not owned by Nutrient. Such third-party
-components are excluded from the definition of "Sample Code" and from Sections 4
-(Confidentiality) and 6 (Ownership), and are licensed to Recipient solely under their own
-applicable license terms, which this License does not modify, limit, or supplement.
-Nutrient makes no warranties, and provides no maintenance or support, with respect to any
-third-party components.
+The Sample Code may include or depend on third-party software components that are not
+owned by Nutrient. Such third-party components are excluded from the definition of "Sample
+Code" and from Sections 4 (Confidentiality) and 6 (Ownership), and are licensed to
+Recipient solely under their own applicable license terms, which this License does not
+modify, limit, or supplement. Nutrient makes no warranties, and provides no maintenance or
+support, with respect to any third-party components.
 
 8. No Support
 

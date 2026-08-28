@@ -10,9 +10,10 @@ Provided to Nutrient customers for evaluation under the [Nutrient Reference-Use
 License](LICENSE) — not open source. See [Licence and distribution](#licence-and-distribution).
 
 **See the output before you run anything:** [`examples/example-report.html`](examples/example-report.html)
-is a real 102-call run on the bundled sample corpus across three providers. Every
-figure in it is measured, and the provenance block at the top of the page says
-exactly which documents, models and price table produced it.
+is a real 272-call run on the bundled sample corpus across four models — two frontier,
+one open-weights hosted, one self-hosted. Every figure in it is measured, and the
+provenance block at the top of the page says exactly which documents, models and price
+table produced it.
 
 ## What it measures
 
@@ -42,6 +43,33 @@ does not.
 
 **The bundled answer key** scores true accuracy on the 17 shipped documents. Every value in it was
 read directly off the document and carries the line it came from.
+
+### The bundled documents are synthetic
+
+All 17 were generated for Nutrient SDK evaluation. **None is a real record, and none contains
+real personal, medical, financial or customer data.** Every name, address, account number,
+patient, claim and total in them is invented — Acme, Meridian, EuroHub, Northgate and the rest
+are fictional.
+
+They are deliberately realistic in *shape*, because that is what makes a cost and accuracy
+measurement meaningful: an emergency-department billing worksheet, a regional health record, an
+insurance first-notice-of-loss, a bill of lading, three financial statements, several invoices,
+and four handwritten or photographed pages with no text layer at all. Extraction behaves very
+differently across those, which is the point of running all seventeen rather than a few clean
+PDFs.
+
+Two consequences worth knowing:
+
+- **`regional-health-record.pdf` carries a marker in the document itself** — a footer reading
+  "SYNTHETIC SAMPLE — generated for Nutrient SDK evaluation. Not a real record". The other
+  documents do not carry an equivalent marker, so if you circulate an individual page outside
+  this repository, it will not identify itself as synthetic.
+- **The four image files are handwriting and photographs.** They measure OCR far more than they
+  measure extraction, and the report's accuracy band excludes documents whose answer key holds
+  only a subjective field for exactly that reason.
+
+If you replace the corpus with your own documents, nothing here applies to them: the tool reads
+what you point it at, and your documents and the reports you generate from them are yours.
 
 **Your own answer key** scores true accuracy on your documents:
 
