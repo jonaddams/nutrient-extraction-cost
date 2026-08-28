@@ -861,16 +861,33 @@ def test_an_unkeyed_run_is_marked_as_unkeyed():
     assert summary["agreementSummary"]["keyed"] is False
 
 
-def test_no_percentage_appears_in_an_unkeyed_agreement_band():
+def test_no_rate_is_printed_in_an_unkeyed_agreement_band():
+    """Asserts the absence of a RATE, not the absence of a percent sign.
+
+    The first version of this test searched the whole band for `\\d+%` and was
+    wrong for the reason the leak audit already documents one file over: the
+    report renders EXTRACTED FIELD VALUES, and a customer's document legitimately
+    contains percentages. A real single-provider run put `10%` in this band --
+    `invoice-ac-2025-1047`'s title carried a retainage line, 14 occurrences in
+    all -- so the broad shape would fail on honest data and teach whoever hit it
+    to delete the guard.
+
+    The rate lives in exactly two places, so those are what is checked: the
+    accent tile's figure, and the note beside it.
+    """
     import re
 
     summary = _unkeyed_summary(_TITLES)
     html = render_html.render(summary)
     band = html[html.index('id="accuracy"'):]
     band = band[:band.index("</section>")]
-    assert not re.search(r"\d+%", band), (
-        "a rate was printed for a run with no answer key:\n" + band[:600]
-    )
+
+    figure = re.search(r"figure-xl>([^<]*)<", band).group(1)
+    assert "%" not in figure, f"the accent tile shows a rate: {figure!r}"
+    assert "of judged fields agreed" not in band, "the rate's caption survived"
+    # And the count that replaced it is present, so this cannot pass by the tile
+    # having vanished altogether.
+    assert re.fullmatch(r"\d+ of \d+", figure), figure
 
 
 def test_the_unkeyed_band_says_why_there_is_no_rate():
